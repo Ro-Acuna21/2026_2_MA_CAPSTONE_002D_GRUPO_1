@@ -8,5 +8,5 @@ class MedicalCenter extends Model
 {
     protected $table = 'medical_center';
     public $timestamps = false;
-    protected $fillable = ['name', 'rut', 'address', 'phone', 'email', 'status'];
+    protected $fillable = ['name', 'slug', 'rut', 'address', 'phone', 'email', 'status'];
 }
