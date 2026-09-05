@@ -4,36 +4,33 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class CenterUser extends Model
+class Appointment extends Model
 {
-    protected $table = 'center_users';
+    protected $table = 'appointment';
 
     public $timestamps = false;
 
     protected $fillable = [
         'medical_center_id',
-        'user_id',
-        'role',
         'patient_id',
         'professional_id',
+        'specialty_id',
+        'appointment_date',
+        'start_time',
+        'end_time',
         'status',
     ];
 
     protected function casts(): array
     {
         return [
-            'status' => 'boolean',
+            'appointment_date' => 'date',
         ];
     }
 
     public function medicalCenter()
     {
         return $this->belongsTo(MedicalCenter::class, 'medical_center_id');
-    }
-
-    public function user()
-    {
-        return $this->belongsTo(User::class, 'user_id');
     }
 
     public function patient()
@@ -44,5 +41,10 @@ class CenterUser extends Model
     public function professional()
     {
         return $this->belongsTo(Professional::class, 'professional_id');
+    }
+
+    public function specialty()
+    {
+        return $this->belongsTo(Specialty::class, 'specialty_id');
     }
 }

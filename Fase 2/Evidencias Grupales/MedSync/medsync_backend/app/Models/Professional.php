@@ -4,20 +4,18 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class Patient extends Model
+class Professional extends Model
 {
-    protected $table = 'patient';
+    protected $table = 'professional';
 
     public $timestamps = false;
 
     protected $fillable = [
         'user_id',
-        'health_insurance_id',
         'medical_center_id',
         'first_name',
         'last_name',
         'rut',
-        'birth_date',
         'email',
         'phone',
         'status',
@@ -26,7 +24,6 @@ class Patient extends Model
     protected function casts(): array
     {
         return [
-            'birth_date' => 'date',
             'status' => 'boolean',
         ];
     }
@@ -36,11 +33,6 @@ class Patient extends Model
         return $this->belongsTo(User::class, 'user_id');
     }
 
-    public function healthInsurance()
-    {
-        return $this->belongsTo(HealthInsurance::class, 'health_insurance_id');
-    }
-
     public function medicalCenter()
     {
         return $this->belongsTo(MedicalCenter::class, 'medical_center_id');
@@ -48,11 +40,26 @@ class Patient extends Model
 
     public function centerUser()
     {
-        return $this->hasOne(CenterUser::class, 'patient_id');
+        return $this->hasOne(CenterUser::class, 'professional_id');
+    }
+
+    public function specialties()
+    {
+        return $this->belongsToMany(
+            Specialty::class,
+            'professional_specialty',
+            'professional_id',
+            'specialty_id'
+        );
+    }
+
+    public function availabilities()
+    {
+        return $this->hasMany(Availability::class, 'professional_id');
     }
 
     public function appointments()
     {
-        return $this->hasMany(Appointment::class, 'patient_id');
+        return $this->hasMany(Appointment::class, 'professional_id');
     }
 }

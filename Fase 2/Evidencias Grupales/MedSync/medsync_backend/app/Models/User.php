@@ -10,10 +10,21 @@ class User extends Authenticatable
     use HasApiTokens;
 
     protected $table = 'users';
+
     public $timestamps = false;
 
-    protected $fillable = ['email', 'password', 'status'];
-    protected $hidden = ['password'];
+    protected $fillable = [
+        'name',
+        'email',
+        'password',
+        'status',
+        'remember_token',
+    ];
+
+    protected $hidden = [
+        'password',
+        'remember_token',
+    ];
 
     protected function casts(): array
     {
@@ -23,22 +34,25 @@ class User extends Authenticatable
         ];
     }
 
-    public function patient()
-    {
-        return $this->hasOne(Patient::class, 'users_id');
-    }
-
     public function centerUsers()
     {
         return $this->hasMany(CenterUser::class, 'user_id');
     }
 
-    /**
-     * Mientras cada usuario pertenezca a un solo centro (caso actual),
-     * este helper simplifica la vida del AuthController.
-     */
+    public function patients()
+    {
+        return $this->hasMany(Patient::class, 'user_id');
+    }
+
+    public function professionals()
+    {
+        return $this->hasMany(Professional::class, 'user_id');
+    }
+
     public function primaryCenterUser()
     {
-        return $this->centerUsers()->where('status', true)->first();
+        return $this->centerUsers()
+            ->where('status', true)
+            ->first();
     }
 }
