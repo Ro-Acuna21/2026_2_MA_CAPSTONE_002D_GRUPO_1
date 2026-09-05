@@ -37,6 +37,9 @@ CONSTRAINT fk_center_users_medical_center FOREIGN KEY (medical_center_id) REFERE
 CONSTRAINT fk_center_users_user FOREIGN KEY (user_id) REFERENCES users(id),
 CONSTRAINT chk_center_users_role CHECK (role IN ('patient', 'professional', 'center_admin', 'super_admin'))
 );
+ALTER TABLE medical_center ADD COLUMN slug VARCHAR(150) UNIQUE;
+UPDATE medical_center SET slug = 'clinica-horizonte' WHERE id = 1;
+ALTER TABLE medical_center ALTER COLUMN slug SET NOT NULL;
 
 --Health insurance
 CREATE TABLE health_insurance(
