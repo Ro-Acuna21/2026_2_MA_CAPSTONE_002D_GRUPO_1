@@ -10,6 +10,7 @@ import { useClinic } from '@/state/clinic-store'
 import { useMemo, useState, type FormEvent } from 'react'
 import { toast } from 'sonner'
 import { useCenterPath } from '@/lib/tenant'
+import { canPatientModifyAppointment } from '@/domain/appointment-rules'
 
 export function AppointmentHistoryPage() {
   const { id } = useParams(); const { data, user } = useClinic(); const centerPath = useCenterPath(); const appointment = data.appointments.find((a) => a.id === id)
@@ -22,7 +23,7 @@ export function AppointmentHistoryPage() {
 export function ReschedulePage() {
   const { id } = useParams(); const { data, user, slots, reschedule } = useClinic(); const navigate = useNavigate(); const centerPath = useCenterPath(); const appointment = data.appointments.find((a) => a.id === id); const [date, setDate] = useState(''); const [time, setTime] = useState('')
   const available = useMemo(() => appointment ? slots(appointment.professionalId, appointment.serviceId, date, appointment.id) : [], [appointment, date, slots])
-  const allowed = appointment && user?.role !== 'PROFESIONAL' && (user?.role === 'RECEPCIONISTA' || appointment.patientId === user?.patientId)
+  const allowed = appointment && user?.role !== 'PROFESIONAL' && (user?.role === 'RECEPCIONISTA' || (appointment.patientId === user?.patientId && canPatientModifyAppointment(appointment)))
   if (!allowed || !appointment) return <Navigate to={centerPath('/citas')} replace />
   const submit = (event: FormEvent) => { event.preventDefault(); if (!time) return; try { reschedule(appointment.id, date, time); navigate(centerPath('/citas')) } catch (error) { toast.error((error as Error).message) } }
   return <><PageHeading title="Reprogramar cita" description="El horario anterior se conservará en el historial." /><Card className="max-w-2xl"><CardContent className="p-6"><form onSubmit={submit}><Field label="Nueva fecha"><Input type="date" min={dateFromToday(1)} required value={date} onChange={(e) => { setDate(e.target.value); setTime('') }} /></Field><div className="my-6"><p className="mb-3 text-sm font-medium">Horarios disponibles</p><div className="flex min-h-16 flex-wrap gap-2 rounded-xl bg-muted p-4">{available.map((slot) => <Button type="button" key={slot.time} size="sm" variant={time === slot.time ? 'default' : 'outline'} onClick={() => setTime(slot.time)}>{slot.time}</Button>)}{!date && <p className="text-sm text-muted-foreground">Selecciona una fecha.</p>}{date && !available.length && <p className="text-sm text-muted-foreground">No hay horas disponibles.</p>}</div></div><div className="flex justify-end gap-3"><Button type="button" variant="ghost" onClick={() => navigate(centerPath('/citas'))}>Cancelar</Button><Button disabled={!time}>Guardar reprogramación</Button></div></form></CardContent></Card></>

@@ -27,15 +27,19 @@ describe('flujos del proveedor demo', () => {
     expect(result.current.data.patients).toHaveLength(1)
     expect(result.current.data.patients[0].organizationId).toBe('org2')
   })
-  it('crea fichas sin conceder acceso y protege acciones administrativas', async () => {
+  it('activa una ficha creada por recepción sin duplicar al paciente y protege acciones administrativas', async () => {
     const { result } = mount(); await signIn(result, 'recepcion@demo.cl')
     act(() => result.current.createPatient(patient))
     expect(result.current.data.patients.some((p) => p.email === patient.email)).toBe(true)
     expect(result.current.data.users.some((u) => u.email === patient.email)).toBe(false)
+    await act(async () => { await result.current.register(patient, 'Prueba2026', 'Prueba2026', 'org1') })
+    expect(result.current.data.patients.filter((p) => p.email === patient.email)).toHaveLength(1)
+    const saved = JSON.parse(localStorage.getItem('clinica_horizonte_react_v4')!)
+    expect(saved.users.find((u: { email: string }) => u.email === patient.email)?.patientId).toBe(result.current.data.patients.find((p) => p.email === patient.email)?.id)
     await expect(result.current.assignAccess('otro@example.com', 'Otra Persona', { role: 'ADMIN', organizationId: 'org1' }, 'Prueba2026')).rejects.toThrow('permiso')
     expect(() => result.current.addResultType('Biopsia')).toThrow('permiso')
   })
-  it('recorre borrador, publicación del responsable y lectura del paciente', async () => {
+  it('recorre borrador, publicación, lectura y eliminación por el profesional responsable', async () => {
     const { result } = mount(); await signIn(result, 'camila.rojas@demo.cl')
     act(() => result.current.addResult({ patientId: 'c1', professionalId: 'p1', typeId: 'rt1', performedAt: '2026-08-01', filename: 'demo.txt', content: 'data:text/plain;base64,RGVtbw==' }))
     const id = result.current.data.results.find((r) => r.status === 'DRAFT')!.id
@@ -45,6 +49,8 @@ describe('flujos del proveedor demo', () => {
     await signIn(result, 'matias.soto@demo.cl'); expect(() => result.current.publishResult(id)).toThrow('responsable')
     await signIn(result, 'camila.rojas@demo.cl'); act(() => result.current.publishResult(id))
     await signIn(result, 'paciente1@demo.cl'); expect(result.current.data.results.find((r) => r.id === id)?.status).toBe('PUBLISHED')
+    await signIn(result, 'camila.rojas@demo.cl'); act(() => result.current.deleteResult(id))
+    await signIn(result, 'paciente1@demo.cl'); expect(result.current.data.results.some((r) => r.id === id)).toBe(false)
   })
   it('crea centros y asigna su administrador sin acceder a la clínica', async () => {
     const { result } = mount(); await signIn(result, 'superadmin@demo.cl')

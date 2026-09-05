@@ -7,6 +7,7 @@ import type { AppointmentStatus, BookingInput, ClinicData, Organization, Patient
 import { activeUser, membershipsFor, scopeData } from '@/domain/access'
 import { formatRut, normalizeRut, validatePatient, validatePassword, hashPassword, validEmail, validPhone, validRut } from '@/domain/validation'
 import { dateFromToday, toMinutes, toTime, uid } from '@/lib/utils'
+import { canPatientModifyAppointment, canSetAppointmentStatus } from '@/domain/appointment-rules'
 
 const DATA_KEY = 'clinica_horizonte_react_v4'
 const SESSION_KEY = 'clinica_horizonte_user'
@@ -40,6 +41,7 @@ interface ClinicContextValue {
   addResultType(name: string): void
   addResult(input: Omit<MedicalResult, 'id' | 'organizationId' | 'createdBy' | 'status'>): void
   publishResult(id: string): void
+  deleteResult(id: string): void
   slots(professionalId: string, serviceId: string, date: string, excludeId?: string): Slot[]
   createAppointment(input: BookingInput): void; changeStatus(id: string, status: AppointmentStatus): void
   reschedule(id: string, date: string, time: string): void; createPatient(input: Omit<Patient, 'id' | 'active' | 'organizationId'>): void
@@ -114,7 +116,8 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
   const changeStatus = (id: string, status: AppointmentStatus) => {
     requirePermission('appointments.update')
     const target = data.appointments.find((a) => a.id === id)
-    if (!target || ['CANCELADA', 'ATENDIDA'].includes(target.status) || (user?.role === 'PACIENTE' && status !== 'CANCELADA') || (user?.role === 'PROFESIONAL' && !['ATENDIDA', 'NO_SHOW'].includes(status))) throw new Error('No puedes realizar este cambio de estado.')
+    if (!target || ['CANCELADA', 'ATENDIDA'].includes(target.status) || (user?.role === 'PACIENTE' && (status !== 'CANCELADA' || !canPatientModifyAppointment(target))) || (user?.role === 'PROFESIONAL' && !['ATENDIDA', 'NO_SHOW'].includes(status))) throw new Error('No puedes realizar este cambio de estado.')
+    if (!canSetAppointmentStatus(target, status)) throw new Error(status === 'NO_SHOW' ? 'Solo puedes marcar inasistencia después de la hora de término.' : 'Solo puedes marcar una cita como atendida desde su hora de inicio.')
     if (!user || !organization) return
     commit((current) => { const appointment = current.appointments.find((a) => a.id === id && a.organizationId === organization.id); if (!appointment) return current; return { ...current, appointments: current.appointments.map((a) => a.id === id ? { ...a, status } : a), history: [...current.history, { id: uid('h'), appointmentId: id, type: status === 'CANCELADA' ? 'CANCELACION' : 'CAMBIO_ESTADO', from: appointment.status, to: status, userId: user.id, at: new Date().toISOString() }] } })
     toast.success('Estado de la cita actualizado')
@@ -122,7 +125,7 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
   const reschedule = (id: string, date: string, time: string) => {
     requirePermission('appointments.update')
     const target = data.appointments.find((a) => a.id === id)
-    if (!target || ['CANCELADA', 'ATENDIDA'].includes(target.status) || user?.role === 'PROFESIONAL' || date < dateFromToday() || !slots(target.professionalId, target.serviceId, date, id).some((s) => s.time === time)) throw new Error('La reprogramación no está permitida o el horario no está disponible.')
+    if (!target || ['CANCELADA', 'ATENDIDA'].includes(target.status) || user?.role === 'PROFESIONAL' || (user?.role === 'PACIENTE' && !canPatientModifyAppointment(target)) || date < dateFromToday() || !slots(target.professionalId, target.serviceId, date, id).some((s) => s.time === time)) throw new Error('La reprogramación no está permitida o el horario no está disponible.')
     if (!user || !organization) return
     commit((current) => { const appointment = current.appointments.find((a) => a.id === id && a.organizationId === organization.id); const service = current.services.find((s) => s.id === appointment?.serviceId); if (!appointment || !service) return current; return { ...current, appointments: current.appointments.map((a) => a.id === id ? { ...a, date, time, end: toTime(toMinutes(time) + service.duration), status: 'PENDIENTE' } : a), history: [...current.history, { id: uid('h'), appointmentId: id, type: 'REPROGRAMACION', to: 'PENDIENTE', oldDate: `${appointment.date} ${appointment.time}`, newDate: `${date} ${time}`, userId: user.id, at: new Date().toISOString() }] } })
     toast.success('Cita reprogramada')
@@ -148,11 +151,13 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
     if (!publicOrganizations.some((o) => o.id === centerId)) throw new Error('Selecciona un centro disponible.')
     const email = input.email.trim().toLowerCase()
     if (allData.users.some((u) => u.email.toLowerCase() === email && membershipsFor(u).some((membership) => membership.organizationId === centerId))) throw new Error('El correo ya tiene una cuenta en este centro. Ingresa con ella.')
-    if (allData.patients.some((p) => p.organizationId === centerId && (normalizeRut(p.rut) === normalizeRut(input.rut) || p.email.toLowerCase() === email))) throw new Error('Ya existe una ficha con ese RUT o correo en este centro. Solicita que vinculen tu acceso.')
+    const patientByRut = allData.patients.find((p) => p.organizationId === centerId && normalizeRut(p.rut) === normalizeRut(input.rut))
+    const patientByEmail = allData.patients.find((p) => p.organizationId === centerId && p.email.toLowerCase() === email)
+    if ((patientByRut || patientByEmail) && (!patientByRut || patientByRut.id !== patientByEmail?.id)) throw new Error('El RUT o correo ya está asociado a otra ficha del centro. Contacta a recepción para corregir tus datos.')
     const salt = crypto.randomUUID(), passwordHash = await hashPassword(password, salt)
-    const patient: Patient = { ...input, name: input.name.trim(), email, rut: formatRut(input.rut), id: uid('c'), organizationId: centerId, active: true }
+    const patient: Patient = patientByRut ?? { ...input, name: input.name.trim(), email, rut: formatRut(input.rut), id: uid('c'), organizationId: centerId, active: true }
     const newUser: User = { id: uid('u'), name: patient.name, email, role: 'PACIENTE', patientId: patient.id, organizationIds: [centerId], permissions: permissionsFor('PACIENTE'), memberships: [{ organizationId: centerId, role: 'PACIENTE', patientId: patient.id }], passwordSalt: salt, passwordHash }
-    commit((current) => ({ ...current, patients: [...current.patients, patient], users: [...current.users, newUser] }))
+    commit((current) => ({ ...current, patients: patientByRut ? current.patients : [...current.patients, patient], users: [...current.users, newUser] }))
   }
   const saveOrganization = (input: Organization) => {
     if (user?.role !== 'SUPER_ADMIN') throw new Error('Solo la administración de plataforma puede gestionar centros.')
@@ -228,7 +233,12 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
     if (!data.results.some((r) => r.id === id && r.professionalId === user?.professionalId && r.status === 'DRAFT')) throw new Error('Solo el profesional responsable puede publicar este borrador.')
     commit((c) => ({ ...c, results: c.results.map((r) => r.id === id ? { ...r, status: 'PUBLISHED', publishedAt: new Date().toISOString() } : r) })); toast.success('Resultado publicado para el paciente')
   }
-  const value = { data, user, organization, publicOrganizations, register, saveOrganization, saveProfessional, saveCatalog, assignAccess, addResultType, addResult, publishResult, login, logout, reset, slots, createAppointment, changeStatus, reschedule, createPatient, updateProfile }
+  const deleteResult = (id: string) => {
+    requirePermission('results.publish')
+    if (user?.role !== 'PROFESIONAL' || !data.results.some((r) => r.id === id && r.professionalId === user.professionalId)) throw new Error('Solo el profesional responsable puede eliminar este informe.')
+    commit((c) => ({ ...c, results: c.results.filter((r) => r.id !== id) })); toast.success('Informe eliminado')
+  }
+  const value = { data, user, organization, publicOrganizations, register, saveOrganization, saveProfessional, saveCatalog, assignAccess, addResultType, addResult, publishResult, deleteResult, login, logout, reset, slots, createAppointment, changeStatus, reschedule, createPatient, updateProfile }
   return <ClinicContext.Provider value={value}>{children}</ClinicContext.Provider>
 }
 

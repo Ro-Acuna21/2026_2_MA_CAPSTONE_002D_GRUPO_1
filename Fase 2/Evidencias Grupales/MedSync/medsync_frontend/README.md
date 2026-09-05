@@ -54,7 +54,7 @@ La interfaz no acopla las pantallas a `fetch`, rutas HTTP ni modelos Eloquent. `
 
 ## Documentación para la integración
 
-El modelo de datos necesario para reemplazar los datos demo está en [REQUERIMIENTOS_BD.md](../REQUERIMIENTOS_BD.md). Las tareas, reglas de seguridad y orden recomendado para Laravel están en [INDICACIONES_BACKEND.md](../INDICACIONES_BACKEND.md). Ambos documentos viven junto a las carpetas de backend, base de datos y frontend para que el equipo los consulte desde la Fase 2.
+En la repo compartida, el modelo de datos necesario para reemplazar los datos demo está en `Fase 2/Evidencias Grupales/MedSync/REQUERIMIENTOS_BD.md`. Las tareas, reglas de seguridad y orden recomendado para Laravel están en `Fase 2/Evidencias Grupales/MedSync/INDICACIONES_BACKEND.md`.
 
 ## Comandos
 
@@ -80,6 +80,10 @@ Crear una ficha no crea una cuenta. Para habilitar la ficha de un profesional, e
 Cada centro publica `/centro/{slug}/ingresar` y `/centro/{slug}/crear-cuenta`. La dirección determina el centro automáticamente: no existe selector, cambio ni vinculación de clínicas. El registro solicita nombres, apellidos, RUT (módulo 11), nacimiento, teléfono chileno, correo, previsión, seguro complementario opcional y contraseña confirmada.
 
 El mismo correo y RUT pueden registrarse por separado en dos centros. La unicidad se valida como `centro + correo` y `centro + RUT`; las cuentas, contraseñas, citas e informes permanecen independientes. No se implementa verificación de identidad ni envío de correo.
+
+Cuando recepción creó previamente la ficha de un paciente, el paciente puede registrarse usando exactamente el mismo RUT y correo. El sistema vincula la nueva cuenta con esa ficha sin crear un paciente duplicado. Si solo coincide uno de los dos datos, debe corregirlo con recepción.
+
+Los pacientes pueden cancelar o reprogramar una cita hasta 24 horas antes de su inicio. Recepción conserva la capacidad de gestionar la agenda. Una cita solo puede marcarse como atendida desde su hora de inicio y como inasistencia después de su hora de término.
 
 `/resultados` muestra documentos publicados al paciente. El administrador define los tipos; el equipo autorizado carga borradores y solo el profesional responsable los publica. Los documentos pueden vincular una atención, visualizarse y descargarse. No hay agendamiento de exámenes. Formatos demo: PDF, PNG, JPEG y TXT, hasta 500 KB por archivo, sujetos a la capacidad del navegador.
 
