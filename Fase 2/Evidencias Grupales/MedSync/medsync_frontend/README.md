@@ -52,6 +52,10 @@ La interfaz no acopla las pantallas a `fetch`, rutas HTTP ni modelos Eloquent. `
 4. Sustituye el proveedor mock por llamadas a `clinicApi` o crea un `ApiClinicProvider`.
 5. Mantén en Laravel la autorización real con policies/middleware y Spatie Permission. Los permisos del frontend solo controlan la interfaz.
 
+## Documentación para la integración
+
+El modelo de datos necesario para reemplazar los datos demo está en [REQUERIMIENTOS_BD.md](../REQUERIMIENTOS_BD.md). Las tareas, reglas de seguridad y orden recomendado para Laravel están en [INDICACIONES_BACKEND.md](../INDICACIONES_BACKEND.md). Ambos documentos viven junto a las carpetas de backend, base de datos y frontend para que el equipo los consulte desde la Fase 2.
+
 ## Comandos
 
 ```bash
