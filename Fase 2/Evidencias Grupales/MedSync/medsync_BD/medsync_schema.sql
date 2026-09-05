@@ -275,7 +275,6 @@ ON appointment(medical_center_id, appointment_date, professional_id, start_time)
 -- ============================================
 -- Datos iniciales para desarrollo
 -- ============================================
-
 INSERT INTO medical_center (
     name,
     slug,
@@ -286,9 +285,9 @@ INSERT INTO medical_center (
     status
 )
 VALUES (
-    'MedSync - Centro Demo',
-    'centro-demo',
-    '76543210-1',
+    'Clínica Horizonte',
+    'clinica-horizonte',
+    '40232467-1',
     'Sede de pruebas',
     '+56900000000',
     'demo@medsync.cl',
