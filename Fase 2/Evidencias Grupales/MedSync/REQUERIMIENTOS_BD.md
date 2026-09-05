@@ -25,7 +25,7 @@ Este documento define el modelo objetivo para PostgreSQL y Laravel. Parte del es
 | Tabla | Atributos requeridos | Claves y reglas |
 | --- | --- | --- |
 | `health_insurances` | `id`, `name`, `type`, `is_active`, timestamps | Catálogo global o por centro. `type`: `FONASA`, `ISAPRE`, `PARTICULAR`, `OTHER`. |
-| `patients` | `id`, `medical_center_id`, `user_id` opcional, `first_name`, `last_name`, `rut`, `birth_date`, `email`, `phone`, `address` opcional, `health_insurance_id` opcional, `medical_insurance` opcional, `consent_at`, `is_active`, timestamps, `deleted_at` | Únicos compuestos `(medical_center_id, rut)` y `(medical_center_id, email)`. `user_id` se completa al registrar o vincular una cuenta. Crear ficha no crea obligatoriamente un usuario. |
+| `patients` | `id`, `medical_center_id`, `user_id` opcional, `first_name`, `last_name`, `rut`, `birth_date`, `email`, `phone`, `address` opcional, `health_insurance_id` opcional, `medical_insurance` opcional, `consent_at`, `consent_version`, `is_active`, timestamps, `deleted_at` | Únicos compuestos `(medical_center_id, rut)` y `(medical_center_id, email)`. `user_id` se completa al registrar o vincular una cuenta. Crear ficha no crea obligatoriamente un usuario. |
 | `professionals` | `id`, `medical_center_id`, `user_id` opcional, `first_name`, `last_name`, `rut`, `email`, `phone`, `description` opcional, `is_active`, timestamps, `deleted_at` | Únicos compuestos por centro para RUT y correo. El usuario se vincula al habilitar acceso profesional. |
 | `specialties` | `id`, `medical_center_id`, `name`, `description` opcional, `is_active`, timestamps | Único compuesto `(medical_center_id, name)`. |
 | `professional_specialty` | `professional_id`, `specialty_id`, timestamps | Clave única compuesta; ambas relaciones deben corresponder al mismo centro. |
@@ -44,7 +44,7 @@ Este documento define el modelo objetivo para PostgreSQL y Laravel. Parte del es
 | Tabla | Atributos requeridos | Claves y reglas |
 | --- | --- | --- |
 | `result_types` | `id`, `medical_center_id`, `name`, `description` opcional, `is_active`, timestamps | Único compuesto `(medical_center_id, name)`. Ejemplos: informe ADOS, biopsia, informe de atención. |
-| `medical_results` | `id`, `medical_center_id`, `patient_id`, `professional_id`, `result_type_id`, `appointment_id` opcional, `performed_at`, `status`, `published_at` opcional, `created_by`, `published_by` opcional, timestamps, `deleted_at` | `status`: `DRAFT` o `PUBLISHED`. El profesional responsable publica; el paciente solo puede leer sus propios registros publicados. |
+| `medical_results` | `id`, `medical_center_id`, `patient_id`, `professional_id`, `result_type_id`, `appointment_id` opcional, `performed_at`, `status`, `published_at` opcional, `created_by`, `published_by` opcional, `voided_at` opcional, `voided_by` opcional, `void_reason` opcional, timestamps, `deleted_at` | `status`: `DRAFT`, `PUBLISHED` o `VOIDED`. El profesional responsable publica; el paciente solo puede leer sus propios registros publicados. |
 | `medical_result_files` | `id`, `medical_result_id`, `disk`, `storage_path`, `original_filename`, `mime_type`, `size_bytes`, `checksum` opcional, `uploaded_by`, timestamps | Archivos privados; no guardar base64 ni contenido binario en la tabla. Validar PDF, PNG, JPEG o TXT y el tamaño acordado. |
 
 ## Spatie Permission y auditoría
@@ -61,3 +61,23 @@ Spatie crea `roles`, `permissions`, `model_has_roles`, `model_has_permissions` y
 - `medical_results(medical_center_id, patient_id, status, performed_at)` y `medical_result_files(medical_result_id)`.
 
 La base de datos debe añadir una restricción o validación transaccional que impida reservas solapadas para un profesional, excepto cuando `overbook` haya sido autorizado explícitamente.
+
+## Reglas de negocio acordadas
+
+### Activación de fichas creadas por recepción
+
+`patients.user_id` debe ser nullable. Cuando recepción cree una ficha, no se crea una cuenta ni contraseña. Si el paciente se registra posteriormente con el mismo `medical_center_id`, RUT y correo, el backend crea el usuario, la fila `center_users` con rol `PACIENTE` y vincula `patients.user_id` a ese usuario. No debe crearse una segunda ficha. Si coincide solo RUT o solo correo, se rechaza el registro y recepción debe corregir los datos. En producción este flujo debe verificar identidad o correo antes de completar la vinculación.
+
+### Cambios de citas
+
+El paciente puede cancelar o reprogramar hasta 24 horas antes de `appointment_date + start_time`. Recepción puede gestionar la agenda fuera de ese plazo. Una cita solo puede pasar a `ATENDIDA` desde su hora de inicio y a `NO_SHOW` después de su hora de término. Estas reglas se validan en backend con la zona horaria del centro, además de ocultarse en la interfaz.
+
+### Consentimiento y trazabilidad
+
+Guardar `consent_at` y `consent_version`, no solo un booleano. Los cambios de citas permanecen en `appointment_history`. En producción, un resultado publicado no se elimina físicamente: el profesional lo deja `VOIDED`, registra motivo, usuario y fecha, y el paciente deja de verlo. Los borradores pueden eliminarse o archivarse según la política acordada.
+
+### Decisiones que deben cerrarse antes de producción
+
+- Suscripción `EXPIRED` o `SUSPENDED`: decidir si bloquea todo, deja acceso de solo lectura o aplica días de gracia.
+- Recepción con permiso de carga: definir si puede consultar todos los resultados del centro o solo los borradores que cargó; aplicar mínimo privilegio.
+- Tamaño y formatos definitivos de archivos clínicos, retención de documentos, respaldos y auditoría.
