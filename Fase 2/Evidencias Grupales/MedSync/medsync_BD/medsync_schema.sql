@@ -302,3 +302,6 @@ INSERT INTO health_insurance (
 VALUES
     ('FONASA', 'FONASA', true),
     ('Particular', 'PARTICULAR', true);
+
+ALTER TABLE patient
+ADD COLUMN address VARCHAR(200);
