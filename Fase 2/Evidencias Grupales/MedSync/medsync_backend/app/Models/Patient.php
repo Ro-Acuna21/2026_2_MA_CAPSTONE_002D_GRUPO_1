@@ -3,17 +3,18 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Patient extends Model
 {
-    protected $table = 'patient';
+    use SoftDeletes;
 
-    public $timestamps = false;
+    protected $table = 'patients';
 
     protected $fillable = [
+        'medical_center_id',
         'user_id',
         'health_insurance_id',
-        'medical_center_id',
         'first_name',
         'last_name',
         'rut',
@@ -21,14 +22,18 @@ class Patient extends Model
         'email',
         'phone',
         'address',
-        'status',
+        'medical_insurance',
+        'consent_at',
+        'consent_version',
+        'is_active',
     ];
 
     protected function casts(): array
     {
         return [
             'birth_date' => 'date',
-            'status' => 'boolean',
+            'consent_at' => 'datetime',
+            'is_active' => 'boolean',
         ];
     }
 

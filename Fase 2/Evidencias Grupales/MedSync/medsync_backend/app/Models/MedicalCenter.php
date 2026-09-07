@@ -6,9 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class MedicalCenter extends Model
 {
-    protected $table = 'medical_center';
-
-    public $timestamps = false;
+    protected $table = 'medical_centers';
 
     protected $fillable = [
         'name',
@@ -17,13 +15,13 @@ class MedicalCenter extends Model
         'address',
         'phone',
         'email',
-        'status',
+        'is_active',
     ];
 
     protected function casts(): array
     {
         return [
-            'status' => 'boolean',
+            'is_active' => 'boolean',
         ];
     }
 

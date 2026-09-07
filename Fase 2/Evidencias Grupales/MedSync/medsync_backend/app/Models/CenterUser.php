@@ -8,21 +8,19 @@ class CenterUser extends Model
 {
     protected $table = 'center_users';
 
-    public $timestamps = false;
-
     protected $fillable = [
         'medical_center_id',
         'user_id',
         'role',
         'patient_id',
         'professional_id',
-        'status',
+        'is_active',
     ];
 
     protected function casts(): array
     {
         return [
-            'status' => 'boolean',
+            'is_active' => 'boolean',
         ];
     }
 

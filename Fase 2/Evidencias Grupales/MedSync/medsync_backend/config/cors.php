@@ -19,7 +19,8 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => ['http://localhost:5173'],
+    // El frontend (Vite) corre en el puerto 3000 (ver medsync_frontend/vite.config.ts).
+    'allowed_origins' => ['http://localhost:3000', 'http://127.0.0.1:3000'],
 
     'allowed_origins_patterns' => [],
 
@@ -29,6 +30,7 @@ return [
 
     'max_age' => 0,
 
-    'supports_credentials' => false,
+    // Necesario para que el navegador envíe la cookie de sesión de Sanctum.
+    'supports_credentials' => true,
 
 ];
