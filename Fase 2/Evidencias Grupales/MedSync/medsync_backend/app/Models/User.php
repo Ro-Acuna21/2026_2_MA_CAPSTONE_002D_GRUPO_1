@@ -2,23 +2,21 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
-    use HasApiTokens;
+    use HasApiTokens, SoftDeletes;
 
     protected $table = 'users';
-
-    public $timestamps = false;
 
     protected $fillable = [
         'name',
         'email',
         'password',
-        'status',
-        'remember_token',
+        'is_active',
     ];
 
     protected $hidden = [
@@ -29,8 +27,9 @@ class User extends Authenticatable
     protected function casts(): array
     {
         return [
+            'email_verified_at' => 'datetime',
             'password' => 'hashed',
-            'status' => 'boolean',
+            'is_active' => 'boolean',
         ];
     }
 
@@ -51,8 +50,6 @@ class User extends Authenticatable
 
     public function primaryCenterUser()
     {
-        return $this->centerUsers()
-            ->where('status', true)
-            ->first();
+        return $this->centerUsers()->where('is_active', true)->first();
     }
 }

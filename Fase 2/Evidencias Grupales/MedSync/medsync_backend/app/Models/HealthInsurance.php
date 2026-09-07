@@ -6,20 +6,18 @@ use Illuminate\Database\Eloquent\Model;
 
 class HealthInsurance extends Model
 {
-    protected $table = 'health_insurance';
-
-    public $timestamps = false;
+    protected $table = 'health_insurances';
 
     protected $fillable = [
         'name',
         'type',
-        'status',
+        'is_active',
     ];
 
     protected function casts(): array
     {
         return [
-            'status' => 'boolean',
+            'is_active' => 'boolean',
         ];
     }
 
