@@ -1,0 +1,103 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="Página-1" id="iyGsslaRCLKGIwZiQau-">
+    <mxGraphModel dx="1269" dy="608" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1500" pageHeight="850" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" parent="1" style="text;html=1;strokeColor=none;fillColor=none;fontSize=26;fontStyle=1;align=center;" value="Vista de procesos — Iteración 1 MedSync" vertex="1">
+          <mxGeometry height="40" width="680" x="420" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="subtitle" parent="1" style="text;html=1;strokeColor=none;fillColor=none;fontSize=15;align=center;" value="Flujos implementados: creación de cuenta, inicio de sesión, usuario autenticado y cierre de sesión" vertex="1">
+          <mxGeometry height="30" width="760" x="380" y="60" as="geometry" />
+        </mxCell>
+        <mxCell id="flow1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=18;fontStyle=1;verticalAlign=top;spacingTop=12;fillColor=#ffffff;strokeColor=#000000;strokeWidth=2;" value="Proceso 1: Crear cuenta de paciente" vertex="1">
+          <mxGeometry height="250" width="1340" x="80" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="flow2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=18;fontStyle=1;verticalAlign=top;spacingTop=12;fillColor=#ffffff;strokeColor=#000000;strokeWidth=2;" value="Proceso 2: Iniciar sesión y consultar usuario autenticado" vertex="1">
+          <mxGeometry height="250" width="1340" x="80" y="410" as="geometry" />
+        </mxCell>
+        <mxCell id="p1_1" parent="1" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;fontSize=15;fontStyle=1;" value="Paciente" vertex="1">
+          <mxGeometry height="100" width="60" x="130" y="195" as="geometry" />
+        </mxCell>
+        <mxCell id="p1_2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=15;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="Formulario de registro&#xa;React" vertex="1">
+          <mxGeometry height="70" width="170" x="270" y="205" as="geometry" />
+        </mxCell>
+        <mxCell id="p1_3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=15;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="API Laravel&#xa;POST /api/register" vertex="1">
+          <mxGeometry height="70" width="170" x="500" y="205" as="geometry" />
+        </mxCell>
+        <mxCell id="p1_4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=15;fillColor=#fff2cc;strokeColor=#d6b656;" value="Validación de datos&#xa;RUT, email, password" vertex="1">
+          <mxGeometry height="70" width="190" x="730" y="205" as="geometry" />
+        </mxCell>
+        <mxCell id="p1_5" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=15;fillColor=#d5e8d4;strokeColor=#82b366;" value="Crear registros&#xa;users / patients / center_users" vertex="1">
+          <mxGeometry height="70" width="210" x="980" y="205" as="geometry" />
+        </mxCell>
+        <mxCell id="p1_6" parent="1" style="shape=cylinder3d;whiteSpace=wrap;html=1;fontSize=15;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#e1d5e7;strokeColor=#9673a6;" value="PostgreSQL&#xa;Datos persistentes" vertex="1">
+          <mxGeometry height="100" width="110" x="1260" y="190" as="geometry" />
+        </mxCell>
+        <mxCell id="p1e1" edge="1" parent="1" source="p1_1" style="endArrow=block;html=1;rounded=0;strokeWidth=2;" target="p1_2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p1e2" edge="1" parent="1" source="p1_2" style="endArrow=block;html=1;rounded=0;strokeWidth=2;" target="p1_3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p1e3" edge="1" parent="1" source="p1_3" style="endArrow=block;html=1;rounded=0;strokeWidth=2;" target="p1_4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p1e4" edge="1" parent="1" source="p1_4" style="endArrow=block;html=1;rounded=0;strokeWidth=2;" target="p1_5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p1e5" edge="1" parent="1" source="p1_5" style="endArrow=block;html=1;rounded=0;strokeWidth=2;" target="p1_6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p2_1" parent="1" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;fontSize=15;fontStyle=1;" value="Usuario" vertex="1">
+          <mxGeometry height="100" width="60" x="130" y="485" as="geometry" />
+        </mxCell>
+        <mxCell id="p2_2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=15;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="Formulario de login&#xa;React" vertex="1">
+          <mxGeometry height="70" width="160" x="260" y="495" as="geometry" />
+        </mxCell>
+        <mxCell id="p2_3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=15;fillColor=#f8cecc;strokeColor=#b85450;" value="CSRF Cookie&#xa;Sanctum" vertex="1">
+          <mxGeometry height="70" width="150" x="470" y="495" as="geometry" />
+        </mxCell>
+        <mxCell id="p2_4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=15;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="API Laravel&#xa;POST /api/login" vertex="1">
+          <mxGeometry height="70" width="160" x="670" y="495" as="geometry" />
+        </mxCell>
+        <mxCell id="p2_5" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=15;fillColor=#fff2cc;strokeColor=#d6b656;" value="Validar credenciales&#xa;email y password" vertex="1">
+          <mxGeometry height="70" width="180" x="880" y="495" as="geometry" />
+        </mxCell>
+        <mxCell id="p2_6" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=15;fillColor=#d5e8d4;strokeColor=#82b366;" value="Sesión iniciada&#xa;Usuario autenticado" vertex="1">
+          <mxGeometry height="70" width="180" x="1110" y="495" as="geometry" />
+        </mxCell>
+        <mxCell id="p2_7" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=15;fillColor=#d5e8d4;strokeColor=#82b366;" value="GET /api/v1/me&#xa;Consultar usuario" vertex="1">
+          <mxGeometry height="60" width="180" x="1110" y="575" as="geometry" />
+        </mxCell>
+        <mxCell id="p2e1" edge="1" parent="1" source="p2_1" style="endArrow=block;html=1;rounded=0;strokeWidth=2;" target="p2_2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p2e2" edge="1" parent="1" source="p2_2" style="endArrow=block;html=1;rounded=0;strokeWidth=2;" target="p2_3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p2e3" edge="1" parent="1" source="p2_3" style="endArrow=block;html=1;rounded=0;strokeWidth=2;" target="p2_4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p2e4" edge="1" parent="1" source="p2_4" style="endArrow=block;html=1;rounded=0;strokeWidth=2;" target="p2_5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p2e5" edge="1" parent="1" source="p2_5" style="endArrow=block;html=1;rounded=0;strokeWidth=2;" target="p2_6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="p2e6" edge="1" parent="1" source="p2_6" style="endArrow=block;html=1;rounded=0;strokeWidth=2;" target="p2_7">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="logout" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=15;fillColor=#f5f5f5;strokeColor=#666666;" value="POST /api/logout&#xa;Cerrar sesión" vertex="1">
+          <mxGeometry height="120" width="90" x="1320" y="505" as="geometry" />
+        </mxCell>
+        <mxCell id="p2e7" edge="1" parent="1" source="p2_6" style="endArrow=block;html=1;rounded=0;strokeWidth=2;" target="logout">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="note" parent="1" style="shape=note;whiteSpace=wrap;html=1;fontSize=14;fillColor=#fff2cc;strokeColor=#d6b656;" value="Nota: Esta vista de procesos representa solo la Iteración 1. No incluye reservas reales, profesionales, especialidades, reportes ni multi-centro final." vertex="1">
+          <mxGeometry height="80" width="780" x="360" y="700" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

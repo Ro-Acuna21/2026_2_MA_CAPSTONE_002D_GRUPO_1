@@ -1,0 +1,130 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="Página-1" id="lDsx_MmUUYdQzsbOhT_5">
+    <mxGraphModel dx="1500" dy="642" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1500" pageHeight="850" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" parent="1" style="text;html=1;strokeColor=none;fillColor=none;fontSize=26;fontStyle=1;align=center;" value="Diagrama de casos de uso — MedSync" vertex="1">
+          <mxGeometry height="40" width="620" x="440" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="system" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fontSize=20;fontStyle=1;verticalAlign=top;spacingTop=14;strokeWidth=2;fillColor=#ffffff;strokeColor=#000000;" value="Sistema MedSync" vertex="1">
+          <mxGeometry height="740" width="1050" x="230" y="90" as="geometry" />
+        </mxCell>
+        <mxCell id="paciente" parent="1" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;fontSize=16;fontStyle=1;fillColor=#ffffff;strokeColor=#000000;" value="Paciente" vertex="1">
+          <mxGeometry height="120" width="70" x="70" y="190" as="geometry" />
+        </mxCell>
+        <mxCell id="recepcionista" parent="1" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;fontSize=16;fontStyle=1;fillColor=#ffffff;strokeColor=#000000;" value="Recepcionista" vertex="1">
+          <mxGeometry height="120" width="100" x="55" y="600" as="geometry" />
+        </mxCell>
+        <mxCell id="profesional" parent="1" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;fontSize=16;fontStyle=1;fillColor=#ffffff;strokeColor=#000000;" value="Profesional" vertex="1">
+          <mxGeometry height="120" width="90" x="1360" y="190" as="geometry" />
+        </mxCell>
+        <mxCell id="admin" parent="1" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;fontSize=16;fontStyle=1;fillColor=#ffffff;strokeColor=#000000;" value="Administrador&lt;br&gt;de centro" vertex="1">
+          <mxGeometry height="120" width="110" x="1350" y="520" as="geometry" />
+        </mxCell>
+        <mxCell id="note" parent="1" style="shape=note;whiteSpace=wrap;html=1;fontSize=14;fillColor=#fff2cc;strokeColor=#d6b656;" value="Nota: El caso de uso «Autenticarse» representa iniciar sesión, mantener sesión y cerrar sesión." vertex="1">
+          <mxGeometry height="60" width="410" x="530" y="730" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" edge="1" parent="1" source="paciente" style="endArrow=none;html=1;rounded=0;strokeWidth=1.5;strokeColor=#000000;" target="uc_auth">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" edge="1" parent="1" source="paciente" style="endArrow=none;html=1;rounded=0;strokeWidth=1.5;strokeColor=#000000;" target="uc_cuenta">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" edge="1" parent="1" source="paciente" style="endArrow=none;html=1;rounded=0;strokeWidth=1.5;strokeColor=#000000;" target="uc_datos">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" edge="1" parent="1" source="paciente" style="endArrow=none;html=1;rounded=0;strokeWidth=1.5;strokeColor=#000000;" target="uc_reservar">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" edge="1" parent="1" source="paciente" style="endArrow=none;html=1;rounded=0;strokeWidth=1.5;strokeColor=#000000;" target="uc_reprogramar">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" edge="1" parent="1" source="paciente" style="endArrow=none;html=1;rounded=0;strokeWidth=1.5;strokeColor=#000000;" target="uc_cancelar">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" edge="1" parent="1" source="recepcionista" style="endArrow=none;html=1;rounded=0;strokeWidth=1.5;strokeColor=#000000;" target="uc_auth">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" edge="1" parent="1" source="recepcionista" style="endArrow=none;html=1;rounded=0;strokeWidth=1.5;strokeColor=#000000;" target="uc_ficha">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e9" edge="1" parent="1" source="recepcionista" style="endArrow=none;html=1;rounded=0;strokeWidth=1.5;strokeColor=#000000;" target="uc_gpacientes">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e10" edge="1" parent="1" source="recepcionista" style="endArrow=none;html=1;rounded=0;strokeWidth=1.5;strokeColor=#000000;" target="uc_greservas">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e11" edge="1" parent="1" source="recepcionista" style="endArrow=none;html=1;rounded=0;strokeWidth=1.5;strokeColor=#000000;" target="uc_reprogramar">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e12" edge="1" parent="1" source="recepcionista" style="endArrow=none;html=1;rounded=0;strokeWidth=1.5;strokeColor=#000000;" target="uc_cancelar">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e13" edge="1" parent="1" source="profesional" style="endArrow=none;html=1;rounded=0;strokeWidth=1.5;strokeColor=#000000;" target="uc_auth">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e14" edge="1" parent="1" source="profesional" style="endArrow=none;html=1;rounded=0;strokeWidth=1.5;strokeColor=#000000;" target="uc_agenda">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e15" edge="1" parent="1" source="profesional" style="endArrow=none;html=1;rounded=0;strokeWidth=1.5;strokeColor=#000000;" target="uc_horas">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e16" edge="1" parent="1" source="admin" style="endArrow=none;html=1;rounded=0;strokeWidth=1.5;strokeColor=#000000;" target="uc_auth">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e17" edge="1" parent="1" source="admin" style="endArrow=none;html=1;rounded=0;strokeWidth=1.5;strokeColor=#000000;" target="uc_profesionales">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e18" edge="1" parent="1" source="admin" style="endArrow=none;html=1;rounded=0;strokeWidth=1.5;strokeColor=#000000;" target="uc_especialidades">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e19" edge="1" parent="1" source="admin" style="endArrow=none;html=1;rounded=0;strokeWidth=1.5;strokeColor=#000000;" target="uc_disponibilidad">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_auth" parent="1" style="ellipse;whiteSpace=wrap;html=1;fontSize=15;fontStyle=1;fillColor=#fff2cc;strokeColor=#d6b656;" value="Autenticarse" vertex="1">
+          <mxGeometry height="60" width="190" x="645" y="145" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_cuenta" parent="1" style="ellipse;whiteSpace=wrap;html=1;fontSize=15;fillColor=#fff2cc;strokeColor=#d6b656;" value="Crear cuenta" vertex="1">
+          <mxGeometry height="60" width="190" x="610" y="220" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_datos" parent="1" style="ellipse;whiteSpace=wrap;html=1;fontSize=15;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="Consultar datos propios" vertex="1">
+          <mxGeometry height="60" width="190" x="270" y="145" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_reservar" parent="1" style="ellipse;whiteSpace=wrap;html=1;fontSize=15;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="Reservar hora" vertex="1">
+          <mxGeometry height="60" width="190" x="320" y="270" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_reprogramar" parent="1" style="ellipse;whiteSpace=wrap;html=1;fontSize=15;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="Reprogramar reserva" vertex="1">
+          <mxGeometry height="60" width="190" x="540" y="330" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_cancelar" parent="1" style="ellipse;whiteSpace=wrap;html=1;fontSize=15;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="Cancelar reserva" vertex="1">
+          <mxGeometry height="60" width="190" x="330" y="465" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_ficha" parent="1" style="ellipse;whiteSpace=wrap;html=1;fontSize=15;fillColor=#e1d5e7;strokeColor=#9673a6;" value="Crear ficha de paciente" vertex="1">
+          <mxGeometry height="60" width="190" x="540" y="490" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_gpacientes" parent="1" style="ellipse;whiteSpace=wrap;html=1;fontSize=15;fillColor=#e1d5e7;strokeColor=#9673a6;" value="Gestionar pacientes" vertex="1">
+          <mxGeometry height="60" width="190" x="490" y="570" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_greservas" parent="1" style="ellipse;whiteSpace=wrap;html=1;fontSize=15;fillColor=#e1d5e7;strokeColor=#9673a6;" value="Gestionar reservas" vertex="1">
+          <mxGeometry height="60" width="190" x="350" y="660" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_agenda" parent="1" style="ellipse;whiteSpace=wrap;html=1;fontSize=15;fillColor=#d5e8d4;strokeColor=#82b366;" value="Consultar agenda" vertex="1">
+          <mxGeometry height="60" width="190" x="970" y="220" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_horas" parent="1" style="ellipse;whiteSpace=wrap;html=1;fontSize=15;fillColor=#d5e8d4;strokeColor=#82b366;" value="Revisar horas asignadas" vertex="1">
+          <mxGeometry height="60" width="190" x="1030" y="300" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_profesionales" parent="1" style="ellipse;whiteSpace=wrap;html=1;fontSize=15;fillColor=#f8cecc;strokeColor=#b85450;" value="Gestionar profesionales" vertex="1">
+          <mxGeometry height="60" width="190" x="960" y="430" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_especialidades" parent="1" style="ellipse;whiteSpace=wrap;html=1;fontSize=15;fillColor=#f8cecc;strokeColor=#b85450;" value="Gestionar especialidades" vertex="1">
+          <mxGeometry height="60" width="190" x="960" y="515" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_disponibilidad" parent="1" style="ellipse;whiteSpace=wrap;html=1;fontSize=15;fillColor=#f8cecc;strokeColor=#b85450;" value="Gestionar disponibilidad" vertex="1">
+          <mxGeometry height="60" width="190" x="960" y="600" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
