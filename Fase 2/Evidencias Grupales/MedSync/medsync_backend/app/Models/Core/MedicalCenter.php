@@ -1,16 +1,19 @@
 <?php
 
-namespace App\Models;
+namespace App\Models\Core;
 
 use Illuminate\Database\Eloquent\Model;
 
 class MedicalCenter extends Model
 {
+    protected $connection = 'core';
+
     protected $table = 'medical_centers';
 
     protected $fillable = [
         'name',
         'slug',
+        'database_name',
         'rut',
         'address',
         'phone',
@@ -28,20 +31,5 @@ class MedicalCenter extends Model
     public function centerUsers()
     {
         return $this->hasMany(CenterUser::class, 'medical_center_id');
-    }
-
-    public function patients()
-    {
-        return $this->hasMany(Patient::class, 'medical_center_id');
-    }
-
-    public function professionals()
-    {
-        return $this->hasMany(Professional::class, 'medical_center_id');
-    }
-
-    public function appointments()
-    {
-        return $this->hasMany(Appointment::class, 'medical_center_id');
     }
 }

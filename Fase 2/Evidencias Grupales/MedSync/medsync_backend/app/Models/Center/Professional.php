@@ -1,41 +1,40 @@
 <?php
 
-namespace App\Models;
+namespace App\Models\Center;
 
+use App\Models\Core\CenterUser;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Professional extends Model
 {
-    protected $table = 'professional';
+    use SoftDeletes;
 
-    public $timestamps = false;
+    protected $connection = 'center';
+
+    protected $table = 'professionals';
 
     protected $fillable = [
         'user_id',
-        'medical_center_id',
         'first_name',
         'last_name',
         'rut',
         'email',
         'phone',
-        'status',
+        'is_active',
     ];
 
     protected function casts(): array
     {
         return [
-            'status' => 'boolean',
+            'is_active' => 'boolean',
         ];
     }
 
     public function user()
     {
         return $this->belongsTo(User::class, 'user_id');
-    }
-
-    public function medicalCenter()
-    {
-        return $this->belongsTo(MedicalCenter::class, 'medical_center_id');
     }
 
     public function centerUser()

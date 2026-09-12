@@ -1,11 +1,13 @@
 <?php
 
-namespace App\Models;
+namespace App\Models\Center;
 
 use Illuminate\Database\Eloquent\Model;
 
 class HealthInsurance extends Model
 {
+    protected $connection = 'center';
+
     protected $table = 'health_insurances';
 
     protected $fillable = [

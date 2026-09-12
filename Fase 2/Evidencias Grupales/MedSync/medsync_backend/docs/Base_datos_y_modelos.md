@@ -1,155 +1,167 @@
-# MedSync Backend
+# MedSync - Base de Datos
 
-Backend del proyecto **MedSync**, desarrollado con **Laravel** y conectado a una base de datos **PostgreSQL**.
-
-Esta primera iteración está enfocada en implementar el flujo inicial de autenticación y persistencia de datos:
-
-- Crear cuenta de paciente.
-- Iniciar sesión.
-- Cerrar sesión.
-- Consultar usuario autenticado.
-- Asociar usuarios a un centro médico.
-- Guardar datos principales del paciente en PostgreSQL.
+Este README explica los cambios realizados en la base de datos del proyecto **MedSync**, incluyendo la estructura definida, migraciones, modelos, seeders, relaciones principales y pasos para levantar el proyecto después de clonarlo.
 
 ---
 
-## Requisitos
+## 1. Objetivo de los cambios
 
-Antes de ejecutar el proyecto, cada integrante debe tener instalado:
+Se reorganizó la base de datos para preparar MedSync para una arquitectura tipo SaaS, donde el sistema pueda trabajar con varios centros médicos.
 
-- PHP
-- Composer
-- PostgreSQL
-- Git
-
-Verificar instalación:
-
-```bash
-php -v
-composer -V
-git --version
-```
-
----
-
-## Instalación
-
-Clonar el repositorio y entrar al backend:
-
-```bash
-git clone URL_DEL_REPOSITORIO
-cd medsync_backend
-```
-
-Instalar dependencias:
-
-```bash
-composer install
-```
-
-Crear archivo `.env`:
-
-```powershell
-Copy-Item .env.example .env
-```
-
-En Git Bash o Linux:
-
-```bash
-cp .env.example .env
-```
-
-Generar clave de Laravel:
-
-```bash
-php artisan key:generate
-```
-
-Limpiar configuración:
-
-```bash
-php artisan config:clear
-```
-
----
-
-## Configuración de la base de datos
-
-En el archivo `.env`, configurar PostgreSQL:
-
-```env
-DB_CONNECTION=pgsql
-DB_HOST=127.0.0.1
-DB_PORT=5432
-DB_DATABASE=medsync_bd
-DB_USERNAME=postgres
-DB_PASSWORD=tu_password
-```
-
-El archivo `.env` no se sube a GitHub.  
-Cada integrante debe crear y configurar su propio `.env`.
-
----
-
-## Base de datos
-
-La fuente principal para crear y versionar la base de datos son las **migraciones de Laravel**, ubicadas en:
+Para esto se separó la información en dos tipos de base de datos:
 
 ```text
-medsync_backend/database/migrations/
+core   = Base de datos central de MedSync
+center = Base de datos propia de cada centro médico
 ```
 
-Para crear las tablas y cargar los datos iniciales:
+Actualmente se configuraron estas bases:
 
-```bash
-php artisan migrate
-php artisan db:seed
+```text
+medsync_core
+medsync_clinica_horizonte
 ```
 
-El archivo SQL ubicado en la carpeta de base de datos se mantiene solo como respaldo documental del esquema principal de la Iteración 1.  
-En caso de diferencias entre el SQL y las migraciones, se debe considerar como válida la estructura definida en las migraciones.
+La idea es que `medsync_core` guarde la información central de la plataforma, mientras que `medsync_clinica_horizonte` guarde los datos propios del centro médico.
 
 ---
 
-## Tablas principales de la Iteración 1
+## 2. Estructura de bases de datos
 
-La estructura actual considera las siguientes tablas principales del sistema:
+### Base de datos `medsync_core`
+
+Contiene las tablas centrales del sistema:
 
 ```text
-medical_centers
 users
+medical_centers
+center_users
+personal_access_tokens
+cache
+cache_locks
+jobs
+job_batches
+failed_jobs
+migrations
+```
+
+### Base de datos `medsync_clinica_horizonte`
+
+Contiene las tablas propias del centro médico:
+
+```text
 health_insurances
 patients
-center_users
+professionals
+migrations
 ```
-
-Estas tablas permiten registrar centros médicos, usuarios, pacientes, previsiones de salud y la relación entre un usuario y un centro médico.
-
-No se incluyen todavía tablas de profesionales, especialidades, disponibilidad, reservas, reportes o suscripciones, ya que corresponden a próximas iteraciones del proyecto.
 
 ---
 
-## Descripción de tablas principales
+## 3. Configuración realizada en Laravel
 
-### `medical_centers`
-
-Guarda los centros médicos registrados en MedSync.
-
-En esta iteración se trabaja con un centro médico fijo de prueba:
+Se agregaron dos conexiones en el archivo:
 
 ```text
-clinica-horizonte
+config/database.php
+```
+
+Las conexiones configuradas fueron:
+
+```text
+core
+center
+```
+
+La conexión por defecto quedó como:
+
+```php
+'default' => env('DB_CONNECTION', 'core'),
+```
+
+En el archivo `.env` se configuraron las variables de base de datos:
+
+```env
+DB_CONNECTION=core
+DB_HOST=127.0.0.1
+DB_PORT=5432
+DB_DATABASE=medsync_core
+DB_CORE_DATABASE=medsync_core
+DB_CENTER_DATABASE=medsync_clinica_horizonte
+DB_USERNAME=postgres
+DB_PASSWORD=
+
+SESSION_DRIVER=file
+CACHE_STORE=file
+QUEUE_CONNECTION=sync
+```
+
+Si PostgreSQL tiene contraseña, completar:
+
+```env
+DB_PASSWORD=tu_contraseña
 ```
 
 ---
+
+## 4. Migraciones organizadas
+
+Las migraciones se separaron en dos carpetas:
+
+```text
+database/migrations/core
+database/migrations/center
+```
+
+### Migraciones de `core`
+
+Estas migraciones crean las tablas centrales de MedSync:
+
+```text
+database/migrations/core
+├── 0001_01_01_000001_create_cache_table.php
+├── 0001_01_01_000002_create_jobs_table.php
+├── 2026_09_04_164340_create_personal_access_tokens_table.php
+├── 2026_09_06_225034_create_medical_centers_table.php
+├── 2026_09_06_225035_create_users_table.php
+└── 2026_09_06_225036_create_center_users_table.php
+```
+
+Estas migraciones usan:
+
+```php
+Schema::connection('core')
+```
+
+### Migraciones de `center`
+
+Estas migraciones crean las tablas propias del centro médico:
+
+```text
+database/migrations/center
+├── 2026_09_06_225040_create_health_insurances_table.php
+├── 2026_09_06_225045_create_patients_table.php
+└── 2026_09_12_212901_create_professionals_table.php
+```
+
+Estas migraciones usan:
+
+```php
+Schema::connection('center')
+```
+
+---
+
+## 5. Tablas principales
 
 ### `users`
 
-Guarda las credenciales de acceso de los usuarios.
+Tabla central donde se almacenan las cuentas de usuario del sistema.
 
 Campos principales:
 
 ```text
+id
 name
 email
 password
@@ -161,16 +173,100 @@ updated_at
 deleted_at
 ```
 
-El rol del usuario no se guarda en esta tabla.  
-El rol se define mediante la tabla `center_users`.
+Esta tabla está en `medsync_core`.
+
+---
+
+### `medical_centers`
+
+Tabla central donde se almacenan los centros médicos registrados en MedSync.
+
+Campos principales:
+
+```text
+id
+name
+slug
+database_name
+rut
+address
+phone
+email
+is_active
+created_at
+updated_at
+```
+
+El campo `database_name` indica a qué base de datos pertenece el centro médico.
+
+Ejemplo:
+
+```text
+name: Clínica Horizonte
+slug: clinica-horizonte
+database_name: medsync_clinica_horizonte
+```
+
+---
+
+### `center_users`
+
+Tabla central que relaciona usuarios con centros médicos y roles.
+
+Campos principales:
+
+```text
+id
+medical_center_id
+user_id
+role
+patient_id
+professional_id
+is_active
+created_at
+updated_at
+```
+
+Roles definidos:
+
+```text
+ADMIN
+RECEPCIONISTA
+PROFESIONAL
+PACIENTE
+```
+
+Esta tabla permite saber qué rol tiene un usuario dentro de un centro médico.
+
+Ejemplo:
+
+```text
+user_id = 1
+medical_center_id = 1
+role = PACIENTE
+patient_id = 1
+professional_id = null
+```
+
+Esto significa que el usuario pertenece al centro médico con rol de paciente.
+
+Los campos `patient_id` y `professional_id` no tienen foreign key directa, porque apuntan a registros que están en la base de datos del centro.
+
+---
+
+### `personal_access_tokens`
+
+Tabla utilizada por Laravel Sanctum cuando se trabaja con autenticación mediante tokens.
+
+Se dejó en `core`, porque la autenticación pertenece al sistema central.
 
 ---
 
 ### `health_insurances`
 
-Guarda el catálogo de previsiones de salud utilizadas en el formulario de registro.
+Tabla del centro médico donde se almacenan las previsiones de salud.
 
-Valores iniciales:
+Registros creados por seeder:
 
 ```text
 Fonasa
@@ -183,12 +279,12 @@ Otra
 
 ### `patients`
 
-Guarda los datos básicos del paciente dentro de un centro médico.
+Tabla del centro médico donde se almacenan los pacientes.
 
 Campos principales:
 
 ```text
-medical_center_id
+id
 user_id
 health_insurance_id
 first_name
@@ -207,162 +303,506 @@ updated_at
 deleted_at
 ```
 
-El campo `user_id` puede ser `NULL`, ya que en futuras iteraciones recepción podría crear una ficha de paciente antes de que el paciente tenga cuenta de usuario.
+Importante:
+
+```text
+patients no tiene medical_center_id
+```
+
+Esto es intencional, porque la tabla ya está dentro de la base de datos propia del centro médico.
+
+Por ejemplo, si un paciente está en:
+
+```text
+medsync_clinica_horizonte.patients
+```
+
+entonces pertenece a Clínica Horizonte.
 
 ---
 
-### `center_users`
+### `professionals`
 
-Relaciona un usuario con un centro médico y define su rol dentro de ese centro.
+Tabla del centro médico donde se almacenan los profesionales.
 
-Relación principal:
-
-```text
-usuario + centro médico + rol
-```
-
-Roles considerados:
+Campos principales:
 
 ```text
-ADMIN
-RECEPCIONISTA
-PROFESIONAL
-PACIENTE
+id
+user_id
+first_name
+last_name
+rut
+email
+phone
+is_active
+created_at
+updated_at
+deleted_at
 ```
 
-Para esta primera iteración, el flujo implementado se enfoca principalmente en el rol `PACIENTE`.
+Al igual que `patients`, no necesita `medical_center_id`, porque ya pertenece a la base de datos del centro.
 
 ---
 
-## Flujo actual de crear cuenta
+## 6. Modelos creados o modificados
+
+Los modelos se organizaron según la base de datos que utilizan.
 
 ```text
-1. El paciente completa el formulario de registro en el frontend.
-2. El frontend envía los datos al backend Laravel.
-3. Laravel valida los datos recibidos.
-4. Se crea el usuario en la tabla users.
-5. Se crea o vincula la ficha del paciente en patients.
-6. Se crea la relación entre usuario y centro en center_users.
-7. Los datos quedan guardados en PostgreSQL.
+app/Models
+├── User.php
+├── Core
+│   ├── MedicalCenter.php
+│   └── CenterUser.php
+└── Center
+    ├── HealthInsurance.php
+    ├── Patient.php
+    └── Professional.php
+```
+
+### Modelos de `core`
+
+Estos modelos usan:
+
+```php
+protected $connection = 'core';
+```
+
+Modelos:
+
+```text
+App\Models\User
+App\Models\Core\MedicalCenter
+App\Models\Core\CenterUser
+```
+
+### Modelos de `center`
+
+Estos modelos usan:
+
+```php
+protected $connection = 'center';
+```
+
+Modelos:
+
+```text
+App\Models\Center\HealthInsurance
+App\Models\Center\Patient
+App\Models\Center\Professional
 ```
 
 ---
 
-## Flujo actual de iniciar sesión
+## 7. Relaciones principales
+
+### Usuario con centro médico
+
+La relación se maneja mediante `center_users`.
 
 ```text
-1. El usuario ingresa correo y contraseña.
-2. Laravel valida las credenciales.
-3. Si son correctas, se inicia sesión mediante Sanctum usando cookies.
-4. El frontend puede consultar los datos del usuario autenticado mediante /api/v1/me.
+users 1 ─── N center_users
+medical_centers 1 ─── N center_users
+```
+
+Esto permite que un usuario tenga un rol dentro de un centro médico.
+
+---
+
+### Centro médico con pacientes y profesionales
+
+Como se usa una base de datos por centro, los pacientes y profesionales no necesitan `medical_center_id`.
+
+La relación se entiende por la base de datos del centro:
+
+```text
+medical_centers.database_name = medsync_clinica_horizonte
+```
+
+Entonces:
+
+```text
+medsync_clinica_horizonte.patients       = pacientes de Clínica Horizonte
+medsync_clinica_horizonte.professionals  = profesionales de Clínica Horizonte
 ```
 
 ---
 
-## Endpoints implementados en la Iteración 1
+### Paciente con previsión
+
+Un paciente puede tener una previsión de salud.
 
 ```text
-POST /api/register
-POST /api/login
-POST /api/logout
-GET /api/v1/me
+health_insurances 1 ─── N patients
 ```
 
 ---
 
-## Autenticación
+### Paciente con profesional
 
-La autenticación se realiza con **Laravel Sanctum** mediante cookies de sesión.
+Actualmente no existe una tabla directa entre paciente y profesional.
 
-Antes de enviar solicitudes como login o registro, el frontend debe solicitar:
+Esto queda para una siguiente iteración, cuando se implemente agenda o reservas.
 
-```text
-GET /sanctum/csrf-cookie
-```
-
-Luego, las peticiones al backend deben enviarse con:
+La relación futura debería ser mediante una tabla de citas o reservas:
 
 ```text
-credentials: 'include'
+patients 1 ─── N appointments N ─── 1 professionals
 ```
 
-Esto permite que Laravel maneje correctamente la sesión del usuario autenticado.
+Esto permitirá que:
+
+```text
+Un paciente pueda atenderse con varios profesionales.
+Un profesional pueda atender a varios pacientes.
+```
 
 ---
 
-## Seeders
+## 8. Seeders creados
 
-Los seeders cargan datos iniciales necesarios para probar la Iteración 1:
+Se crearon seeders para cargar datos base y datos de prueba.
+
+### `CoreMedicalCenterSeeder`
+
+Crea el centro médico inicial en `medsync_core.medical_centers`.
+
+Datos principales:
 
 ```text
-Clínica Horizonte
+name: Clínica Horizonte
+slug: clinica-horizonte
+database_name: medsync_clinica_horizonte
+```
+
+### `CenterHealthInsuranceSeeder`
+
+Crea las previsiones de salud en la base del centro:
+
+```text
 Fonasa
 Isapre
 Particular
 Otra
 ```
 
-Estos datos permiten probar el flujo de registro e inicio de sesión desde una base de datos vacía.
+### `DemoCenterUserSeeder`
+
+Crea datos de prueba para validar las relaciones principales:
+
+```text
+Usuario paciente
+Paciente
+Usuario profesional
+Profesional
+Relación center_users para paciente
+Relación center_users para profesional
+```
+
+Este seeder permite comprobar que:
+
+```text
+users se crea en core
+patients se crea en center
+professionals se crea en center
+center_users relaciona usuario, centro y rol
+```
 
 ---
 
-## SQL de respaldo
+## 9. Cómo levantar el proyecto después de clonarlo
 
-El archivo SQL de respaldo representa solamente las tablas principales implementadas en la Iteración 1.
+### 1. Clonar el repositorio
 
-Este archivo no reemplaza las migraciones de Laravel.  
-Su objetivo es servir como apoyo documental o respaldo en caso de necesitar revisar la estructura principal de la base de datos.
+```powershell
+git clone URL_DEL_REPOSITORIO
+```
 
-No se incluyen tablas internas de Laravel como:
+Entrar a la carpeta del backend:
+
+```powershell
+cd "Fase 2\Evidencias Grupales\MedSync\medsync_backend"
+```
+
+### 2. Instalar dependencias
+
+```powershell
+composer install
+```
+
+### 3. Crear archivo `.env`
+
+Si no existe `.env`, copiarlo desde `.env.example`:
+
+```powershell
+copy .env.example .env
+```
+
+Luego configurar las variables de base de datos:
+
+```env
+DB_CONNECTION=core
+DB_HOST=127.0.0.1
+DB_PORT=5432
+DB_DATABASE=medsync_core
+DB_CORE_DATABASE=medsync_core
+DB_CENTER_DATABASE=medsync_clinica_horizonte
+DB_USERNAME=postgres
+DB_PASSWORD=
+```
+
+### 4. Generar clave de Laravel
+
+```powershell
+php artisan key:generate
+```
+
+### 5. Crear bases de datos en PostgreSQL
+
+Desde pgAdmin o psql:
+
+```sql
+CREATE DATABASE medsync_core;
+CREATE DATABASE medsync_clinica_horizonte;
+```
+
+### 6. Limpiar caché de Laravel
+
+```powershell
+php artisan optimize:clear
+```
+
+Nota:
+
+Si aparece un error indicando que la tabla `cache` no existe, ejecutar primero las migraciones de `core` y luego volver a ejecutar `optimize:clear`.
+
+### 7. Ejecutar migraciones de `core`
+
+```powershell
+php artisan migrate --database=core --path=database/migrations/core
+```
+
+### 8. Ejecutar migraciones de `center`
+
+```powershell
+php artisan migrate --database=center --path=database/migrations/center
+```
+
+### 9. Ejecutar seeders
+
+```powershell
+php artisan db:seed
+```
+
+### 10. Levantar servidor Laravel
+
+```powershell
+php artisan serve
+```
+
+El backend quedará disponible en:
+
+```text
+http://127.0.0.1:8000
+```
+
+---
+
+## 10. Comandos útiles de prueba
+
+Entrar a Tinker:
+
+```powershell
+php artisan tinker
+```
+
+### Ver bases de datos configuradas
+
+```php
+[
+    'core' => DB::connection('core')->getDatabaseName(),
+    'center' => DB::connection('center')->getDatabaseName(),
+];
+```
+
+Resultado esperado:
+
+```php
+[
+    "core" => "medsync_core",
+    "center" => "medsync_clinica_horizonte",
+]
+```
+
+### Ver conexión de modelos
+
+```php
+[
+    'User' => (new \App\Models\User)->getConnectionName(),
+    'MedicalCenter' => (new \App\Models\Core\MedicalCenter)->getConnectionName(),
+    'CenterUser' => (new \App\Models\Core\CenterUser)->getConnectionName(),
+    'HealthInsurance' => (new \App\Models\Center\HealthInsurance)->getConnectionName(),
+    'Patient' => (new \App\Models\Center\Patient)->getConnectionName(),
+    'Professional' => (new \App\Models\Center\Professional)->getConnectionName(),
+];
+```
+
+Resultado esperado:
+
+```php
+[
+    "User" => "core",
+    "MedicalCenter" => "core",
+    "CenterUser" => "core",
+    "HealthInsurance" => "center",
+    "Patient" => "center",
+    "Professional" => "center",
+]
+```
+
+### Ver tablas creadas
+
+```php
+[
+    'core_tables' => collect(DB::connection('core')->select("
+        SELECT table_name
+        FROM information_schema.tables
+        WHERE table_schema = 'public'
+        ORDER BY table_name
+    "))->pluck('table_name'),
+
+    'center_tables' => collect(DB::connection('center')->select("
+        SELECT table_name
+        FROM information_schema.tables
+        WHERE table_schema = 'public'
+        ORDER BY table_name
+    "))->pluck('table_name'),
+];
+```
+
+Resultado esperado para `core`:
 
 ```text
 cache
+cache_locks
+center_users
+failed_jobs
+job_batches
 jobs
-personal_access_tokens
+medical_centers
 migrations
+personal_access_tokens
+users
 ```
 
-Estas tablas son administradas por Laravel mediante sus propias migraciones.
-
----
-
-## Consideraciones importantes
-
-- La fuente principal de la base de datos son las migraciones de Laravel.
-- El SQL se mantiene solo como respaldo documental.
-- El archivo `.env` no debe subirse a GitHub.
-- Después de clonar el proyecto, cada integrante debe ejecutar `composer install`.
-- El centro médico se trabaja por ahora como centro fijo: `clinica-horizonte`.
-- El rol se obtiene desde `center_users`, no desde `users`.
-- La autenticación usa Sanctum con cookies/sesión.
-- El frontend debe conectarse al backend mediante la API REST.
-
----
-
-## Estado actual
+Resultado esperado para `center`:
 
 ```text
-Registro de cuenta funcionando.
-Inicio de sesión funcionando.
-Logout funcionando.
-Consulta de usuario autenticado funcionando.
-Frontend conectado con backend Laravel.
-Datos persistidos correctamente en PostgreSQL.
-Migraciones y seeders creados para la Iteración 1.
-SQL de respaldo actualizado según las migraciones actuales.
+health_insurances
+migrations
+patients
+professionals
+```
+
+### Ver conteos de datos
+
+```php
+[
+    'core_users' => \App\Models\User::count(),
+    'core_medical_centers' => \App\Models\Core\MedicalCenter::count(),
+    'core_center_users' => \App\Models\Core\CenterUser::count(),
+    'center_health_insurances' => \App\Models\Center\HealthInsurance::count(),
+    'center_patients' => \App\Models\Center\Patient::count(),
+    'center_professionals' => \App\Models\Center\Professional::count(),
+];
+```
+
+Resultado esperado aproximado después de ejecutar seeders:
+
+```php
+[
+    "core_users" => 2,
+    "core_medical_centers" => 1,
+    "core_center_users" => 2,
+    "center_health_insurances" => 4,
+    "center_patients" => 1,
+    "center_professionals" => 1,
+]
 ```
 
 ---
 
-## Pendiente para próximas iteraciones
+## 11. Validaciones comprobadas
+
+Se realizaron pruebas con Tinker y se comprobó que:
 
 ```text
-Implementar roles y permisos con Spatie Permission.
-Agregar gestión de profesionales.
-Agregar gestión de especialidades.
-Agregar disponibilidad horaria.
-Agregar reservas/citas.
-Implementar multi-centro real.
-Agregar reportes administrativos.
-Definir futuras funcionalidades de plataforma y suscripciones.
+Los modelos apuntan a la conexión correcta.
+Las tablas están en la base de datos correspondiente.
+patients no tiene medical_center_id.
+center_users relaciona usuario, centro y rol.
+No se permite duplicar el RUT de un paciente.
+No se permite duplicar la relación del mismo usuario con el mismo centro.
+No se permite asignar una previsión inexistente a un paciente.
 ```
+
+---
+
+## Cómo agregar nuevas migraciones y modelos en el futuro
+
+Para mantener el proyecto ordenado, se debe respetar la separación entre `core` y `center`.
+
+La regla principal es:
+
+````text
+Si la tabla pertenece a la plataforma MedSync → va en core.
+Si la tabla pertenece a un centro médico → va en center.
+
+## 12. Consideraciones para backend
+
+La lógica de login, registro y cierre de sesión debe adaptarse a esta arquitectura.
+
+El flujo recomendado para el backend es:
+
+```text
+1. Recibir el slug del centro desde la URL.
+2. Buscar el centro en medsync_core.medical_centers.
+3. Leer el database_name del centro.
+4. Configurar la conexión center usando ese database_name.
+5. Crear o consultar el usuario en medsync_core.users.
+6. Crear o consultar paciente/profesional en la base del centro.
+7. Crear o consultar la relación en medsync_core.center_users.
+````
+
+Ejemplo de rutas futuras:
+
+```text
+/api/centro/clinica-horizonte/register
+/api/centro/clinica-horizonte/login
+```
+
+---
+
+## 13. Estado actual
+
+Estado actual de `core`:
+
+```text
+users
+medical_centers
+center_users
+personal_access_tokens
+cache
+jobs
+```
+
+Estado actual de `center`:
+
+```text
+health_insurances
+patients
+professionals
+```
+
+Esta entrega deja preparada la base de datos para trabajar con varios centros médicos, separando la información central de MedSync de la información propia de cada centro.

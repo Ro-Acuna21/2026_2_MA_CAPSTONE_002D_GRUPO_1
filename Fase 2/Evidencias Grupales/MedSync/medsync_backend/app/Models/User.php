@@ -2,13 +2,17 @@
 
 namespace App\Models;
 
+use App\Models\Core\CenterUser;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
-    use HasApiTokens, SoftDeletes;
+    use HasApiTokens, HasFactory, SoftDeletes;
+
+    protected $connection = 'core';
 
     protected $table = 'users';
 
@@ -38,18 +42,10 @@ class User extends Authenticatable
         return $this->hasMany(CenterUser::class, 'user_id');
     }
 
-    public function patients()
-    {
-        return $this->hasMany(Patient::class, 'user_id');
-    }
-
-    public function professionals()
-    {
-        return $this->hasMany(Professional::class, 'user_id');
-    }
-
     public function primaryCenterUser()
     {
-        return $this->centerUsers()->where('is_active', true)->first();
+        return $this->centerUsers()
+            ->where('is_active', true)
+            ->first();
     }
 }

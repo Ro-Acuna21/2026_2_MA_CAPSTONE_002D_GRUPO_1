@@ -1,7 +1,9 @@
 <?php
 
-namespace App\Models;
+namespace App\Models\Center;
 
+use App\Models\Core\CenterUser;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -9,10 +11,11 @@ class Patient extends Model
 {
     use SoftDeletes;
 
+    protected $connection = 'center';
+
     protected $table = 'patients';
 
     protected $fillable = [
-        'medical_center_id',
         'user_id',
         'health_insurance_id',
         'first_name',
@@ -45,11 +48,6 @@ class Patient extends Model
     public function healthInsurance()
     {
         return $this->belongsTo(HealthInsurance::class, 'health_insurance_id');
-    }
-
-    public function medicalCenter()
-    {
-        return $this->belongsTo(MedicalCenter::class, 'medical_center_id');
     }
 
     public function centerUser()

@@ -8,7 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('health_insurances', function (Blueprint $table) {
+        Schema::connection('center')->create('health_insurances', function (Blueprint $table) {
             $table->id();
             $table->string('name', 100)->unique();
             $table->enum('type', ['FONASA', 'ISAPRE', 'PARTICULAR', 'OTHER']);
@@ -19,6 +19,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::dropIfExists('health_insurances');
+        Schema::connection('center')->dropIfExists('health_insurances');
     }
 };

@@ -8,7 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('users', function (Blueprint $table) {
+        Schema::connection('core')->create('users', function (Blueprint $table) {
             $table->id();
             $table->string('name', 150);
             $table->string('email', 150);
@@ -18,11 +18,13 @@ return new class extends Migration
             $table->rememberToken();
             $table->timestamps();
             $table->softDeletes();
+
+            $table->index('email');
         });
     }
 
     public function down(): void
     {
-        Schema::dropIfExists('users');
+        Schema::connection('core')->dropIfExists('users');
     }
 };
