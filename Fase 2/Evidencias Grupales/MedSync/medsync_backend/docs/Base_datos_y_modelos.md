@@ -749,6 +749,37 @@ No se permite asignar una previsión inexistente a un paciente.
 
 ---
 
+## Rol global de MedSync y roles por centro
+
+Se agregó una mejora a la estructura de roles del sistema para diferenciar entre el administrador general de MedSync y los roles que existen dentro de cada centro médico.
+
+---
+
+### Admin global de MedSync
+
+El administrador general de MedSync se maneja en la tabla `users`, ubicada en la base de datos central:
+
+`````text
+medsync_core.users
+Para esto se agregó el campo:
+
+system_role
+
+Este campo permite identificar usuarios que tienen permisos globales dentro de la plataforma MedSync.
+
+Actualmente se utiliza el valor:
+
+SUPER_ADMIN
+
+Ejemplo:
+
+email: admin@medsync.cl
+system_role: SUPER_ADMIN
+
+Este usuario representa al administrador general de MedSync, por lo tanto puede administrar la plataforma completa, como centros médicos, configuración general y datos globales del sistema.
+
+El usuario SUPER_ADMIN no se registra en center_users, porque no pertenece a un centro médico específico.
+
 ## Cómo agregar nuevas migraciones y modelos en el futuro
 
 Para mantener el proyecto ordenado, se debe respetar la separación entre `core` y `center`.
@@ -773,7 +804,7 @@ El flujo recomendado para el backend es:
 5. Crear o consultar el usuario en medsync_core.users.
 6. Crear o consultar paciente/profesional en la base del centro.
 7. Crear o consultar la relación en medsync_core.center_users.
-````
+`````
 
 Ejemplo de rutas futuras:
 

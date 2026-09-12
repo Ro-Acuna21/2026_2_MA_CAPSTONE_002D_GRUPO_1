@@ -20,6 +20,7 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'system_role',
         'is_active',
     ];
 
@@ -48,4 +49,7 @@ class User extends Authenticatable
             ->where('is_active', true)
             ->first();
     }
+    public function isSuperAdmin(): bool {
+    return $this->system_role === 'SUPER_ADMIN';
+}
 }
