@@ -9,6 +9,7 @@ use App\Models\Core\CenterUser;
 use App\Models\Core\MedicalCenter;
 use App\Models\User;
 use Illuminate\Database\Seeder;
+use App\Models\Center\PatientAddress;
 
 class DemoCenterUserSeeder extends Seeder
 {
@@ -45,13 +46,25 @@ class DemoCenterUserSeeder extends Seeder
                 'birth_date' => '2000-01-01',
                 'email' => 'paciente.prueba@test.cl',
                 'phone' => '+56911111111',
-                'address' => 'Dirección paciente prueba',
                 'medical_insurance' => null,
                 'consent_at' => now(),
                 'consent_version' => 'v1',
                 'is_active' => true,
             ]
         );
+        PatientAddress::updateOrCreate(
+    [
+        'patient_id' => $patient->id,
+        'is_primary' => true,
+    ],
+    [
+        'address_line' => 'Dirección paciente prueba',
+        'commune' => 'Maipú',
+        'region' => 'Región Metropolitana',
+        'postal_code' => null,
+        'reference' => null,
+    ]
+);
 
         CenterUser::updateOrCreate(
             [

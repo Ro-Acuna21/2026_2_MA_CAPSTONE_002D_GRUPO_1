@@ -886,6 +886,19 @@ patients
 professionals
 ```
 
+## Normalización de direcciones
+
+Se normalizó la gestión de direcciones separándolas en tablas independientes.
+
+Antes, la dirección del centro médico se almacenaba directamente en `medical_centers.address`, y la dirección del paciente se almacenaba directamente en `patients.address`.
+
+Para mejorar la normalización, se crearon dos tablas nuevas:
+
+```text
+medical_center_addresses
+patient_addresses
+
 Esta entrega deja preparada una estructura inicial para separar la información central de MedSync de la información propia del centro médico.
 
 Actualmente está enfocada en una sola base de datos de centro configurada manualmente, pero queda preparada para que en una siguiente iteración el backend pueda automatizar la creación y selección de bases de datos por centro médico.
+```

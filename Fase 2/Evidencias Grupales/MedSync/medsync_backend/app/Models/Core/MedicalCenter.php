@@ -15,7 +15,6 @@ class MedicalCenter extends Model
         'slug',
         'database_name',
         'rut',
-        'address',
         'phone',
         'email',
         'is_active',
@@ -27,6 +26,15 @@ class MedicalCenter extends Model
             'is_active' => 'boolean',
         ];
     }
+    public function addresses()
+{
+    return $this->hasMany(MedicalCenterAddress::class, 'medical_center_id');
+}
+public function primaryAddress()
+{
+    return $this->hasOne(MedicalCenterAddress::class, 'medical_center_id')
+        ->where('is_primary', true);
+}
 
     public function centerUsers()
     {

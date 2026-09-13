@@ -24,7 +24,6 @@ class Patient extends Model
         'birth_date',
         'email',
         'phone',
-        'address',
         'medical_insurance',
         'consent_at',
         'consent_version',
@@ -59,4 +58,14 @@ class Patient extends Model
     {
         return $this->hasMany(Appointment::class, 'patient_id');
     }
+    public function addresses()
+{
+    return $this->hasMany(PatientAddress::class, 'patient_id');
+}
+
+public function primaryAddress()
+{
+    return $this->hasOne(PatientAddress::class, 'patient_id')
+        ->where('is_primary', true);
+}
 }
