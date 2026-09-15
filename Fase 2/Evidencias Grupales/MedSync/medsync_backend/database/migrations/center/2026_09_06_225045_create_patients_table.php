@@ -8,11 +8,16 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('patients', function (Blueprint $table) {
+        Schema::connection('center')->create('patients', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('medical_center_id')->constrained('medical_centers')->cascadeOnDelete();
-            $table->foreignId('user_id')->nullable()->constrained('users')->nullOnDelete();
-            $table->unsignedBigInteger('health_insurance_id')->nullable();
+
+            $table->unsignedBigInteger('user_id')->nullable();
+
+            $table->foreignId('health_insurance_id')
+                ->nullable()
+                ->constrained('health_insurances')
+                ->nullOnDelete();
+
             $table->string('first_name', 100);
             $table->string('last_name', 100);
             $table->string('rut', 12);
@@ -27,14 +32,15 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->unique(['medical_center_id', 'rut']);
-            $table->unique(['medical_center_id', 'email']);
-            $table->index(['medical_center_id']);
+            $table->unique('rut');
+            $table->unique('email');
+            $table->index('user_id');
+            $table->index('health_insurance_id');
         });
     }
 
     public function down(): void
     {
-        Schema::dropIfExists('patients');
+        Schema::connection('center')->dropIfExists('patients');
     }
 };

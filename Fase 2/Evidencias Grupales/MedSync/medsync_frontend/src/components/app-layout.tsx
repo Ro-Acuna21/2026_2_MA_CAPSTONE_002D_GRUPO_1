@@ -7,6 +7,7 @@ import { useClinic } from '@/state/clinic-store'
 import { Logo } from './logo'
 import { Button } from './ui/button'
 import { useCenterPath } from '@/lib/tenant'
+import { sanctum } from '@/services/http'
 
 export function AppLayout() {
   const { user, organization, logout } = useClinic(); const [open, setOpen] = useState(false); const centerPath = useCenterPath()
@@ -17,6 +18,14 @@ export function AppLayout() {
     : [{ to: '/', label: 'Inicio', icon: LayoutDashboard }, { to: '/citas', label: 'Mis citas', icon: CalendarDays }, { to: '/reservar', label: 'Reservar hora', icon: ClipboardPlus }, { to: '/resultados', label: 'Mis informes y resultados', icon: ClipboardPlus }, { to: '/perfil', label: 'Mis datos', icon: UserRound }]
   const links = user?.role === 'SUPER_ADMIN' ? roleLinks : roleLinks.map((link) => ({ ...link, to: centerPath(link.to) }))
   useEffect(() => { document.title = user?.role === 'SUPER_ADMIN' ? 'MedSync · Plataforma' : organization?.name ?? 'Portal médico' }, [organization?.name, user?.role])
+  // Además de cerrar la sesión mock, avisa al backend real (solo aplica si
+  // había una sesión real iniciada en clinica-horizonte vía login/registro).
+  const handleLogout = () => {
+    if (organization?.slug === 'clinica-horizonte') {
+      sanctum.logout().catch((err) => console.warn('Backend real: no fue posible cerrar sesión ahí.', err))
+    }
+    logout()
+  }
   return <div className="min-h-screen bg-background lg:pl-64">
     <Button variant="outline" size="icon" className="fixed left-4 top-4 z-40 bg-card lg:hidden" onClick={() => setOpen(!open)}>{open ? <X /> : <Menu />}</Button>
     {open && <button aria-label="Cerrar menú" className="fixed inset-0 z-20 bg-black/30 lg:hidden" onClick={() => setOpen(false)} />}
@@ -24,7 +33,7 @@ export function AppLayout() {
       <div className="px-3"><Logo light name={user?.role === 'SUPER_ADMIN' ? 'MedSync' : organization?.name} /></div>
       <div className="mt-7 rounded-xl border border-white/10 bg-white/5 p-3"><div className="flex items-center gap-2"><Building2 className="size-4 text-emerald-200" /><div className="min-w-0"><p className="text-[10px] uppercase tracking-wider text-emerald-50/50">{user?.role === 'SUPER_ADMIN' ? 'Plataforma' : 'Centro médico'}</p><p className="truncate text-sm font-semibold">{user?.role === 'SUPER_ADMIN' ? 'Administración MedSync' : organization?.name}</p></div></div></div>
       <nav className="mt-5 grid gap-1">{links.map(({ to, label, icon: Icon }) => <NavLink key={to} to={to} end={to === '/plataforma' || to === centerPath()} onClick={() => setOpen(false)} className={({ isActive }) => cn('flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-emerald-50/75 transition-colors hover:bg-white/10 hover:text-white', isActive && 'bg-white/[0.14] text-white shadow-inner ring-1 ring-white/20')}><Icon className="size-[18px]" /><span>{label}</span><ChevronRight className="ml-auto size-4 opacity-40" /></NavLink>)}</nav>
-      <div className="mt-auto border-t border-white/15 pt-5"><div className="flex items-center gap-3 rounded-xl bg-white/5 p-3"><span className="grid size-9 shrink-0 place-items-center rounded-full bg-emerald-100 font-bold text-primary">{user?.name[0]}</span><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{user?.name}</p><p className="truncate text-[11px] text-emerald-50/60">{user && roleNames[user.role]}</p></div><Button aria-label="Cerrar sesión" variant="ghost" size="icon" className="size-8 text-white hover:bg-white/10" onClick={logout}><LogOut className="size-4" /></Button></div></div>
+      <div className="mt-auto border-t border-white/15 pt-5"><div className="flex items-center gap-3 rounded-xl bg-white/5 p-3"><span className="grid size-9 shrink-0 place-items-center rounded-full bg-emerald-100 font-bold text-primary">{user?.name[0]}</span><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{user?.name}</p><p className="truncate text-[11px] text-emerald-50/60">{user && roleNames[user.role]}</p></div><Button aria-label="Cerrar sesión" variant="ghost" size="icon" className="size-8 text-white hover:bg-white/10" onClick={handleLogout}><LogOut className="size-4" /></Button></div></div>
     </aside>
     <main className="mx-auto max-w-[1500px] px-4 pb-12 pt-20 sm:px-7 lg:px-10 lg:pt-9"><Outlet key={organization?.id ?? user?.id} /></main>
   </div>

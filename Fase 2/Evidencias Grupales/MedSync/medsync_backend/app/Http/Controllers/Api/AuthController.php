@@ -3,10 +3,10 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\CenterUser;
-use App\Models\HealthInsurance;
-use App\Models\MedicalCenter;
-use App\Models\Patient;
+use App\Models\Core\CenterUser;
+use App\Models\Center\HealthInsurance;
+use App\Models\Core\MedicalCenter;
+use App\Models\Center\Patient;
 use App\Models\User;
 use App\Rules\ValidRut;
 use Illuminate\Http\Request;
@@ -65,8 +65,7 @@ class AuthController extends Controller
         }
 
         $patient = DB::transaction(function () use ($data, $rut, $medicalCenter, $healthInsurance) {
-            $existingPatient = Patient::where('medical_center_id', $medicalCenter->id)
-                ->where(function ($query) use ($rut, $data) {
+            $existingPatient = Patient::where(function ($query) use ($rut, $data) {
                     $query->where('rut', $rut)->orWhere('email', $data['email']);
                 })
                 ->first();
@@ -99,7 +98,6 @@ class AuthController extends Controller
                 $patient = $existingPatient;
             } else {
                 $patient = Patient::create([
-                    'medical_center_id' => $medicalCenter->id,
                     'user_id' => $user->id,
                     'health_insurance_id' => $healthInsurance->id,
                     'first_name' => $data['first_name'],

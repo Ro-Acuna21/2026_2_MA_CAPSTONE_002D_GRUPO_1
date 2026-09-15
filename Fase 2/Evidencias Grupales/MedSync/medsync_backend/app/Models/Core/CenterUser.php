@@ -1,11 +1,16 @@
 <?php
 
-namespace App\Models;
+namespace App\Models\Core;
 
+use App\Models\Center\Patient;
+use App\Models\Center\Professional;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 
 class CenterUser extends Model
 {
+    protected $connection = 'core';
+
     protected $table = 'center_users';
 
     protected $fillable = [
