@@ -10,9 +10,16 @@ Backend del proyecto **MedSync** (Duoc UC, Capstone). API REST hecha con **Larav
 
 Iteración 1 = **registro de cuenta + login**, funcionando de punta a punta (frontend → backend → Postgres), para un **solo centro médico fijo**: "Clínica Horizonte" (`slug: clinica-horizonte`).
 
+⚠️ **Arquitectura de base de datos cambió a mitad de esta iteración** (trabajo de Roberto): ya no es una sola base de datos. Ahora hay **dos conexiones/bases separadas**:
+
+- **`core`** (base `medsync_core`): datos globales, compartidos entre todos los centros — `users`, `medical_centers`, `medical_center_addresses`, `center_users`.
+- **`center`** (base `medsync_clinica_horizonte` en esta iteración): datos propios de un centro médico — `patients`, `patient_addresses`, `professionals`, `health_insurances`.
+
+Los modelos ahora están namespaced según a qué base pertenecen: `App\Models\Core\*` (`MedicalCenter`, `CenterUser`, `MedicalCenterAddress`) y `App\Models\Center\*` (`Patient`, `Professional`, `HealthInsurance`, `PatientAddress`). `App\Models\User` se mantiene sin namespace, vive en `core`. Ver `docs/Base_datos_y_modelos.md` (actualizado por Roberto) para el detalle completo del diseño.
+
 Lo que ya funciona:
 
-- Migraciones y modelos para `medical_centers`, `users`, `center_users`, `patients`, `health_insurances`.
+- Migraciones y modelos para `medical_centers`, `users`, `center_users`, `patients`, `health_insurances`, `professionals`, `medical_center_addresses`, `patient_addresses`, repartidos entre las dos bases.
 - Registro de pacientes con validación de RUT chileno (módulo 11), teléfono chileno, previsión de salud, contraseña y consentimiento.
 - Vinculación automática cuando recepción ya creó una ficha de paciente antes de que este cree su cuenta (mismo RUT **y** correo).
 - Login / logout / usuario autenticado (`/api/v1/me`) vía **cookies de sesión de Sanctum** (no Bearer token).
@@ -20,7 +27,9 @@ Lo que ya funciona:
 - El frontend (`register-page.tsx`, `login-page.tsx`) ya llama a esta API real además de su mock local, solo para el centro `clinica-horizonte`.
 - Tests automatizados (Pest) para registro y login.
 
-Lo que **todavía no existe** (ver sección 7, próximas iteraciones): roles con Spatie Permission, multi-centro real, profesionales, especialidades, agenda/citas, resultados médicos, plataforma/suscripciones.
+⚠️ **Riesgo conocido, pendiente de decidir en equipo** (ver detalle en sección 11): al usar dos bases físicas separadas, una sola transacción de Laravel ya no puede cubrir una operación que escribe en ambas a la vez. Esto afecta el registro de pacientes.
+
+Lo que **todavía no existe** (ver sección 10, próximas iteraciones): roles con Spatie Permission, multi-centro real (hoy sigue fijo a `clinica-horizonte`), especialidades, agenda/citas, resultados médicos, plataforma/suscripciones.
 
 ---
 
@@ -63,15 +72,26 @@ Copy-Item .env.example .env
 cp .env.example .env
 ```
 
-Editar en `.env` los datos de tu PostgreSQL local:
+Editar en `.env` los datos de tu PostgreSQL local. **Importante:** ahora son dos bases de datos, no una — `DB_CONNECTION` debe ser `core` (no `pgsql`), y hacen falta las variables `DB_CORE_DATABASE` / `DB_CENTER_DATABASE`:
 
 ```env
-DB_CONNECTION=pgsql
+DB_CONNECTION=core
 DB_HOST=127.0.0.1
 DB_PORT=5432
-DB_DATABASE=medsync_bd
+DB_DATABASE=medsync_core
+DB_CORE_DATABASE=medsync_core
+DB_CENTER_DATABASE=medsync_clinica_horizonte
 DB_USERNAME=postgres
 DB_PASSWORD=tu_password
+```
+
+Si vienes de una versión anterior del `.env` (con `DB_CONNECTION=pgsql` y `DB_DATABASE=medsync_bd`), **actualízalo a mano** — el `.env` no se sube a Git, así que `git pull` nunca lo toca por ti.
+
+Crear las **dos bases de datos vacías** en Postgres antes de migrar (desde pgAdmin o `psql`):
+
+```sql
+CREATE DATABASE medsync_core;
+CREATE DATABASE medsync_clinica_horizonte;
 ```
 
 Generar la clave de la app y correr migraciones + seeders:
@@ -82,11 +102,14 @@ php artisan migrate
 php artisan db:seed
 ```
 
-`db:seed` crea automáticamente:
+Un solo `php artisan migrate` llena las dos bases: cada migración especifica su propia conexión (`Schema::connection('core')` o `Schema::connection('center')`) y `app/Providers/AppServiceProvider.php` registra ambas carpetas (`database/migrations/core` y `database/migrations/center`) con `loadMigrationsFrom()`.
 
-- El centro médico fijo "Clínica Horizonte" (`MedicalCenterSeeder`).
-- El catálogo de previsiones Fonasa / Isapre / Particular / Otra (`HealthInsuranceSeeder`).
-- Un usuario de prueba de Laravel (`test@example.com`), sin relación con MedSync — se puede ignorar.
+`db:seed` corre, en este orden, `SuperAdminSeeder` → `CoreMedicalCenterSeeder` → `CenterHealthInsuranceSeeder` → `DemoCenterUserSeeder`, y crea automáticamente:
+
+- Un usuario super administrador.
+- El centro médico fijo "Clínica Horizonte".
+- El catálogo de previsiones Fonasa / Isapre / Particular / Otra.
+- Un paciente y un profesional de prueba (`paciente.prueba@test.cl` / `profesional.prueba@test.cl`, contraseña `Password123`).
 
 Levantar el servidor:
 
@@ -136,27 +159,34 @@ Queda disponible en `http://localhost:3000`. La variable `VITE_API_URL` (opciona
 
 Para confirmar el dato en la base, cualquiera de estas tres opciones:
 
+Ojo: como ahora son dos bases, `patients` vive en `medsync_clinica_horizonte` y `users`/`center_users` viven en `medsync_core`.
+
 **a) Tinker (más rápido, no necesita nada adicional):**
 ```bash
 php artisan tinker
 ```
 ```php
-\App\Models\Patient::latest()->first();
+\App\Models\Center\Patient::latest()->first();
 \App\Models\User::latest()->first();
-\App\Models\CenterUser::latest()->first();
+\App\Models\Core\CenterUser::latest()->first();
 ```
 
-**b) psql:**
+**b) psql (una conexión por base):**
 ```bash
-psql -U postgres -h 127.0.0.1 -d medsync_bd
+psql -U postgres -h 127.0.0.1 -d medsync_core
 ```
 ```sql
-SELECT id, first_name, last_name, rut, email FROM patients ORDER BY id DESC LIMIT 5;
 SELECT id, name, email FROM users ORDER BY id DESC LIMIT 5;
 SELECT * FROM center_users ORDER BY id DESC LIMIT 5;
 ```
+```bash
+psql -U postgres -h 127.0.0.1 -d medsync_clinica_horizonte
+```
+```sql
+SELECT id, first_name, last_name, rut, email FROM patients ORDER BY id DESC LIMIT 5;
+```
 
-**c) pgAdmin 4:** conectar a `localhost:5432`, base `medsync_bd` → Schemas → public → Tables → clic derecho en `patients` (o `users`, `center_users`) → View/Edit Data → All Rows.
+**c) pgAdmin 4:** conectar a `localhost:5432` → expandir **ambas** bases (`medsync_core` y `medsync_clinica_horizonte`) → Schemas → public → Tables → clic derecho en la tabla que corresponda → View/Edit Data → All Rows.
 
 ---
 
@@ -231,14 +261,20 @@ Requiere estar autenticado. Devuelve `{ "data": { ...mismo formato... } }` con e
 | "El centro médico no está configurado" | No se corrió `php artisan db:seed` | Correr `php artisan db:seed` |
 | "Previsión no reconocida" | Igual que el anterior (falta `HealthInsuranceSeeder`) | `php artisan db:seed` |
 | Error 500 crudo en vez de mensaje de validación | Dos registros llegaron casi simultáneamente con el mismo RUT/correo (choque con el índice único de Postgres) | Conocido, pendiente de pulir (ver sección 9) |
+| `php artisan migrate` dice "Nothing to migrate" | Laravel solo revisa `database/migrations` en la raíz por defecto; con la base dividida, las migraciones están en `database/migrations/core` y `database/migrations/center` | Ya está resuelto en `app/Providers/AppServiceProvider.php` con `loadMigrationsFrom([...])`. Si vuelve a pasar, revisa que ese archivo no se haya pisado. |
+| `SQLSTATE[42P01]: ... no existe la relación «medical_centers»` (o similar) al migrar | El `.env` sigue apuntando a la conexión/base vieja (`DB_CONNECTION=pgsql`, `DB_DATABASE=medsync_bd`) en vez de `core` + `medsync_core`/`medsync_clinica_horizonte`, o la caché de config quedó desactualizada | Revisar el bloque `DB_*` del `.env` (sección 3) y correr `php artisan config:clear` |
+| `php artisan migrate:status` dice "Ran" en migraciones cuyas tablas no existen | Quedó un estado inconsistente de un intento anterior (bases a medio borrar, o corridas contra una conexión equivocada) | Borrar ambas bases con `DROP DATABASE nombre WITH (FORCE);` (Postgres 13+; cierra primero cualquier pestaña de Query Tool abierta sobre esa base), recrearlas vacías y volver a `migrate` + `db:seed` |
+| Error de registro: "El RUT o el correo ya están asociados a otra ficha..." aunque la tabla `patients` no tiene esa fila | El registro "mock" del frontend (guardado en `localStorage` del navegador) tiene un intento anterior guardado y falla antes de llegar al backend real | Botón "Restablecer datos demo" en el login, o borrar `localStorage` del sitio en las herramientas de desarrollador (F12 → Application → Local Storage) |
 
 ---
 
-## 9. Nota para Roberto — sobre `medsync_BD/medsync_schema.sql`
+## 9. Nota sobre `medsync_BD/medsync_schema.sql` y `docs/Base_datos_y_modelos.md`
 
-Ese archivo fue el punto de partida del diseño de base de datos, pero **ya no es la fuente de verdad**: nada lo ejecuta ni lo referencia. El esquema real que existe hoy en Postgres lo crean y versionan las migraciones de Laravel en `medsync_backend/database/migrations/`, que ya se alejaron de ese SQL (nombres de tabla, `is_active` en vez de `status`, columnas de consentimiento, catálogo de previsiones, etc.).
+`medsync_BD/medsync_schema.sql` sigue **sin ser la fuente de verdad**: nada lo ejecuta ni lo referencia. El esquema real que existe hoy en Postgres lo crean y versionan las migraciones de Laravel en `medsync_backend/database/migrations/core/` y `database/migrations/center/`.
 
-Recomendación: no correr `medsync_schema.sql` contra una base que ya tiene las migraciones aplicadas (crearía conflictos). Si quieres, lo actualizamos para que sirva como documentación fiel del esquema actual, o simplemente lo marcamos como archivo histórico.
+Roberto agregó `medsync_backend/docs/Base_datos_y_modelos.md`, que **sí está al día** con el diseño de dos bases (core/center) — léelo junto con la sección 1 de este README para el detalle completo del modelo de datos.
+
+Recomendación: no correr `medsync_schema.sql` contra una base que ya tiene las migraciones aplicadas (crearía conflictos). Si se quiere mantener, lo ideal es actualizarlo para que refleje el esquema actual o marcarlo como archivo histórico.
 
 ---
 
@@ -284,7 +320,25 @@ Orden recomendado según `INDICACIONES_BACKEND.md` y `REQUERIMIENTOS_BD.md`, aju
 
 Esta sección lista, archivo por archivo, todo lo que se modificó o se creó para dejar funcionando el registro y login reales. Sirve como changelog técnico para que ambos sepan exactamente qué cambió antes de tocar esos mismos archivos.
 
-### Base de datos y backend
+### Cambios más recientes — rama `feature/bd-por-centro`
+
+Roberto rediseñó la base de datos para separar los datos "globales" (`core`) de los datos propios de cada centro médico (`center`, una base física por centro). Esto significó: mover los modelos a `App\Models\Core\*` / `App\Models\Center\*`, dividir `database/migrations/` en `migrations/core/` y `migrations/center/`, agregar `medical_center_addresses` y `patient_addresses` (antes la dirección era un solo campo de texto), quitar el campo `medical_center_id` de `patients` (ya no hace falta: la base entera ya es de ese centro), y agregar los seeders `SuperAdminSeeder`, `CoreMedicalCenterSeeder`, `CenterHealthInsuranceSeeder`, `DemoCenterUserSeeder`.
+
+Sobre eso, se hicieron estos ajustes para dejar el registro/login funcionando de nuevo:
+
+- **`app/Http/Controllers/Api/AuthController.php`** — seguía importando los modelos desde el namespace viejo (`App\Models\CenterUser`, `App\Models\HealthInsurance`, `App\Models\MedicalCenter`, `App\Models\Patient`), que ya no existen ahí; esto rompía `/api/register`, `/api/login` y `/api/v1/me` con "Class not found". Se corrigieron los `use` a `App\Models\Core\CenterUser`, `App\Models\Center\HealthInsurance`, `App\Models\Core\MedicalCenter`, `App\Models\Center\Patient`. Además, se quitó `medical_center_id` de la búsqueda de paciente duplicado y de `Patient::create(...)`, porque esa columna ya no existe en la tabla `patients` (sigue existiendo y usándose en `CenterUser`, que sí vive en `core` y sí necesita saber a qué centro pertenece cada usuario).
+- **`app/Providers/AppServiceProvider.php`** — estaba vacío; Laravel no sabía que las migraciones ahora viven en subcarpetas (`migrations/core/`, `migrations/center/`) y por eso `php artisan migrate` no encontraba nada. Se agregó `loadMigrationsFrom([...])` en `boot()` registrando ambas rutas.
+- **`.env`** (local de cada integrante, no se sube a Git) — necesita actualizarse a mano con `DB_CONNECTION=core`, `DB_CORE_DATABASE=medsync_core` y `DB_CENTER_DATABASE=medsync_clinica_horizonte` (ver sección 3). Si tu `.env` es de antes de esta rama, todavía va a tener `DB_CONNECTION=pgsql` y `DB_DATABASE=medsync_bd`, que ya no aplican.
+
+⚠️ **Punto pendiente de conversar en equipo — transacción entre las dos bases:**
+
+En `AuthController::register()`, el bloque `DB::transaction(function () { ... })` envuelve la creación del `User` (conexión `core`) y del `CenterUser` (conexión `core`), pero **no** la del `Patient`, que vive en la conexión `center` — es decir, en otra base de datos física. `DB::transaction()` sin especificar conexión usa la conexión por defecto (`core`) únicamente; no puede cubrir una escritura en `center` al mismo tiempo, porque son dos conexiones/transacciones de Postgres completamente independientes.
+
+En la práctica, esto significa que si el registro falla **después** de crear el `Patient` pero **antes** de terminar de crear el `User` o el `CenterUser` (por ejemplo, por un error de validación tardío o una caída de conexión), el `Patient` ya creado en `center` **no se revierte**, y queda una ficha de paciente huérfana, sin usuario asociado.
+
+No es un bug de sintaxis — es una limitación real de tener dos bases físicas separadas, y hay que decidir en equipo cómo manejarlo, por ejemplo: revertir el `Patient` manualmente en un `catch` si falla el resto (transacción compensatoria), aceptar el riesgo por ahora dado que Iteración 1 es de bajo volumen/uso académico, o buscar otro patrón. Por ahora se dejó **sin corregir**, documentado aquí para que se discuta antes de construir más funcionalidad sobre este mismo flujo (por ejemplo, en Iteración 3 al agregar el registro de profesionales, que tendrá el mismo problema).
+
+### Base de datos y backend (cambios de la iteración anterior, registro/login inicial)
 
 **Modelos corregidos** (tenían el diseño viejo: nombre de tabla en singular, campo `status` en vez de `is_active`, `$timestamps = false` aunque la migración sí trae timestamps):
 - `app/Models/MedicalCenter.php` → tabla `medical_centers`, campo `is_active`, timestamps habilitados.
@@ -323,6 +377,7 @@ Se tocaron solo 3 archivos, sin modificar `src/state/clinic-store.tsx` (el prove
 - `src/services/http.ts` — le faltaba adjuntar el header `X-XSRF-TOKEN` (leído de la cookie `XSRF-TOKEN`) en cada request; sin eso Laravel rechaza todo con error 419. Se agregó esa lógica más una función `sanctum.register(payload)` para llamar a `POST /api/register`.
 - `src/pages/register-page.tsx` — el flujo de registro sigue guardando en el mock exactamente igual que antes; **además**, solo cuando el centro es `clinica-horizonte`, llama a `sanctum.register(...)` con los datos del formulario para guardarlos también en el backend real. Si esa llamada falla, se muestra un toast de aviso pero no se interrumpe el flujo mock.
 - `src/pages/login-page.tsx` — mismo criterio: al iniciar sesión en `clinica-horizonte`, además del login mock intenta silenciosamente `sanctum.login(...)` contra el backend real (falla esperable con las cuentas demo que no existen en Postgres, solo funciona con cuentas creadas vía `/crear-cuenta`).
+- `src/components/app-layout.tsx` — el botón "Cerrar sesión" ahora también llama a `sanctum.logout()` contra el backend real (antes solo hacía el logout del mock; por eso no aparecía nada en la consola de `php artisan serve` al cerrar sesión).
 
 Ningún test existente de frontend (`App.test.tsx`, `clinic-store.test.tsx`) ejecuta estos formularios, así que no deberían verse afectados — de todas formas, correr `npm run test` para confirmarlo.
 
@@ -333,11 +388,20 @@ Ningún test existente de frontend (`App.test.tsx`, `clinic-store.test.tsx`) eje
 ```text
 app/
   Http/Controllers/Api/   Controladores de la API (AuthController, ...)
-  Models/                 Modelos Eloquent
+  Models/
+    Core/                 Modelos de la base "core" (MedicalCenter, CenterUser, MedicalCenterAddress)
+    Center/                Modelos de la base "center" (Patient, Professional, HealthInsurance, PatientAddress)
+    User.php              Vive en "core", sin namespace
+  Providers/
+    AppServiceProvider.php  Registra las carpetas de migraciones de core/ y center/
   Rules/                  Reglas de validación propias (ValidRut)
 database/
-  migrations/             Esquema real de la base de datos
-  seeders/                Datos iniciales (centro fijo, previsiones)
+  migrations/
+    core/                 Migraciones de la base "core" (medsync_core)
+    center/                Migraciones de la base "center" (medsync_clinica_horizonte)
+  seeders/                Datos iniciales (super admin, centro fijo, previsiones, paciente/profesional demo)
+docs/
+  Base_datos_y_modelos.md  Diseño detallado del modelo de datos core/center (Roberto)
 routes/
   api.php                 Rutas de la API (/api/*)
 tests/
