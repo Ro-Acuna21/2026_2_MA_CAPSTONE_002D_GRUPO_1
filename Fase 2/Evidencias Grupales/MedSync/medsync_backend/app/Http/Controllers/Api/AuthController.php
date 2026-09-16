@@ -13,6 +13,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use App\Models\Center\PatientAddress;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
@@ -105,7 +106,6 @@ class AuthController extends Controller
                     'rut' => $rut,
                     'email' => $data['email'],
                     'phone' => $data['phone'],
-                    'address' => $data['address'] ?? null,
                     'birth_date' => $data['birth_date'],
                     'medical_insurance' => $data['medical_insurance'] ?? null,
                     'consent_at' => now(),
@@ -113,6 +113,17 @@ class AuthController extends Controller
                     'is_active' => true,
                 ]);
             }
+            if (! empty($data['address'])) {
+    PatientAddress::updateOrCreate(
+        [
+            'patient_id' => $patient->id,
+            'is_primary' => true,
+        ],
+        [
+            'address_line' => $data['address'],
+        ]
+    );
+}
 
             CenterUser::firstOrCreate(
                 [
@@ -201,7 +212,9 @@ class AuthController extends Controller
             'id' => $user->id,
             'name' => $user->name,
             'email' => $user->email,
-            'role' => $centerUser?->role,
+            'role' => $user->system_role === 'SUPER_ADMIN'
+            ? 'SUPER_ADMIN'
+            : $centerUser?->role,
             'medical_center' => $centerUser?->medicalCenter,
             'patient' => $centerUser?->patient,
             'professional' => $centerUser?->professional,
