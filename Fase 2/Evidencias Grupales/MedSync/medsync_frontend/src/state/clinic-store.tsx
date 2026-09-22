@@ -39,7 +39,6 @@ import {
   hashPassword,
   validEmail,
   validPhone,
-  validRut,
 } from "@/domain/validation";
 
 import { dateFromToday, toMinutes, toTime, uid } from "@/lib/utils";

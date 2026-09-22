@@ -62,6 +62,17 @@ Spatie crea `roles`, `permissions`, `model_has_roles`, `model_has_permissions` y
 
 La base de datos debe añadir una restricción o validación transaccional que impida reservas solapadas para un profesional, excepto cuando `overbook` haya sido autorizado explícitamente.
 
+## Comercial y finanzas de centros
+
+| Tabla | Atributos requeridos | Claves y reglas |
+| --- | --- | --- |
+| `plans` | `id`, `name`, `monthly_price_clp`, `professional_limit` opcional, `user_limit` opcional, `features` JSONB opcional, `is_active`, timestamps | Catálogo global de MedSync; precio en pesos chilenos, nunca definido por el frontend. |
+| `subscriptions` | `id`, `medical_center_id`, `plan_id`, `status`, `started_at`, `renews_at`, `ended_at` opcional, timestamps | Una suscripción vigente por centro; `status`: `TRIAL`, `ACTIVE`, `EXPIRED`, `SUSPENDED`. |
+| `subscription_payments` | `id`, `subscription_id`, `amount_clp`, `status`, `due_at`, `paid_at` opcional, `provider_reference` opcional, timestamps | `status`: al menos `PENDING`, `PAID`, `OVERDUE`; no implementar cobro hasta definir proveedor. |
+| `service_prices` | `id`, `medical_center_id`, `service_id`, `amount_clp`, `effective_from`, `effective_to` opcional, timestamps | Historial de precio por prestación para calcular ingresos y pérdidas del centro sin alterar datos de otros centros. |
+
+Para los reportes económicos, agregar índices por `(medical_center_id, appointment_date, status)`, `(medical_center_id, service_id)` y `(medical_center_id, professional_id)`. Las consultas deben agregar únicamente citas del centro resuelto y no exponer pacientes ni información clínica.
+
 ## Reglas de negocio acordadas
 
 ### Activación de fichas creadas por recepción
