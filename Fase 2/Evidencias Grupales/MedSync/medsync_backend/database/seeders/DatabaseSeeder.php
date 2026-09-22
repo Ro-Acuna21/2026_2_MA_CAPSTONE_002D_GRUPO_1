@@ -12,7 +12,7 @@ class DatabaseSeeder extends Seeder
             SuperAdminSeeder::class,
             CoreMedicalCenterSeeder::class,
             CenterHealthInsuranceSeeder::class,
-            DemoCenterUserSeeder::class,
+            MedSyncDemoSeeder::class,
         ]);
     }
 }
