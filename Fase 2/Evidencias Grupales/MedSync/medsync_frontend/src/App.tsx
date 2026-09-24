@@ -17,6 +17,8 @@ import { ProfilePage } from "@/pages/profile-page";
 import { ReportsPage } from "@/pages/reports-page";
 import { RegisterPage } from "@/pages/register-page";
 import { PlatformPage } from "@/pages/platform-page";
+import { PlansPage } from "@/pages/plans-page";
+import { ClinicFinancePage } from "@/pages/clinic-finance-page";
 import { ResultsPage } from "@/pages/results-page";
 import type { Role } from "@/domain/types";
 import { centerBase, useCenterPath } from "@/lib/tenant";
@@ -106,6 +108,7 @@ export default function App() {
       <Route element={<PlatformProtectedRoute />}>
         <Route element={<AppLayout />}>
           <Route path="/plataforma" element={<PlatformPage />} />
+          <Route path="/plataforma/planes" element={<PlansPage />} />
         </Route>
       </Route>
       <Route path="/centro/:centerSlug" element={<CenterProtectedRoute />}>
@@ -133,6 +136,11 @@ export default function App() {
           <Route element={<RoleRoute allowed={["ADMIN"]} />}>
             <Route path="reportes" element={<ReportsPage />} />
             <Route path="administracion" element={<AdminPage />} />
+            <Route path="comercial" element={<ClinicFinancePage />} />
+            <Route
+              path="reportes-comerciales"
+              element={<ClinicFinancePage reports />}
+            />
           </Route>
           <Route element={<RoleRoute allowed={["PACIENTE"]} />}>
             <Route path="perfil" element={<ProfilePage />} />

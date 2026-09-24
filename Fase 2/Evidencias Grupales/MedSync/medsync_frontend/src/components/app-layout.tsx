@@ -1,4 +1,4 @@
-import { BarChart3, Building2, CalendarDays, ChevronRight, ClipboardPlus, LayoutDashboard, LogOut, Menu, Settings2, UserRound, Users, X } from 'lucide-react'
+import { BarChart3, Building2, CalendarDays, ChevronRight, CircleDollarSign, ClipboardPlus, CreditCard, LayoutDashboard, LogOut, Menu, Settings2, UserRound, Users, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { roleNames } from '@/domain/types'
@@ -11,8 +11,8 @@ import { sanctum } from '@/services/http'
 
 export function AppLayout() {
   const { user, organization, logout } = useClinic(); const [open, setOpen] = useState(false); const centerPath = useCenterPath()
-  const roleLinks = user?.role === 'SUPER_ADMIN' ? [{ to: '/plataforma', label: 'Centros y suscripciones', icon: Building2 }]
-    : user?.role === 'ADMIN' ? [{ to: '/administracion', label: 'Administración del centro', icon: Settings2 }, { to: '/resultados', label: 'Tipos de informes', icon: ClipboardPlus }, { to: '/reportes', label: 'Reportes generales', icon: BarChart3 }]
+  const roleLinks = user?.role === 'SUPER_ADMIN' ? [{ to: '/plataforma', label: 'Comercial / Suscripciones', icon: Building2 }, { to: '/plataforma/planes', label: 'Planes', icon: CreditCard }]
+    : user?.role === 'ADMIN' ? [{ to: '/administracion', label: 'Administración del centro', icon: Settings2 }, { to: '/comercial', label: 'Comercial / Finanzas', icon: CircleDollarSign }, { to: '/reportes-comerciales', label: 'Reportes comerciales', icon: BarChart3 }, { to: '/resultados', label: 'Tipos de informes', icon: ClipboardPlus }, { to: '/reportes', label: 'Reportes generales', icon: BarChart3 }]
     : user?.role === 'RECEPCIONISTA' ? [{ to: '/', label: 'Inicio', icon: LayoutDashboard }, { to: '/citas', label: 'Agenda', icon: CalendarDays }, { to: '/reservar', label: 'Reservar hora', icon: ClipboardPlus }, { to: '/pacientes', label: 'Pacientes', icon: Users }, ...(user.permissions.includes('results.upload') ? [{ to: '/resultados', label: 'Cargar informes', icon: ClipboardPlus }] : [])]
     : user?.role === 'PROFESIONAL' ? [{ to: '/', label: 'Inicio', icon: LayoutDashboard }, { to: '/citas', label: 'Mi agenda', icon: CalendarDays }, { to: '/resultados', label: 'Informes y resultados', icon: ClipboardPlus }]
     : [{ to: '/', label: 'Inicio', icon: LayoutDashboard }, { to: '/citas', label: 'Mis citas', icon: CalendarDays }, { to: '/reservar', label: 'Reservar hora', icon: ClipboardPlus }, { to: '/resultados', label: 'Mis informes y resultados', icon: ClipboardPlus }, { to: '/perfil', label: 'Mis datos', icon: UserRound }]

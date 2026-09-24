@@ -87,3 +87,11 @@ Las rutas y cargas completas están documentadas en `medsync_frontend/docs/api-c
 - Documentar variables de entorno, comandos de instalación y cómo ejecutar pruebas en `medsync_backend/README.md`.
 - Antes de conectar el frontend, acordar con el equipo las estructuras JSON definitivas y actualizar `medsync_frontend/docs/api-contract.md` si cambian.
 - Acordar el comportamiento comercial de suscripciones vencidas o suspendidas, el alcance de recepción sobre informes y los límites definitivos de archivos antes de habilitar producción.
+
+## Integración comercial de frontend
+
+Las vistas de plataforma incorporan gestión comercial de centros, planes y suscripciones; las vistas del `ADMIN` muestran indicadores económicos únicamente de su propio centro. La interfaz usa valores temporales mientras no existen endpoints, pero backend debe reemplazarlos sin que el cliente pueda elegir otro centro.
+
+- Plataforma (`SUPER_ADMIN`): exponer centros con plan, estado de suscripción, fecha de inicio, próxima renovación, usuarios/profesionales asociados, valor mensual y estado de pago. Agregar `GET /api/v1/platform/centers/{id}/subscription` y `PATCH /api/v1/platform/centers/{id}/subscription`; solo `SUPER_ADMIN` puede consultar o cambiar estos recursos.
+- Administración del centro (`ADMIN`): exponer `GET /api/v1/commercial/summary?from=&to=&professional_id=&service_id=` y `GET /api/v1/commercial/reports` resueltos exclusivamente desde el centro autenticado. Deben devolver ingresos estimados, atenciones, ticket promedio, cancelaciones, no-show, pérdidas estimadas, series mensuales y agrupaciones por servicio/profesional.
+- Los importes comerciales no se calculan ni se aceptan desde React. El servidor debe usar precios, pagos y citas de su propio centro, aplicar autorización por rol/centro y devolver agregados sin datos clínicos identificatorios innecesarios.
