@@ -62,11 +62,16 @@ public function specialties(): BelongsToMany
         ->using(ProfessionalSpecialty::class)
         ->withTimestamps();
 }
-
-    public function availabilities()
-    {
-        return $this->hasMany(Availability::class, 'professional_id');
-    }
+/**
+ * Bloques de disponibilidad configurados para el profesional.
+ */
+public function availabilities(): HasMany
+{
+    return $this->hasMany(
+        Availability::class,
+        'professional_id'
+    );
+}
     /**
  * Reservas asignadas al profesional.
  */
