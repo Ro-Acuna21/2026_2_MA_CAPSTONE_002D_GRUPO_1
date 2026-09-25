@@ -6,6 +6,7 @@ use App\Models\Core\CenterUser;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Patient extends Model
 {
@@ -53,11 +54,16 @@ class Patient extends Model
     {
         return $this->hasOne(CenterUser::class, 'patient_id');
     }
-
-    public function appointments()
-    {
-        return $this->hasMany(Appointment::class, 'patient_id');
-    }
+    /**
+ * Reservas pertenecientes al paciente.
+ */
+public function appointments(): HasMany
+{
+    return $this->hasMany(
+        Appointment::class,
+        'patient_id'
+    );
+}
     public function addresses()
 {
     return $this->hasMany(PatientAddress::class, 'patient_id');
