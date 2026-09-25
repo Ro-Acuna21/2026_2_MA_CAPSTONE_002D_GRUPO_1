@@ -4,6 +4,7 @@ namespace App\Models\Center;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Specialty extends Model
 {
@@ -51,4 +52,14 @@ class Specialty extends Model
             ->using(ProfessionalSpecialty::class)
             ->withTimestamps();
     }
+    /**
+ * Prestaciones asociadas a la especialidad.
+ */
+public function services(): HasMany
+{
+    return $this->hasMany(
+        Service::class,
+        'specialty_id'
+    );
+}
 }
