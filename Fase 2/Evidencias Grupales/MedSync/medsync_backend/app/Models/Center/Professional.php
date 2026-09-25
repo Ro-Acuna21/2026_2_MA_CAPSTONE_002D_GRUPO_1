@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Professional extends Model
 {
@@ -66,9 +67,14 @@ public function specialties(): BelongsToMany
     {
         return $this->hasMany(Availability::class, 'professional_id');
     }
-
-    public function appointments()
-    {
-        return $this->hasMany(Appointment::class, 'professional_id');
-    }
+    /**
+ * Reservas asignadas al profesional.
+ */
+public function appointments(): HasMany
+{
+    return $this->hasMany(
+        Appointment::class,
+        'professional_id'
+    );
+}
 }
