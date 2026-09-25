@@ -6,6 +6,7 @@ use App\Models\Core\CenterUser;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Professional extends Model
 {
@@ -24,6 +25,7 @@ class Professional extends Model
         'phone',
         'is_active',
     ];
+    
 
     protected function casts(): array
     {
@@ -42,15 +44,23 @@ class Professional extends Model
         return $this->hasOne(CenterUser::class, 'professional_id');
     }
 
-    public function specialties()
-    {
-        return $this->belongsToMany(
-            Specialty::class,
-            'professional_specialty',
-            'professional_id',
-            'specialty_id'
-        );
-    }
+/**
+ * Especialidades asociadas al profesional.
+ *
+ * La relación es muchos-a-muchos mediante
+ * professional_specialty.
+ */
+public function specialties(): BelongsToMany
+{
+    return $this->belongsToMany(
+        Specialty::class,
+        'professional_specialty',
+        'professional_id',
+        'specialty_id'
+    )
+        ->using(ProfessionalSpecialty::class)
+        ->withTimestamps();
+}
 
     public function availabilities()
     {
