@@ -22,6 +22,7 @@ import { ClinicFinancePage } from "@/pages/clinic-finance-page";
 import { ResultsPage } from "@/pages/results-page";
 import type { Role } from "@/domain/types";
 import { centerBase, useCenterPath } from "@/lib/tenant";
+import { ActivateAccountPage } from "@/pages/activate-account-page";
 
 function PlatformProtectedRoute() {
   const { user, organization } = useClinic();
@@ -99,6 +100,7 @@ export default function App() {
           <Navigate to="/centro/clinica-horizonte/crear-cuenta" replace />
         }
       />
+      <Route path="/activar-cuenta" element={<ActivateAccountPage />} />
       <Route path="/plataforma/acceso" element={<LoginPage platform />} />
       <Route path="/centro/:centerSlug/ingresar" element={<LoginPage />} />
       <Route
