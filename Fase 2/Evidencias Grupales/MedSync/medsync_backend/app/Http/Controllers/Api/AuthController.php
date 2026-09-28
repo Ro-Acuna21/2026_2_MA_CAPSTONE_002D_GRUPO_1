@@ -27,9 +27,12 @@ class AuthController extends Controller
      */
     public function register(Request $request)
     {
+        // Normaliza el correo y el teléfono antes de validar.
+        // El correo se almacena en minúsculas y sin espacios exteriores.
         // Normaliza el teléfono antes de validar, igual que hace el frontend
         // (quita espacios, paréntesis y guiones) para que el regex sea comparable.
         $request->merge([
+            'email' => strtolower(trim((string) $request->input('email'))),
             'phone' => preg_replace('/[\s()-]/', '', (string) $request->input('phone')),
         ]);
 
@@ -46,6 +49,17 @@ class AuthController extends Controller
             'password' => ['required', 'string', 'min:8', 'regex:/[a-z]/', 'regex:/[A-Z]/', 'regex:/\d/', 'confirmed'],
             'consent' => ['required', 'accepted'],
         ]);
+        $existingUser = User::query()
+    ->whereRaw('LOWER(BTRIM(email)) = ?', [$data['email']])
+    ->exists();
+
+if ($existingUser) {
+    throw ValidationException::withMessages([
+        'email' => [
+            'Ya existe una cuenta registrada con este correo electrónico.',
+        ],
+    ]);
+}
 
         $rut = ValidRut::normalize($data['rut']);
 
@@ -67,12 +81,17 @@ class AuthController extends Controller
 
         $patient = DB::transaction(function () use ($data, $rut, $medicalCenter, $healthInsurance) {
             $existingPatient = Patient::where(function ($query) use ($rut, $data) {
-                    $query->where('rut', $rut)->orWhere('email', $data['email']);
-                })
-                ->first();
+    $query->where('rut', $rut)
+        ->orWhereRaw(
+            'LOWER(BTRIM(email)) = ?',
+            [$data['email']]
+        );
+})
+->first();
 
             $rutMatches = $existingPatient && $existingPatient->rut === $rut;
-            $emailMatches = $existingPatient && $existingPatient->email === $data['email'];
+            $emailMatches = $existingPatient
+    && strtolower(trim($existingPatient->email)) === $data['email'];
 
             if ($existingPatient && $existingPatient->user_id) {
                 throw ValidationException::withMessages([
@@ -150,6 +169,9 @@ class AuthController extends Controller
      */
     public function login(Request $request)
     {
+        $request->merge([
+    'email' => strtolower(trim((string) $request->input('email'))),
+]);
         $credentials = $request->validate([
             'email' => ['required', 'email'],
             'password' => ['required', 'string'],
