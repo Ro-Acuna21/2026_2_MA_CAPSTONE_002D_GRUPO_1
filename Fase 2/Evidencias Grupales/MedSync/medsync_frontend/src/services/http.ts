@@ -116,9 +116,26 @@ export interface ProfessionalResponse {
 export interface ProfessionalsResponse {
   data: BackendProfessional[];
 }
+export interface ActivateAccountPayload {
+  email: string;
+  token: string;
+  password: string;
+  password_confirmation: string;
+}
 
+export interface MessageResponse {
+  message: string;
+}
 export const sanctum = {
   csrf: () => apiRequest<void>("/sanctum/csrf-cookie"),
+  activateAccount: async (payload: ActivateAccountPayload) => {
+    await sanctum.csrf();
+
+    return apiRequest<MessageResponse>("/api/auth/activate-account", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
 
   login: async (email: string, password: string) => {
     await sanctum.csrf();
