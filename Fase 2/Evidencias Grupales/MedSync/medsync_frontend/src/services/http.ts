@@ -116,6 +116,17 @@ export interface ProfessionalResponse {
 export interface ProfessionalsResponse {
   data: BackendProfessional[];
 }
+export interface ProfessionalAccessResponse {
+  message: string;
+
+  data: {
+    professional_id: number;
+    user_id: number;
+    role: "PROFESIONAL";
+    account_created: boolean;
+    invitation_sent: boolean;
+  };
+}
 export interface ActivateAccountPayload {
   email: string;
   token: string;
@@ -125,6 +136,17 @@ export interface ActivateAccountPayload {
 
 export interface MessageResponse {
   message: string;
+}
+export interface ProfessionalAccessResponse {
+  message: string;
+
+  data: {
+    professional_id: number;
+    user_id: number;
+    role: "PROFESIONAL";
+    account_created: boolean;
+    invitation_sent: boolean;
+  };
 }
 export const sanctum = {
   csrf: () => apiRequest<void>("/sanctum/csrf-cookie"),
@@ -173,4 +195,15 @@ export const professionalApi = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
+
+  enableAccess: async (professionalId: number) => {
+    await sanctum.csrf();
+
+    return apiRequest<ProfessionalAccessResponse>(
+      `/api/v1/professionals/${professionalId}/enable-access`,
+      {
+        method: "POST",
+      },
+    );
+  },
 };
