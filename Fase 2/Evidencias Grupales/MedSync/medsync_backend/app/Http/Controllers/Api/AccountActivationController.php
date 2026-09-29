@@ -7,7 +7,6 @@ use App\Http\Requests\ActivateAccountRequest;
 use App\Models\User;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Support\Facades\Password;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class AccountActivationController extends Controller
@@ -43,9 +42,6 @@ class AccountActivationController extends Controller
                 /*
                  * Invalida sesiones persistentes antiguas si existieran.
                  */
-                $user->setRememberToken(
-                    Str::random(60)
-                );
 
                 $user->save();
 
