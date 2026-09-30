@@ -16,7 +16,7 @@ export function AppointmentTable({ appointments, title = 'Agenda' }: { appointme
   const professional = (id: string) => data.professionals.find((item) => item.id === id)
   const service = (id: string) => data.services.find((item) => item.id === id)
   const canReschedule = (appointment: Appointment, role?: Role) => role === 'RECEPCIONISTA' || (role === 'PACIENTE' && canPatientModifyAppointment(appointment))
-  const change = (id: string, value: string) => { try { if (value) changeStatus(id, value as AppointmentStatus) } catch (error) { toast.error((error as Error).message) } }
+  const change = async (id: string, value: string) => { try { if (value) await changeStatus(id, value as AppointmentStatus) } catch (error) { toast.error((error as Error).message) } }
   return <div className="overflow-hidden rounded-xl border bg-card shadow-soft">
     <div className="flex items-center justify-between border-b px-5 py-4"><div><h2 className="font-semibold">{title}</h2><p className="text-xs text-muted-foreground">{appointments.length} registros visibles</p></div><Ellipsis className="size-5 text-muted-foreground" /></div>
     <div className="overflow-x-auto"><table className="w-full min-w-[850px] text-left text-sm"><thead className="bg-muted/60 text-[11px] uppercase tracking-wider text-muted-foreground"><tr><th className="px-5 py-3">Fecha y hora</th><th className="px-4 py-3">Paciente</th><th className="px-4 py-3">Profesional</th><th className="px-4 py-3">Atención</th><th className="px-4 py-3">Estado</th><th className="px-4 py-3">Acciones</th></tr></thead>

@@ -29,7 +29,9 @@ Lo que ya funciona:
 
 ⚠️ **Riesgo conocido, pendiente de decidir en equipo** (ver detalle en sección 11): al usar dos bases físicas separadas, una sola transacción de Laravel ya no puede cubrir una operación que escribe en ambas a la vez. Esto afecta el registro de pacientes.
 
-Lo que **todavía no existe** (ver sección 10, próximas iteraciones): roles con Spatie Permission, multi-centro real (hoy sigue fijo a `clinica-horizonte`), especialidades, agenda/citas, resultados médicos, plataforma/suscripciones.
+Lo que **todavía no existe** (ver sección 10, próximas iteraciones): roles con Spatie Permission, multi-centro real (hoy sigue fijo a `clinica-horizonte`), resultados médicos, plataforma/suscripciones.
+
+> Actualización: especialidades, prestaciones, disponibilidad y reservas **ya tienen backend real** (el flujo de reserva del propio paciente, de punta a punta). Ver sección 13 para el detalle — la administración del catálogo y la agenda de recepción/profesional siguen pendientes.
 
 ---
 
@@ -288,15 +290,20 @@ Orden recomendado según `INDICACIONES_BACKEND.md` y `REQUERIMIENTOS_BD.md`, aju
 - Middlewares/policies que verifiquen rol + centro en cada request (no confiar en lo que muestra React).
 
 ### Iteración 3 — Catálogos y fichas del centro
-- Migraciones y CRUD para `professionals`, `specialties`, `services`, `professional_specialty`.
-- Ajustar esos modelos (hoy usan el diseño viejo: tabla en singular, sin `is_active`/timestamps reales) igual que se hizo con `MedicalCenter`, `Patient`, `CenterUser`.
-- Únicos compuestos por centro (RUT y correo de profesionales).
+- ✅ Migraciones para `professionals`, `specialties`, `services`, `professional_specialty` (Roberto).
+- ✅ CRUD de `professionals` (`ProfessionalController`) y flujo de habilitación de acceso por correo (`ProfessionalAccessService`/`ProfessionalAccessController`, Roberto).
+- Pendiente: CRUD real de `specialties`/`services` (hoy solo se leen — ver sección 13 — pero se administran con datos de seeder, no desde una pantalla de administración).
+- Únicos compuestos por centro (RUT y correo de profesionales) — ya implementado para `professionals`.
 
 ### Iteración 4 — Agenda y disponibilidad
-- `availabilities` (horarios recurrentes) y `appointments` (horas como `TIME`, no `DATE`).
-- Endpoint `GET /api/v1/slots` calculando disponibilidad real en servidor.
-- Reglas: cancelar/reprogramar hasta 24h antes, `ATENDIDA` solo desde la hora de inicio, `NO_SHOW` solo después de la hora de término, sin solapamientos (transaccional).
-- `appointment_history` para trazabilidad de cambios.
+- ✅ `availabilities` (horarios recurrentes) y `appointments` (horas como `TIME`, no `DATE`) — migraciones de Roberto.
+- ✅ Cálculo de disponibilidad real en servidor: `GET /api/v1/appointments/available-slots` (equivalente al `GET /api/v1/slots` propuesto originalmente).
+- ✅ Reglas ya implementadas en `AppointmentService`: cancelar/reprogramar hasta 24h antes, sin solapamientos (revalidado dentro de la transacción), profesional↔especialidad, disponibilidad↔horario.
+- ✅ `appointment_history` para trazabilidad de cambios (creación, reprogramación, cancelación).
+- Pendiente: `ATENDIDA` solo desde la hora de inicio y `NO_SHOW` solo después de la hora de término (cambios de estado que hace recepción/profesional, no el paciente — no se construyó ese endpoint todavía).
+- Pendiente: agenda general para recepción/profesional (`GET /api/v1/appointments` con todas las citas del centro, no solo `/my` del paciente autenticado).
+- Pendiente: administración del catálogo (crear/editar especialidades, prestaciones y disponibilidad desde una pantalla, no desde el seeder).
+- Detalle completo en sección 13.
 
 ### Iteración 5 — Resultados médicos
 - `result_types` y `medical_results` (estados `DRAFT` / `PUBLISHED` / `VOIDED`).
@@ -387,10 +394,17 @@ Ningún test existente de frontend (`App.test.tsx`, `clinic-store.test.tsx`) eje
 
 ```text
 app/
-  Http/Controllers/Api/   Controladores de la API (AuthController, ...)
+  Http/Controllers/Api/   Controladores de la API (AuthController, ProfessionalController,
+                          ProfessionalAccessController, AccountActivationController,
+                          ServiceController, AppointmentController, ...)
+  Services/
+    Professionals/        ProfessionalAccessService (habilitación de acceso, Roberto)
+    Appointments/          AppointmentService (reservas, disponibilidad, ver sección 13)
   Models/
     Core/                 Modelos de la base "core" (MedicalCenter, CenterUser, MedicalCenterAddress)
-    Center/                Modelos de la base "center" (Patient, Professional, HealthInsurance, PatientAddress)
+    Center/                Modelos de la base "center" (Patient, Professional, HealthInsurance,
+                          PatientAddress, Specialty, ProfessionalSpecialty, Service,
+                          Availability, Appointment, AppointmentHistory)
     User.php              Vive en "core", sin namespace
   Providers/
     AppServiceProvider.php  Registra las carpetas de migraciones de core/ y center/
@@ -398,8 +412,11 @@ app/
 database/
   migrations/
     core/                 Migraciones de la base "core" (medsync_core)
-    center/                Migraciones de la base "center" (medsync_clinica_horizonte)
-  seeders/                Datos iniciales (super admin, centro fijo, previsiones, paciente/profesional demo)
+    center/                Migraciones de la base "center" (medsync_clinica_horizonte),
+                          incluye specialties/services/professional_specialty/
+                          availabilities/appointments/appointment_history
+  seeders/                Datos iniciales (super admin, centro fijo, previsiones,
+                          pacientes/profesionales demo, catálogo de reservas)
 docs/
   Base_datos_y_modelos.md  Diseño detallado del modelo de datos core/center (Roberto)
 routes/

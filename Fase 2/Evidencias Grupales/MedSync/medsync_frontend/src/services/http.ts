@@ -1,4 +1,4 @@
-import type { Role } from "@/domain/types";
+import type { AppointmentStatus, Role } from "@/domain/types";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
@@ -48,6 +48,21 @@ export async function apiRequest<T>(
   }
 
   return response.status === 204 ? (undefined as T) : response.json();
+}
+
+/**
+ * Extrae el primer mensaje de validación de un ApiError, o su mensaje
+ * general si no trae errores de campo. Útil para mostrar un solo
+ * mensaje de error en toasts/formularios.
+ */
+export function firstApiErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof ApiError) {
+    const firstField = error.errors ? Object.values(error.errors)[0] : undefined;
+
+    return firstField?.[0] ?? error.message ?? fallback;
+  }
+
+  return error instanceof Error ? error.message : fallback;
 }
 
 export interface PatientRegisterPayload {
@@ -137,17 +152,6 @@ export interface ActivateAccountPayload {
 export interface MessageResponse {
   message: string;
 }
-export interface ProfessionalAccessResponse {
-  message: string;
-
-  data: {
-    professional_id: number;
-    user_id: number;
-    role: "PROFESIONAL";
-    account_created: boolean;
-    invitation_sent: boolean;
-  };
-}
 export const sanctum = {
   csrf: () => apiRequest<void>("/sanctum/csrf-cookie"),
   activateAccount: async (payload: ActivateAccountPayload) => {
@@ -206,4 +210,131 @@ export const professionalApi = {
       },
     );
   },
+};
+
+/*
+ * Reservas y disponibilidad (README_RESERVAS_DISPONIBILIDAD_BD.md).
+ *
+ * Por ahora estos endpoints solo cubren la reserva realizada por el
+ * propio paciente autenticado (POST /api/v1/appointments resuelve el
+ * paciente desde la sesión). La agenda de recepción/profesional y la
+ * administración del catálogo (especialidades, prestaciones,
+ * disponibilidad) todavía no están conectadas al backend.
+ */
+export interface BackendSpecialtySummary {
+  id: number;
+  name: string;
+}
+
+export interface BackendService {
+  id: number;
+  name: string;
+  description: string | null;
+  duration_minutes: number;
+  specialty: BackendSpecialtySummary | null;
+}
+
+export interface ServicesResponse {
+  data: BackendService[];
+}
+
+export interface BackendProfessionalSummary {
+  id: number;
+  first_name: string;
+  last_name: string;
+}
+
+export interface ServiceProfessionalsResponse {
+  data: BackendProfessionalSummary[];
+}
+
+export interface AvailableSlotsResponse {
+  data: {
+    date: string;
+    professional_id: number;
+    service_id: number;
+    duration_minutes: number;
+    slots: string[];
+  };
+}
+
+export interface BackendAppointment {
+  id: number;
+  appointment_date: string;
+  start_time: string;
+  end_time: string;
+  status: AppointmentStatus;
+  source: "WEB" | "RECEPCION" | "DEMO";
+  overbook: boolean;
+  note: string | null;
+
+  service: {
+    id: number;
+    name: string;
+    duration_minutes: number;
+    specialty: BackendSpecialtySummary | null;
+  } | null;
+
+  professional: {
+    id: number;
+    first_name: string;
+    last_name: string;
+  } | null;
+}
+
+export interface AppointmentResponse {
+  message: string;
+  data: BackendAppointment;
+}
+
+export interface AppointmentsResponse {
+  data: BackendAppointment[];
+}
+
+export interface CreateAppointmentPayload {
+  service_id: number;
+  professional_id: number;
+  appointment_date: string;
+  start_time: string;
+}
+
+export interface RescheduleAppointmentPayload {
+  service_id?: number;
+  professional_id?: number;
+  appointment_date: string;
+  start_time: string;
+}
+
+export const appointmentApi = {
+  services: () => apiRequest<ServicesResponse>("/api/v1/services"),
+
+  professionalsForService: (serviceId: number) =>
+    apiRequest<ServiceProfessionalsResponse>(
+      `/api/v1/services/${serviceId}/professionals`,
+    ),
+
+  availableSlots: (serviceId: number, professionalId: number, date: string) =>
+    apiRequest<AvailableSlotsResponse>(
+      `/api/v1/appointments/available-slots?service_id=${serviceId}&professional_id=${professionalId}&date=${date}`,
+    ),
+
+  my: () => apiRequest<AppointmentsResponse>("/api/v1/appointments/my"),
+
+  create: (payload: CreateAppointmentPayload) =>
+    apiRequest<AppointmentResponse>("/api/v1/appointments", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  reschedule: (id: number, payload: RescheduleAppointmentPayload) =>
+    apiRequest<AppointmentResponse>(`/api/v1/appointments/${id}/reschedule`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+
+  cancel: (id: number, reason?: string) =>
+    apiRequest<AppointmentResponse>(`/api/v1/appointments/${id}/cancel`, {
+      method: "PATCH",
+      body: JSON.stringify({ reason }),
+    }),
 };

@@ -15,6 +15,7 @@ import { createMockData } from "@/data/mock-data";
 import { permissionsFor } from "@/domain/permissions";
 
 import type {
+  Appointment,
   AppointmentStatus,
   BookingInput,
   ClinicData,
@@ -48,7 +49,14 @@ import {
   canSetAppointmentStatus,
 } from "@/domain/appointment-rules";
 
-import { professionalApi, sanctum, type AuthUser } from "@/services/http";
+import {
+  appointmentApi,
+  firstApiErrorMessage,
+  professionalApi,
+  sanctum,
+  type AuthUser,
+  type BackendAppointment,
+} from "@/services/http";
 
 const DATA_KEY = "clinica_horizonte_react_v4";
 
@@ -60,6 +68,52 @@ const ACTIVE: AppointmentStatus[] = [
   "ATENDIDA",
   "NO_SHOW",
 ];
+
+/*
+ * Convierte una reserva devuelta por Laravel (snake_case, ids
+ * numéricos) al formato que ya espera el frontend (camelCase, ids
+ * como string).
+ *
+ * Solo se utiliza para reservas del PACIENTE autenticado, ya que por
+ * ahora es el único flujo de reservas conectado al backend real.
+ */
+function mapBackendAppointment(
+  item: BackendAppointment,
+  organizationId: string,
+  user: User,
+): Appointment {
+  return {
+    id: String(item.id),
+
+    organizationId,
+
+    patientId: user.patientId ?? "",
+
+    professionalId: item.professional ? String(item.professional.id) : "",
+
+    specialtyId: item.service?.specialty
+      ? String(item.service.specialty.id)
+      : "",
+
+    serviceId: item.service ? String(item.service.id) : "",
+
+    date: item.appointment_date,
+
+    time: item.start_time,
+
+    end: item.end_time,
+
+    status: item.status,
+
+    source: item.source,
+
+    note: item.note ?? undefined,
+
+    overbook: item.overbook,
+
+    createdBy: user.id,
+  };
+}
 
 function loadData(): ClinicData {
   try {
@@ -195,11 +249,30 @@ interface ClinicContextValue {
     excludeId?: string,
   ): Slot[];
 
-  createAppointment(input: BookingInput): void;
+  /*
+   * Igual que slots(), pero consultando los horarios reales
+   * (GET /api/v1/appointments/available-slots) en vez del catálogo
+   * mock. Se usa en el flujo de reserva del paciente.
+   */
+  patientSlots(
+    serviceId: string,
+    professionalId: string,
+    date: string,
+  ): Promise<Slot[]>;
 
-  changeStatus(id: string, status: AppointmentStatus): void;
+  /*
+   * Profesionales reales que atienden la especialidad de una
+   * prestación (GET /api/v1/services/{service}/professionals).
+   */
+  professionalsForService(
+    serviceId: string,
+  ): Promise<{ id: string; name: string }[]>;
 
-  reschedule(id: string, date: string, time: string): void;
+  createAppointment(input: BookingInput): Promise<void>;
+
+  changeStatus(id: string, status: AppointmentStatus): Promise<void>;
+
+  reschedule(id: string, date: string, time: string): Promise<void>;
 
   createPatient(input: Omit<Patient, "id" | "active" | "organizationId">): void;
 
@@ -454,6 +527,152 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
       });
   }, [authLoading, user, organization]);
 
+  /*
+   * Catálogo real de especialidades y prestaciones para el paciente.
+   *
+   * Reemplaza el catálogo mock de este centro por el que devuelve
+   * Laravel (README_RESERVAS_DISPONIBILIDAD_BD.md). La administración
+   * de especialidades/prestaciones/disponibilidad sigue siendo mock
+   * por ahora: solo la consulta que ve el paciente al reservar está
+   * conectada al backend real.
+   */
+  useEffect(() => {
+    if (authLoading || !user || !organization || user.role !== "PACIENTE") {
+      return;
+    }
+
+    appointmentApi
+      .services()
+      .then((response) => {
+        const specialties = new Map<string, ClinicData["specialties"][number]>();
+
+        const services: ClinicData["services"] = response.data.map((item) => {
+          if (item.specialty) {
+            specialties.set(String(item.specialty.id), {
+              id: String(item.specialty.id),
+              organizationId: organization.id,
+              name: item.specialty.name,
+              description: "",
+              active: true,
+            });
+          }
+
+          return {
+            id: String(item.id),
+            organizationId: organization.id,
+            specialtyId: item.specialty ? String(item.specialty.id) : "",
+            name: item.name,
+            duration: item.duration_minutes,
+            active: true,
+          };
+        });
+
+        setAllData((current) => ({
+          ...current,
+
+          specialties: [
+            ...current.specialties.filter(
+              (specialty) => specialty.organizationId !== organization.id,
+            ),
+            ...Array.from(specialties.values()),
+          ],
+
+          services: [
+            ...current.services.filter(
+              (service) => service.organizationId !== organization.id,
+            ),
+            ...services,
+          ],
+        }));
+      })
+      .catch((error) => {
+        console.error("No fue posible cargar el catálogo real de reservas:", error);
+      });
+  }, [authLoading, user, organization]);
+
+  /*
+   * "Mis Reservas" real del paciente autenticado
+   * (GET /api/v1/appointments/my).
+   *
+   * createAppointment/reschedule/changeStatus actualizan esta misma
+   * lista directamente al recibir la respuesta de Laravel, por lo que
+   * este efecto solo necesita ejecutarse al iniciar sesión.
+   */
+  useEffect(() => {
+    if (authLoading || !user || !organization || user.role !== "PACIENTE") {
+      return;
+    }
+
+    appointmentApi
+      .my()
+      .then((response) => {
+        const appointments = response.data.map((item) =>
+          mapBackendAppointment(item, organization.id, user),
+        );
+
+        /*
+         * GET /api/v1/professionals solo lo puede consultar un ADMIN,
+         * así que un paciente no puede sincronizar el roster completo
+         * de profesionales. En vez de eso, agregamos aquí los
+         * profesionales reales que aparecen en sus propias reservas,
+         * para que AppointmentTable pueda mostrar su nombre.
+         */
+        const professionalStubs: Professional[] = [];
+
+        response.data.forEach((item) => {
+          if (!item.professional) {
+            return;
+          }
+
+          const id = String(item.professional.id);
+
+          if (professionalStubs.some((professional) => professional.id === id)) {
+            return;
+          }
+
+          professionalStubs.push({
+            id,
+            organizationId: organization.id,
+            name: `${item.professional.first_name} ${item.professional.last_name}`,
+            rut: "",
+            email: "",
+            phone: "",
+            specialtyIds: [],
+            description: "",
+            active: true,
+          });
+        });
+
+        setAllData((current) => ({
+          ...current,
+
+          appointments: [
+            ...current.appointments.filter(
+              (appointment) =>
+                !(
+                  appointment.organizationId === organization.id &&
+                  appointment.patientId === user.patientId
+                ),
+            ),
+            ...appointments,
+          ],
+
+          professionals: [
+            ...current.professionals,
+            ...professionalStubs.filter(
+              (stub) =>
+                !current.professionals.some(
+                  (professional) => professional.id === stub.id,
+                ),
+            ),
+          ],
+        }));
+      })
+      .catch((error) => {
+        console.error("No fue posible cargar tus reservas:", error);
+      });
+  }, [authLoading, user, organization]);
+
   const commit = useCallback(
     (updater: (current: ClinicData) => ClinicData) => {
       const next = updater(allData);
@@ -676,7 +895,112 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
       });
   };
 
-  const createAppointment = (input: BookingInput) => {
+  /*
+   * Horarios reales disponibles para una prestación y profesional
+   * (GET /api/v1/appointments/available-slots). Laravel ya descarta
+   * los bloques ocupados y los horarios pasados.
+   */
+  const patientSlots = useCallback(
+    async (
+      serviceId: string,
+      professionalId: string,
+      date: string,
+    ): Promise<Slot[]> => {
+      if (!serviceId || !professionalId || !date) {
+        return [];
+      }
+
+      try {
+        const response = await appointmentApi.availableSlots(
+          Number(serviceId),
+          Number(professionalId),
+          date,
+        );
+
+        const duration = response.data.duration_minutes;
+
+        return response.data.slots.map((time) => ({
+          time,
+          end: toTime(toMinutes(time) + duration),
+        }));
+      } catch (error) {
+        console.error("No fue posible obtener los horarios disponibles:", error);
+
+        return [];
+      }
+    },
+    [],
+  );
+
+  /*
+   * Profesionales reales que atienden la especialidad de una
+   * prestación (GET /api/v1/services/{service}/professionals).
+   */
+  const professionalsForService = useCallback(
+    async (serviceId: string): Promise<{ id: string; name: string }[]> => {
+      if (!serviceId) {
+        return [];
+      }
+
+      try {
+        const response = await appointmentApi.professionalsForService(
+          Number(serviceId),
+        );
+
+        return response.data.map((professional) => ({
+          id: String(professional.id),
+          name: `${professional.first_name} ${professional.last_name}`,
+        }));
+      } catch (error) {
+        console.error("No fue posible obtener los profesionales:", error);
+
+        return [];
+      }
+    },
+    [],
+  );
+
+  const createAppointment = async (input: BookingInput) => {
+    /*
+     * El paciente reserva su propia hora contra el backend real.
+     * Recepción todavía crea citas en el catálogo mock (el backend
+     * solo resuelve al paciente autenticado, no permite reservar a
+     * nombre de otra persona todavía).
+     */
+    if (user?.role === "PACIENTE") {
+      if (!organization) {
+        return;
+      }
+
+      try {
+        const response = await appointmentApi.create({
+          service_id: Number(input.serviceId),
+          professional_id: Number(input.professionalId),
+          appointment_date: input.date,
+          start_time: input.time,
+        });
+
+        const mapped = mapBackendAppointment(
+          response.data,
+          organization.id,
+          user,
+        );
+
+        setAllData((current) => ({
+          ...current,
+          appointments: [...current.appointments, mapped],
+        }));
+
+        toast.success("Reserva creada correctamente");
+      } catch (error) {
+        throw new Error(
+          firstApiErrorMessage(error, "No fue posible crear la reserva."),
+        );
+      }
+
+      return;
+    }
+
     requirePermission("appointments.create");
 
     if (!user || !organization) {
@@ -772,7 +1096,47 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
     toast.success("Reserva creada correctamente");
   };
 
-  const changeStatus = (id: string, status: AppointmentStatus) => {
+  const changeStatus = async (id: string, status: AppointmentStatus) => {
+    /*
+     * El paciente solo puede cancelar, y lo hace contra el backend
+     * real (PATCH /api/v1/appointments/{id}/cancel). Laravel vuelve a
+     * validar la ventana de 24 horas y el estado actual de la cita.
+     */
+    if (user?.role === "PACIENTE") {
+      if (status !== "CANCELADA") {
+        throw new Error("No puedes realizar este cambio de estado.");
+      }
+
+      if (!organization) {
+        return;
+      }
+
+      try {
+        const response = await appointmentApi.cancel(Number(id));
+
+        const mapped = mapBackendAppointment(
+          response.data,
+          organization.id,
+          user,
+        );
+
+        setAllData((current) => ({
+          ...current,
+          appointments: current.appointments.map((item) =>
+            item.id === id ? mapped : item,
+          ),
+        }));
+
+        toast.success("Reserva cancelada");
+      } catch (error) {
+        throw new Error(
+          firstApiErrorMessage(error, "No fue posible cancelar la reserva."),
+        );
+      }
+
+      return;
+    }
+
     requirePermission("appointments.update");
 
     const target = data.appointments.find(
@@ -848,7 +1212,46 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
     toast.success("Estado de la cita actualizado");
   };
 
-  const reschedule = (id: string, date: string, time: string) => {
+  const reschedule = async (id: string, date: string, time: string) => {
+    /*
+     * Reprogramación real del paciente
+     * (PATCH /api/v1/appointments/{id}/reschedule). Laravel vuelve a
+     * validar disponibilidad, solapamiento y la ventana de 24 horas.
+     */
+    if (user?.role === "PACIENTE") {
+      if (!organization) {
+        return;
+      }
+
+      try {
+        const response = await appointmentApi.reschedule(Number(id), {
+          appointment_date: date,
+          start_time: time,
+        });
+
+        const mapped = mapBackendAppointment(
+          response.data,
+          organization.id,
+          user,
+        );
+
+        setAllData((current) => ({
+          ...current,
+          appointments: current.appointments.map((item) =>
+            item.id === id ? mapped : item,
+          ),
+        }));
+
+        toast.success("Cita reprogramada");
+      } catch (error) {
+        throw new Error(
+          firstApiErrorMessage(error, "No fue posible reprogramar la reserva."),
+        );
+      }
+
+      return;
+    }
+
     requirePermission("appointments.update");
 
     const target = data.appointments.find(
@@ -1840,6 +2243,10 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
     reset,
 
     slots,
+
+    patientSlots,
+
+    professionalsForService,
 
     createAppointment,
 
