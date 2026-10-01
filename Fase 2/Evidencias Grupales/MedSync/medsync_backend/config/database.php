@@ -98,8 +98,8 @@ return [
             'search_path' => 'public',
             'sslmode' => env('DB_SSLMODE', 'prefer'),
         ],
-        'core' => [
-    'driver' => 'pgsql',
+'core' => [
+    'driver' => env('DB_CORE_CONNECTION', 'pgsql'),
     'url' => env('DB_URL'),
     'host' => env('DB_HOST', '127.0.0.1'),
     'port' => env('DB_PORT', '5432'),
@@ -114,7 +114,7 @@ return [
 ],
 
 'center' => [
-    'driver' => 'pgsql',
+    'driver' => env('DB_CENTER_CONNECTION', 'pgsql'),
     'url' => env('DB_URL'),
     'host' => env('DB_HOST', '127.0.0.1'),
     'port' => env('DB_PORT', '5432'),

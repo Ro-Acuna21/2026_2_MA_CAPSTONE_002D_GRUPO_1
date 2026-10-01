@@ -101,6 +101,10 @@ return new class extends Migration
             );
         });
 
+        if (DB::connection('center')->getDriverName() !== 'pgsql') {
+            return;
+        }
+
         /*
          * La hora de término debe ser posterior
          * a la hora de inicio.

@@ -84,6 +84,10 @@ return new class extends Migration
             }
         );
 
+        if (DB::connection('center')->getDriverName() !== 'pgsql') {
+            return;
+        }
+
         DB::connection('center')->statement(
             "
             ALTER TABLE appointment_history

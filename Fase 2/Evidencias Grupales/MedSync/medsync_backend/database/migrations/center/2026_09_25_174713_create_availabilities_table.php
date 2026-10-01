@@ -57,6 +57,10 @@ return new class extends Migration
             );
         });
 
+        if (DB::connection('center')->getDriverName() !== 'pgsql') {
+            return;
+        }
+
         /*
          * Los días válidos van de lunes (1) a domingo (7).
          */

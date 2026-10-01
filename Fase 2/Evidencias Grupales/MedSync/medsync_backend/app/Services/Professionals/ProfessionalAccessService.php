@@ -51,7 +51,7 @@ class ProfessionalAccessService
         $email = strtolower(trim($professional->email));
 
         $user = User::query()
-            ->whereRaw('LOWER(BTRIM(email)) = ?', [$email])
+            ->whereRaw('LOWER(TRIM(email)) = ?', [$email])
             ->first();
 
         if ($user && ! $user->is_active) {

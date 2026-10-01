@@ -15,6 +15,9 @@ Route::post(
 );
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
+});
+
+Route::middleware(['auth:sanctum', 'tenant.center'])->group(function () {
     Route::get('/v1/me', [AuthController::class, 'me']);
     Route::get('/v1/professionals',[ProfessionalController::class,'index']);
     Route::post('/v1/professionals',[ProfessionalController::class,'store']);

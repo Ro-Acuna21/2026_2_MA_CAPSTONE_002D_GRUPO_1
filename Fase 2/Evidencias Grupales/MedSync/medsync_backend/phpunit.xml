@@ -11,6 +11,9 @@
         <testsuite name="Feature">
             <directory>tests/Feature</directory>
         </testsuite>
+        <testsuite name="Tenant">
+            <directory>tests/Tenant</directory>
+        </testsuite>
     </testsuites>
     <source>
         <include>
@@ -25,6 +28,10 @@
         <env name="CACHE_STORE" value="array"/>
         <env name="DB_CONNECTION" value="sqlite"/>
         <env name="DB_DATABASE" value=":memory:"/>
+        <env name="DB_CORE_CONNECTION" value="sqlite"/>
+        <env name="DB_CORE_DATABASE" value=":memory:"/>
+        <env name="DB_CENTER_CONNECTION" value="sqlite"/>
+        <env name="DB_CENTER_DATABASE" value=":memory:"/>
         <env name="DB_URL" value=""/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>

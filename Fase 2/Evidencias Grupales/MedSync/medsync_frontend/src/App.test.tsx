@@ -34,6 +34,13 @@ describe('navegación por roles', () => {
     expect(screen.getByText('Acceso de plataforma')).toBeDefined()
     expect(screen.getByRole('button', { name: 'Ingresar a la plataforma' })).toBeDefined()
   })
+  it('permite seleccionar un centro antes de abrir el login contextual', () => {
+    open('/ingresar')
+    expect(screen.getByRole('heading', { name: '¿A qué centro deseas ingresar?' })).toBeDefined()
+    expect(screen.getByRole('link', { name: /Ingresar a Clínica Horizonte/i }).getAttribute('href')).toBe('/centro/clinica-horizonte/ingresar')
+    expect(screen.getByRole('link', { name: /Ingresar a Centro Médico Alameda/i }).getAttribute('href')).toBe('/centro/centro-medico-alameda/ingresar')
+    expect(screen.getByRole('link', { name: /Ir al acceso de plataforma/i }).getAttribute('href')).toBe('/plataforma/acceso')
+  })
   it('redirige al administrador a configuración y bloquea rutas operativas', async () => {
     sessionStorage.setItem('clinica_horizonte_user', 'u1'); sessionStorage.setItem('clinica_horizonte_organization', 'org1'); open('/centro/clinica-horizonte/citas')
     expect(await screen.findByRole('heading', { name: 'Administración del centro' })).toBeDefined()

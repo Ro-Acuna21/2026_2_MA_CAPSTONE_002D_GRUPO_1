@@ -44,10 +44,7 @@ import {
 
 import { dateFromToday, toMinutes, toTime, uid } from "@/lib/utils";
 
-import {
-  canPatientModifyAppointment,
-  canSetAppointmentStatus,
-} from "@/domain/appointment-rules";
+import { canSetAppointmentStatus } from "@/domain/appointment-rules";
 
 import {
   appointmentApi,
@@ -193,7 +190,7 @@ interface ClinicContextValue {
     email: string,
     password: string,
     portal?: "CENTER" | "PLATFORM",
-    centerId?: string,
+    centerSlug?: string,
   ): Promise<boolean>;
 
   logout(): Promise<void>;
@@ -715,10 +712,14 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
     email: string,
     password: string,
     portal: "CENTER" | "PLATFORM" = "CENTER",
-    centerId?: string,
+    centerSlug?: string,
   ) => {
     try {
-      const response = await sanctum.login(email, password);
+      const response = await sanctum.login(
+        email,
+        password,
+        portal === "CENTER" ? centerSlug : undefined,
+      );
 
       const backendUser = response.data;
 
@@ -761,17 +762,13 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
        * la URL.
        */
       if (portal === "CENTER") {
-        if (!centerId) {
+        if (!centerSlug) {
           await sanctum.logout();
 
           return false;
         }
 
-        const frontendCenter = allData.organizations.find(
-          (item) => item.slug === backendUser.medical_center?.slug,
-        );
-
-        if (!frontendCenter || frontendCenter.id !== centerId) {
+        if (backendUser.medical_center?.slug !== centerSlug) {
           await sanctum.logout();
 
           return false;
@@ -1009,8 +1006,7 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
 
     const service = data.services.find((item) => item.id === input.serviceId);
 
-    const patientId =
-      user.role === "PACIENTE" ? user.patientId : input.patientId;
+    const patientId = input.patientId;
 
     if (
       !service ||
@@ -1058,8 +1054,7 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
 
         status: "PENDIENTE" as const,
 
-        source:
-          user.role === "PACIENTE" ? ("WEB" as const) : ("RECEPCION" as const),
+        source: "RECEPCION" as const,
 
         overbook: !!input.overbook,
 
@@ -1146,8 +1141,6 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
     if (
       !target ||
       ["CANCELADA", "ATENDIDA"].includes(target.status) ||
-      (user?.role === "PACIENTE" &&
-        (status !== "CANCELADA" || !canPatientModifyAppointment(target))) ||
       (user?.role === "PROFESIONAL" &&
         !["ATENDIDA", "NO_SHOW"].includes(status))
     ) {
@@ -1262,7 +1255,6 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
       !target ||
       ["CANCELADA", "ATENDIDA"].includes(target.status) ||
       user?.role === "PROFESIONAL" ||
-      (user?.role === "PACIENTE" && !canPatientModifyAppointment(target)) ||
       date < dateFromToday() ||
       !slots(target.professionalId, target.serviceId, date, id).some(
         (slot) => slot.time === time,

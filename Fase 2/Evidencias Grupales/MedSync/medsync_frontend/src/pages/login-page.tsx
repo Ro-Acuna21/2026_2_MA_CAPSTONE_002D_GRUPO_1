@@ -119,7 +119,7 @@ export function LoginPage({ platform = false }: { platform?: boolean }) {
 
         platform ? "PLATFORM" : "CENTER",
 
-        center?.id,
+        center?.slug,
       );
 
       if (!ok) {

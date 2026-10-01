@@ -14,10 +14,18 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use App\Models\Center\PatientAddress;
+use App\Services\Tenants\TenantConnectionResolver;
+use App\Support\TenantContext;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
+    public function __construct(
+        private readonly TenantConnectionResolver $connectionResolver,
+        private readonly TenantContext $tenantContext,
+    ) {
+    }
+
     /**
      * POST /api/register
      *
@@ -50,7 +58,7 @@ class AuthController extends Controller
             'consent' => ['required', 'accepted'],
         ]);
         $existingUser = User::query()
-    ->whereRaw('LOWER(BTRIM(email)) = ?', [$data['email']])
+    ->whereRaw('LOWER(TRIM(email)) = ?', [$data['email']])
     ->exists();
 
 if ($existingUser) {
@@ -83,7 +91,7 @@ if ($existingUser) {
             $existingPatient = Patient::where(function ($query) use ($rut, $data) {
     $query->where('rut', $rut)
         ->orWhereRaw(
-            'LOWER(BTRIM(email)) = ?',
+            'LOWER(TRIM(email)) = ?',
             [$data['email']]
         );
 })
@@ -170,33 +178,101 @@ if ($existingUser) {
     public function login(Request $request)
     {
         $request->merge([
-    'email' => strtolower(trim((string) $request->input('email'))),
-]);
-        $credentials = $request->validate([
-            'email' => ['required', 'email'],
-            'password' => ['required', 'string'],
+            'email' => strtolower(trim((string) $request->input('email'))),
+            'center_slug' => trim((string) $request->input('center_slug')) ?: null,
         ]);
 
-        if (! Auth::attempt($credentials)) {
+        $data = $request->validate([
+            'email' => ['required', 'email'],
+            'password' => ['required', 'string'],
+            'center_slug' => ['nullable', 'string', 'max:150'],
+        ]);
+
+        $medicalCenter = null;
+
+        if ($data['center_slug'] ?? null) {
+            $medicalCenter = MedicalCenter::query()
+                ->where('slug', $data['center_slug'])
+                ->where('is_active', true)
+                ->first();
+
+            if (! $medicalCenter) {
+                throw ValidationException::withMessages([
+                    'center_slug' => ['El centro médico solicitado no está disponible.'],
+                ]);
+            }
+        }
+
+        if (! Auth::guard('web')->attempt([
+            'email' => $data['email'],
+            'password' => $data['password'],
+        ])) {
             throw ValidationException::withMessages([
                 'email' => ['Las credenciales ingresadas no son correctas.'],
             ]);
         }
 
-        $user = Auth::user();
+        $user = Auth::guard('web')->user();
 
         if (! $user->is_active) {
-            Auth::logout();
+            Auth::guard('web')->logout();
 
             throw ValidationException::withMessages([
                 'email' => ['Esta cuenta se encuentra inactiva.'],
             ]);
         }
 
-        $request->session()->regenerate();
+        if (! $medicalCenter) {
+            if (! $user->isSuperAdmin()) {
+                Auth::guard('web')->logout();
+
+                throw ValidationException::withMessages([
+                    'center_slug' => ['Selecciona el portal del centro médico al que perteneces.'],
+                ]);
+            }
+
+            if ($request->hasSession()) {
+                $request->session()->regenerate();
+                $request->session()->forget('active_medical_center_id');
+            }
+
+            return response()->json([
+                'data' => $this->presentUser($user),
+            ]);
+        }
+
+        if ($user->isSuperAdmin()) {
+            Auth::guard('web')->logout();
+
+            throw ValidationException::withMessages([
+                'center_slug' => ['Las cuentas de plataforma deben ingresar desde el acceso de plataforma.'],
+            ]);
+        }
+
+        $centerUser = $user->centerUsers()
+            ->where('medical_center_id', $medicalCenter->id)
+            ->where('is_active', true)
+            ->with('medicalCenter')
+            ->first();
+
+        if (! $centerUser) {
+            Auth::guard('web')->logout();
+
+            throw ValidationException::withMessages([
+                'center_slug' => ['Tu cuenta no tiene acceso activo a este centro médico.'],
+            ]);
+        }
+
+        $this->connectionResolver->connect($medicalCenter);
+        $centerUser->load(['patient', 'professional']);
+
+        if ($request->hasSession()) {
+            $request->session()->regenerate();
+            $request->session()->put('active_medical_center_id', $medicalCenter->id);
+        }
 
         return response()->json([
-            'data' => $this->presentUser($user),
+            'data' => $this->presentUser($user, $centerUser),
         ]);
     }
 
@@ -218,17 +294,27 @@ if ($existingUser) {
      */
     public function me(Request $request)
     {
+        $user = $request->user();
+
+        if ($user->isSuperAdmin()) {
+            return response()->json([
+                'data' => $this->presentUser($user),
+            ]);
+        }
+
         return response()->json([
-            'data' => $this->presentUser($request->user()),
+            'data' => $this->presentUser($user, $this->tenantContext->centerUser(), false),
         ]);
     }
 
-    private function presentUser(User $user): array
+    private function presentUser(User $user, ?CenterUser $centerUser = null, bool $fallbackToFirstMembership = true): array
     {
-        $centerUser = $user->centerUsers()
-            ->with(['patient', 'professional', 'medicalCenter'])
-            ->where('is_active', true)
-            ->first();
+        if (! $user->isSuperAdmin() && ! $centerUser && $fallbackToFirstMembership) {
+            $centerUser = $user->centerUsers()
+                ->with(['patient', 'professional', 'medicalCenter'])
+                ->where('is_active', true)
+                ->first();
+        }
 
         return [
             'id' => $user->id,

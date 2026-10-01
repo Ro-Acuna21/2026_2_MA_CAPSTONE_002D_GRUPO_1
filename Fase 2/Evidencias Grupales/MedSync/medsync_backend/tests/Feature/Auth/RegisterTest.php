@@ -1,8 +1,8 @@
 <?php
 
-use App\Models\HealthInsurance;
-use App\Models\MedicalCenter;
-use App\Models\Patient;
+use App\Models\Center\HealthInsurance;
+use App\Models\Center\Patient;
+use App\Models\Core\MedicalCenter;
 use App\Models\User;
 
 beforeEach(function () {
@@ -10,6 +10,7 @@ beforeEach(function () {
         'name' => 'Clínica Horizonte',
         'slug' => 'clinica-horizonte',
         'rut' => '76543210-3',
+        'database_name' => 'medsync_clinica_horizonte',
         'is_active' => true,
     ]);
 
@@ -41,9 +42,7 @@ it('registra un paciente nuevo correctamente', function () {
 
     expect(User::where('email', 'juan.perez@example.com')->exists())->toBeTrue();
     expect(
-        Patient::where('rut', '12345678-5')
-            ->where('medical_center_id', $this->center->id)
-            ->exists()
+        Patient::where('rut', '12345678-5')->exists()
     )->toBeTrue();
 });
 
@@ -65,7 +64,6 @@ it('rechaza un correo ya registrado en el mismo centro', function () {
     ]);
 
     Patient::create([
-        'medical_center_id' => $this->center->id,
         'user_id' => $existingUser->id,
         'first_name' => 'Existente',
         'last_name' => 'Usuario',

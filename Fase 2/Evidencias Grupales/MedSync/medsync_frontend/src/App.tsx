@@ -23,6 +23,9 @@ import { ResultsPage } from "@/pages/results-page";
 import type { Role } from "@/domain/types";
 import { centerBase, useCenterPath } from "@/lib/tenant";
 import { ActivateAccountPage } from "@/pages/activate-account-page";
+import { CentersPage, LandingPage } from "@/pages/landing-page";
+import { PublicCenterPage } from "@/pages/public-center-page";
+import { CenterSelectorPage } from "@/pages/center-selector-page";
 
 function PlatformProtectedRoute() {
   const { user, organization } = useClinic();
@@ -86,20 +89,11 @@ function HomePage() {
 export default function App() {
   return (
     <Routes>
-      <Route
-        path="/"
-        element={<Navigate to="/centro/clinica-horizonte/ingresar" replace />}
-      />
-      <Route
-        path="/ingresar"
-        element={<Navigate to="/centro/clinica-horizonte/ingresar" replace />}
-      />
-      <Route
-        path="/crear-cuenta"
-        element={
-          <Navigate to="/centro/clinica-horizonte/crear-cuenta" replace />
-        }
-      />
+      <Route path="/" element={<LandingPage />} />
+      <Route path="/centros" element={<CentersPage />} />
+      <Route path="/centros/:slug" element={<PublicCenterPage />} />
+      <Route path="/ingresar" element={<CenterSelectorPage />} />
+      <Route path="/crear-cuenta" element={<CenterSelectorPage purpose="register" />} />
       <Route path="/activar-cuenta" element={<ActivateAccountPage />} />
       <Route path="/plataforma/acceso" element={<LoginPage platform />} />
       <Route path="/centro/:centerSlug/ingresar" element={<LoginPage />} />
