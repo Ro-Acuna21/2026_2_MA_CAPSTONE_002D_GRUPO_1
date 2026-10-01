@@ -5,7 +5,7 @@ Prefijo: `/api/v1`. Las respuestas de recursos usan `{ "data": ... }` y los erro
 ## Autenticación con Sanctum
 
 - `GET /sanctum/csrf-cookie`
-- `POST /api/login` — `{ email, password }`
+- `POST /api/login` — login clínico contextual: `{ email, password, center_slug }`
 - `POST /api/logout`
 - `GET /api/v1/me` — usuario, rol y permisos de Spatie
 
@@ -31,7 +31,9 @@ La API es responsable de validar disponibilidad, prevenir solapamientos, registr
 
 ## Aislamiento por centro
 
-Cada recurso de negocio debe incluir `organization_id`. El backend determina el centro desde el dominio o subdominio solicitado y valida que la cuenta autenticada pertenezca a ese mismo centro; no debe confiar en un identificador enviado libremente por el navegador. No existe un selector de organizaciones en el portal clínico.
+El centro se selecciona públicamente antes del login y React envía únicamente `center_slug` a `POST /api/login`. Laravel busca el slug en `core.medical_centers`, exige que esté activo y comprueba la membresía activa en `core.center_users`. Si es correcto guarda `active_medical_center_id` en la sesión. Un slug no autoriza por sí solo a una cuenta.
+
+En cada ruta clínica autenticada, Laravel recupera ese centro desde la sesión y configura la conexión `center` con `medical_centers.database_name` antes del route-model binding y de los controladores. No debe confiar en `organization_id`, `medical_center_id` o nombre de base enviado desde el navegador. El acceso de plataforma `SUPER_ADMIN` es independiente y no abre una conexión clínica.
 
 Las cuentas de pacientes y trabajadores son independientes por centro. El correo y el RUT deben usar restricciones únicas compuestas con `organization_id`, por lo que la misma persona puede tener registros separados en dos instituciones sin que una revele la existencia de la otra. Las cookies de sesión deberán limitarse al dominio del portal correspondiente.
 

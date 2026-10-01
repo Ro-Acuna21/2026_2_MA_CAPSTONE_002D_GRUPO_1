@@ -8,7 +8,7 @@ Implementar una API REST con Laravel, PostgreSQL, Eloquent, Sanctum y Spatie Per
 
 1. Corregir y migrar el esquema actual de `medsync_BD` siguiendo `REQUERIMIENTOS_BD.md`.
 2. Instalar y configurar Sanctum y Spatie Permission; crear el superadministrador de plataforma y los roles del centro.
-3. Resolver el centro por dominio o subdominio antes de atender rutas clínicas. En desarrollo se puede usar un middleware o cabecera controlada, nunca un `medical_center_id` libre enviado por el cliente.
+3. ✅ Resolver el centro para rutas clínicas mediante sesión: tras `auth:sanctum`, el middleware valida `active_medical_center_id`, `medical_centers.is_active` y la membresía activa en `center_users`; configura la conexión `center` desde `medical_centers.database_name`. Nunca usar un `medical_center_id` ni nombre de base libre enviado por el cliente.
 4. Implementar autenticación, sesión, `GET /api/v1/me` y el bootstrap mínimo por rol.
 5. Implementar catálogos, fichas de pacientes y profesionales, horarios, disponibilidad y agenda.
 6. Implementar resultados médicos con almacenamiento privado y publicación por profesional.
@@ -52,7 +52,7 @@ El permiso opcional `results.upload` puede habilitar a recepción a cargar borra
 
 Usar prefijo `/api/v1`, respuestas de recursos como `{ "data": ... }`, paginación estándar de Laravel y errores de validación como `{ "message": "...", "errors": { "campo": ["..."] } }`.
 
-- Autenticación: `GET /sanctum/csrf-cookie`, `POST /api/login`, `POST /api/logout`, `GET /api/v1/me`, `POST /api/register`.
+- Autenticación: `GET /sanctum/csrf-cookie`, `POST /api/login`, `POST /api/logout`, `GET /api/v1/me`, `POST /api/register`. El login clínico recibe `email`, `password` y `center_slug`; Laravel valida el slug y la membresía antes de guardar el centro activo en sesión.
 - Agenda: `GET/POST/PATCH /api/v1/appointments`, `GET /api/v1/appointments/{id}`, `GET /api/v1/slots`.
 - Gestión del centro: `GET/POST/PATCH /api/v1/patients`, `/professionals`, `/specialties`, `/services`, `/availability`, `/result-types`.
 - Resultados: `GET/POST /api/v1/results`, `POST /api/v1/results/{id}/publish`, `GET /api/v1/results/{id}/document`.

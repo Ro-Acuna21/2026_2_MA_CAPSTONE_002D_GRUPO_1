@@ -14,11 +14,19 @@ Este documento define el modelo objetivo para PostgreSQL y Laravel. Parte del es
 
 | Tabla | Atributos requeridos | Claves y reglas |
 | --- | --- | --- |
-| `medical_centers` | `id`, `name`, `slug`, `rut`, `address`, `phone`, `email`, `plan`, `subscription_status`, `subscription_ends_at`, `is_active`, timestamps | `slug` único; `rut` único para el centro. `plan`: `STARTER` o `PRO`. `subscription_status`: `TRIAL`, `ACTIVE`, `EXPIRED`, `SUSPENDED`. |
+| `medical_centers` | `id`, `name`, `slug`, `database_name`, `rut`, `address`, `phone`, `email`, `plan`, `subscription_status`, `subscription_ends_at`, `is_active`, timestamps | `slug` único; `database_name` identifica la base clínica física y solo puede ser administrada desde Core; `rut` único para el centro. `plan`: `STARTER` o `PRO`. `subscription_status`: `TRIAL`, `ACTIVE`, `EXPIRED`, `SUSPENDED`. |
 | `users` | `id`, `name`, `email`, `password`, `email_verified_at`, `is_active`, `remember_token`, timestamps, `deleted_at` | El correo no debe tener un índice único global si una cuenta se repite en distintos centros. La contraseña se almacena solo con hash de Laravel. |
 | `center_users` | `id`, `medical_center_id`, `user_id`, `role`, `patient_id` opcional, `professional_id` opcional, `is_active`, timestamps | Único compuesto `(medical_center_id, user_id)`. `role`: `ADMIN`, `RECEPCIONISTA`, `PROFESIONAL` o `PACIENTE`. El superadministrador es global mediante Spatie y no necesita pertenecer a un centro. |
 | `plans` opcional | `id`, `name`, `code`, `description`, `is_active`, timestamps | Permite sustituir el enum de plan si se administrarán planes desde plataforma. |
 | `subscriptions` opcional | `id`, `medical_center_id`, `plan_id`, `status`, `started_at`, `ends_at`, `notes`, timestamps | Mantiene historial de cambios; el estado actual puede derivarse desde el último registro. |
+
+## Resolución de tenant y conexión clínica
+
+`core.medical_centers` es la fuente de verdad para resolver la base clínica. Después de autenticar con Sanctum, Laravel recupera `active_medical_center_id` de la sesión, valida que el centro y su fila en `core.center_users` estén activos y recién entonces obtiene `medical_centers.database_name`.
+
+El middleware clínico configura `database.connections.center.database`, ejecuta `DB::purge('center')` y `DB::reconnect('center')` cuando cambia de tenant. Nunca se acepta un nombre de base desde URL, headers ni payload. Las rutas clínicas usan esta conexión antes del route-model binding; las rutas públicas no abren una base clínica y `SUPER_ADMIN` no resuelve tenant.
+
+`DB_CENTER_DATABASE` no es el mecanismo de selección por petición: puede existir como valor local de arranque, pero no autoriza ni determina el tenant autenticado. Crear una nueva base y aplicar sus migraciones sigue siendo una tarea de provisionamiento explícita, fuera de esta resolución.
 
 ## Catálogos y personas del centro
 
