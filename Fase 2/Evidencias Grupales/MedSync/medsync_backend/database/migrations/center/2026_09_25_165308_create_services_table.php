@@ -52,6 +52,10 @@ return new class extends Migration
             );
         });
 
+        if (DB::connection('center')->getDriverName() !== 'pgsql') {
+            return;
+        }
+
         /*
          * Impide nombres vacíos.
          */

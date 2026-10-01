@@ -1,4 +1,4 @@
-# Clínica Horizonte — frontend
+# MediSync — frontend
 
 Frontend de gestión de agenda médica construido con **React, TypeScript, Tailwind CSS** y componentes con la convención de **shadcn/ui**. Funciona hoy con datos demo locales y está preparado para conectarse después a una API REST desarrollada en Laravel.
 
@@ -13,7 +13,23 @@ npm install
 npm run dev
 ```
 
-Abre [http://localhost:3000](http://localhost:3000). La demostración redirige al portal de Clínica Horizonte.
+Abre [http://localhost:3000](http://localhost:3000). La raíz es una landing pública; no redirige a ningún centro.
+
+## Navegación pública y acceso contextual
+
+La experiencia pública usa temporalmente `src/data/public-centers.ts` como fuente de centros. Esta fuente está aislada para sustituirla posteriormente por una API pública sin duplicar páginas ni rutas.
+
+| Ruta | Propósito |
+| --- | --- |
+| `/` | Landing comercial de MediSync. |
+| `/centros` | Directorio de centros asociados. |
+| `/centros/{slug}` | Micrositio público reutilizable de cada centro. |
+| `/ingresar` | Busca o selecciona el centro antes de cualquier autenticación. |
+| `/centro/{slug}/ingresar` | Login contextual; React entrega el slug al backend. |
+| `/crear-cuenta` | Selector de centro para continuar al registro contextual. |
+| `/plataforma/acceso` | Acceso separado y exclusivo de `SUPER_ADMIN`. |
+
+Los accesos genéricos nunca asumen Clínica Horizonte ni otro centro. Los botones dentro de un micrositio sí llevan directamente a su propio `/centro/{slug}/ingresar`.
 
 ## Usuarios demo
 
@@ -77,7 +93,7 @@ Crear una ficha no crea una cuenta. Para habilitar la ficha de un profesional, e
 
 ## Registro e informes del paciente
 
-Cada centro publica `/centro/{slug}/ingresar` y `/centro/{slug}/crear-cuenta`. La dirección determina el centro automáticamente: no existe selector, cambio ni vinculación de clínicas. El registro solicita nombres, apellidos, RUT (módulo 11), nacimiento, teléfono chileno, correo, previsión, seguro complementario opcional y contraseña confirmada.
+Cada centro publica `/centro/{slug}/ingresar` y `/centro/{slug}/crear-cuenta`. La dirección determina el contexto clínico después de que la persona lo selecciona explícitamente desde `/ingresar` o `/crear-cuenta`; dentro del portal no existe cambio ni vinculación libre de clínicas. El registro solicita nombres, apellidos, RUT (módulo 11), nacimiento, teléfono chileno, correo, previsión, seguro complementario opcional y contraseña confirmada.
 
 El mismo correo y RUT pueden registrarse por separado en dos centros. La unicidad se valida como `centro + correo` y `centro + RUT`; las cuentas, contraseñas, citas e informes permanecen independientes. No se implementa verificación de identidad ni envío de correo.
 

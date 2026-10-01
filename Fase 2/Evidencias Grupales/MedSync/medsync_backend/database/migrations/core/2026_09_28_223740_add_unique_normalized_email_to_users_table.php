@@ -15,7 +15,7 @@ return new class extends Migration
         DB::connection('core')->statement(
             '
             UPDATE users
-            SET email = LOWER(BTRIM(email))
+            SET email = LOWER(TRIM(email))
             WHERE email IS NOT NULL
             '
         );
@@ -23,7 +23,7 @@ return new class extends Migration
         /*
          * Cada correo identifica una única cuenta global activa.
          *
-         * La expresión LOWER(BTRIM(email)) evita diferencias por
+         * La expresión LOWER(TRIM(email)) evita diferencias por
          * mayúsculas, minúsculas o espacios exteriores.
          *
          * Los usuarios eliminados mediante soft delete quedan fuera
@@ -32,7 +32,7 @@ return new class extends Migration
         DB::connection('core')->statement(
             '
             CREATE UNIQUE INDEX users_email_unique_ci
-            ON users (LOWER(BTRIM(email)))
+            ON users (LOWER(TRIM(email)))
             WHERE deleted_at IS NULL
             '
         );

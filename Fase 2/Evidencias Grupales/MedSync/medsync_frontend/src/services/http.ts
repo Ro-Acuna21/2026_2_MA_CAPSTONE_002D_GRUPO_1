@@ -163,7 +163,7 @@ export const sanctum = {
     });
   },
 
-  login: async (email: string, password: string) => {
+  login: async (email: string, password: string, centerSlug?: string) => {
     await sanctum.csrf();
 
     return apiRequest<AuthResponse>("/api/login", {
@@ -171,6 +171,7 @@ export const sanctum = {
       body: JSON.stringify({
         email,
         password,
+        ...(centerSlug ? { center_slug: centerSlug } : {}),
       }),
     });
   },

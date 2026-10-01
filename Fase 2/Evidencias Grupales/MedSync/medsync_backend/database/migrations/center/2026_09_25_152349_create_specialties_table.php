@@ -24,6 +24,10 @@ return new class extends Migration
             $table->timestamps();
         });
 
+        if (DB::connection('center')->getDriverName() !== 'pgsql') {
+            return;
+        }
+
         /*
          * Evita nombres vacíos o compuestos solamente por espacios.
          */

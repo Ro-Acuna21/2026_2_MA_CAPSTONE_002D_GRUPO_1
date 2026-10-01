@@ -54,6 +54,8 @@ Cada centro puede almacenar información como:
 
 El campo `database_name` permite identificar qué base de datos corresponde a cada centro médico.
 
+En una solicitud clínica, Laravel no toma el nombre de base desde la URL, headers ni payload. Después de autenticar, recupera el centro activo desde sesión, valida su estado y la membresía activa en `center_users`, y usa este campo para configurar la conexión clínica `center`. Esto permite que cada centro ya provisionado use su propia base sin rutas o controladores específicos.
+
 ### medical_center_addresses
 
 Almacena las direcciones de los centros médicos de manera separada y normalizada.

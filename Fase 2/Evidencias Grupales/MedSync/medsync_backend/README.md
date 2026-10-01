@@ -4,6 +4,8 @@ Backend del proyecto **MedSync** (Duoc UC, Capstone). API REST hecha con **Larav
 
 > Este README reemplaza al genérico de Laravel y a `docs/Base_datos_y_modelos.md`, que quedó desactualizado (esquema antiguo, sin timestamps, nombres de tabla en singular). Este documento describe **lo que realmente existe hoy** en el código.
 
+> **Actualización multi-centro:** las secciones históricas que hablan de un centro fijo describen la Iteración 1. El acceso clínico actual es contextual: el login recibe `center_slug`, valida el centro y su membresía en Core, y la conexión clínica se resuelve por solicitud desde `medical_centers.database_name`.
+
 ---
 
 ## 1. Estado actual (Iteración 1)
@@ -32,6 +34,21 @@ Lo que ya funciona:
 Lo que **todavía no existe** (ver sección 10, próximas iteraciones): roles con Spatie Permission, multi-centro real (hoy sigue fijo a `clinica-horizonte`), resultados médicos, plataforma/suscripciones.
 
 > Actualización: especialidades, prestaciones, disponibilidad y reservas **ya tienen backend real** (el flujo de reserva del propio paciente, de punta a punta). Ver sección 13 para el detalle — la administración del catálogo y la agenda de recepción/profesional siguen pendientes.
+
+### Estado multi-centro implementado
+
+El flujo clínico vigente es el siguiente:
+
+1. El frontend abre `/centro/{slug}/ingresar` después de seleccionar un centro público.
+2. `POST /api/login` recibe `email`, `password` y `center_slug`.
+3. Laravel valida el slug en `core.medical_centers`, que el centro esté activo y que la cuenta tenga una fila activa en `core.center_users` para ese centro.
+4. Si es válido, guarda solo `active_medical_center_id` en la sesión. El navegador nunca envía un nombre de base de datos.
+5. En rutas clínicas, el middleware `ResolveCenterTenant` recupera ese id, vuelve a validar centro y membresía, y `TenantConnectionResolver` configura `database.connections.center.database` con `medical_centers.database_name`. Si la conexión cambia, ejecuta `DB::purge('center')` y `DB::reconnect('center')`.
+6. Recién después se ejecutan los bindings de ruta y los controladores clínicos. Los controladores usan el `CenterUser` del `TenantContext`, no la primera membresía activa que encuentre el usuario.
+
+La prioridad de middleware es `auth:sanctum → tenant.center → route-model binding → controlador`. Un centro desactivado o una membresía desactivada bloquea las rutas clínicas. `SUPER_ADMIN` se mantiene fuera de este flujo: utiliza `/plataforma/acceso`, no depende de un centro y no configura/consulta la base clínica.
+
+Las pruebas de aislamiento usan dos archivos SQLite temporales distintos para demostrar que la misma ruta clínica consulta datos diferentes según el centro activo. No usan ni modifican `medsync_core` ni `medsync_clinica_horizonte`.
 
 ---
 
@@ -86,6 +103,8 @@ DB_CENTER_DATABASE=medsync_clinica_horizonte
 DB_USERNAME=postgres
 DB_PASSWORD=tu_password
 ```
+
+`DB_CENTER_DATABASE` es un valor local inicial y de compatibilidad; no selecciona el tenant durante una solicitud autenticada. Para esas solicitudes, la única fuente de verdad es `core.medical_centers.database_name` después de validar la sesión y `center_users`.
 
 Si vienes de una versión anterior del `.env` (con `DB_CONNECTION=pgsql` y `DB_DATABASE=medsync_bd`), **actualízalo a mano** — el `.env` no se sube a Git, así que `git pull` nunca lo toca por ti.
 
@@ -241,9 +260,13 @@ Todas las peticiones deben ir con `credentials: 'include'`. Antes de `POST /api/
 
 ### `POST /api/login`
 ```json
-{ "email": "juan@correo.cl", "password": "Password123" }
+{
+  "email": "juan@correo.cl",
+  "password": "Password123",
+  "center_slug": "clinica-horizonte"
+}
 ```
-Respuesta: `200` con `{ "data": { ...mismo formato que register... } }`. Establece la cookie de sesión.
+Respuesta: `200` con `{ "data": { ...mismo formato que register... } }`. Establece la cookie de sesión y el centro activo. El slug debe existir, estar activo y corresponder a una membresía activa del usuario; credenciales correctas en otro centro se rechazan. Un `SUPER_ADMIN` usa exclusivamente el endpoint visual `/plataforma/acceso` y no ingresa por este flujo clínico.
 
 ### `POST /api/logout`
 Sin body. Requiere estar autenticado. Cierra la sesión.
@@ -311,9 +334,10 @@ Orden recomendado según `INDICACIONES_BACKEND.md` y `REQUERIMIENTOS_BD.md`, aju
 - Solo el profesional responsable publica; el paciente solo ve sus propios resultados publicados.
 
 ### Iteración 6 — Multi-centro real y plataforma
-- Resolver el centro por dominio/subdominio (o slug) en middleware, en vez del slug fijo `clinica-horizonte` actual.
-- Rol `SUPER_ADMIN` global, gestión de centros/planes/suscripciones (`medical_centers.plan`, `subscription_status`, tablas `plans`/`subscriptions` opcionales).
-- Aislamiento estricto: ninguna consulta puede devolver datos de otro centro.
+- ✅ Resolver el centro por slug de login, sesión y middleware; la conexión clínica se selecciona dinámicamente desde `medical_centers.database_name`.
+- ✅ `SUPER_ADMIN` separado del portal clínico y aislamiento probado entre dos bases SQLite temporales.
+- Pendiente: provisionamiento automatizado de una nueva base clínica y sus migraciones al crear un centro; por ahora `database_name` debe apuntar a una base ya provisionada.
+- Pendiente: exponer una API pública de centros para sustituir los mocks del directorio/selector frontend.
 
 ### Pendientes transversales (aplican en cualquier iteración)
 - Actualizar `medsync_frontend/docs/api-contract.md` cada vez que cambie un endpoint (ver sección 7 de este documento).

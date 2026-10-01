@@ -8,12 +8,14 @@ use App\Models\Center\Patient;
 use App\Models\Center\Professional;
 use App\Models\Center\Service;
 use App\Services\Appointments\AppointmentService;
+use App\Support\TenantContext;
 use Illuminate\Http\Request;
 
 class AppointmentController extends Controller
 {
     public function __construct(
-        private readonly AppointmentService $appointmentService
+        private readonly AppointmentService $appointmentService,
+        private readonly TenantContext $tenantContext,
     ) {
     }
 
@@ -157,14 +159,10 @@ class AppointmentController extends Controller
      */
     private function resolvePatient(Request $request): Patient
     {
-        $centerUser = $request->user()
-            ->centerUsers()
-            ->where('role', 'PACIENTE')
-            ->where('is_active', true)
-            ->first();
+        $centerUser = $this->tenantContext->centerUser();
 
         abort_unless(
-            $centerUser && $centerUser->patient_id,
+            $centerUser->role === 'PACIENTE' && $centerUser->patient_id,
             403,
             'No tienes un perfil de paciente asociado a tu cuenta.'
         );

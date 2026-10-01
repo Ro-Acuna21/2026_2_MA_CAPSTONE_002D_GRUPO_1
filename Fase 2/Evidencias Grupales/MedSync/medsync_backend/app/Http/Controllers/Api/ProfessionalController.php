@@ -5,11 +5,16 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Center\Professional;
 use App\Rules\ValidRut;
+use App\Support\TenantContext;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 
 class ProfessionalController extends Controller
 {
+    public function __construct(private readonly TenantContext $tenantContext)
+    {
+    }
+
     /**
      * GET /api/v1/professionals
      *
@@ -17,7 +22,7 @@ class ProfessionalController extends Controller
      */
     public function index(Request $request)
     {
-        $this->ensureAdmin($request);
+        $this->ensureAdmin();
 
         $professionals = Professional::query()
             ->orderBy('first_name')
@@ -42,7 +47,7 @@ class ProfessionalController extends Controller
      */
     public function store(Request $request)
     {
-        $this->ensureAdmin($request);
+        $this->ensureAdmin();
 
         // Normaliza el teléfono antes de validarlo.
         $request->merge([
@@ -137,16 +142,12 @@ class ProfessionalController extends Controller
      * Verifica que el usuario autenticado sea
      * administrador de un centro médico.
      */
-    private function ensureAdmin(Request $request): void
+    private function ensureAdmin(): void
     {
-        $centerUser = $request->user()
-            ->centerUsers()
-            ->where('role', 'ADMIN')
-            ->where('is_active', true)
-            ->first();
+        $centerUser = $this->tenantContext->centerUser();
 
         abort_unless(
-            $centerUser,
+            $centerUser->role === 'ADMIN',
             403,
             'No tienes permisos para gestionar profesionales.'
         );

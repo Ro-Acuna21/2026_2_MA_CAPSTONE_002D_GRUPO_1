@@ -41,8 +41,8 @@ return new class extends Migration
                     id,
                     address,
                     true,
-                    NOW(),
-                    NOW()
+                    CURRENT_TIMESTAMP,
+                    CURRENT_TIMESTAMP
                 FROM medical_centers
                 WHERE address IS NOT NULL
                 AND address <> ''

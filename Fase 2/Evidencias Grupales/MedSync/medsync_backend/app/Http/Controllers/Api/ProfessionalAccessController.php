@@ -6,12 +6,14 @@ use App\Http\Controllers\Controller;
 use App\Models\Center\Professional;
 use App\Models\Core\CenterUser;
 use App\Services\Professionals\ProfessionalAccessService;
+use App\Support\TenantContext;
 use Illuminate\Http\Request;
 
 class ProfessionalAccessController extends Controller
 {
     public function __construct(
-        private readonly ProfessionalAccessService $professionalAccessService
+        private readonly ProfessionalAccessService $professionalAccessService,
+        private readonly TenantContext $tenantContext,
     ) {
     }
 
@@ -22,7 +24,7 @@ class ProfessionalAccessController extends Controller
         Request $request,
         Professional $professional
     ) {
-        $adminCenterUser = $this->getAdminCenterUser($request);
+        $adminCenterUser = $this->getAdminCenterUser();
 
         $result = $this->professionalAccessService->enableAccess(
             $professional,
@@ -48,7 +50,7 @@ class ProfessionalAccessController extends Controller
         Request $request,
         Professional $professional
     ) {
-        $adminCenterUser = $this->getAdminCenterUser($request);
+        $adminCenterUser = $this->getAdminCenterUser();
 
         $result = $this->professionalAccessService->resendInvitation(
             $professional,
@@ -61,17 +63,12 @@ class ProfessionalAccessController extends Controller
     /**
      * Obtiene la membresía ADMIN del usuario autenticado.
      */
-    private function getAdminCenterUser(Request $request): CenterUser
+    private function getAdminCenterUser(): CenterUser
     {
-        $centerUser = $request->user()
-            ->centerUsers()
-            ->with('medicalCenter')
-            ->where('role', 'ADMIN')
-            ->where('is_active', true)
-            ->first();
+        $centerUser = $this->tenantContext->centerUser();
 
         abort_unless(
-            $centerUser,
+            $centerUser->role === 'ADMIN',
             403,
             'No tienes permisos para gestionar el acceso de profesionales.'
         );
