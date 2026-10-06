@@ -750,35 +750,28 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
           return mapBackendAppointment(item, organization.id, user);
         });
 
-        setAllData((current) => ({
-          ...current,
-          appointments: [
-            ...current.appointments.filter(
-              (appointment) => appointment.organizationId !== organization.id,
-            ),
-            ...appointments,
-          ],
-          specialties: [
-            ...current.specialties.filter(
-              (specialty) => specialty.organizationId !== organization.id,
-            ),
-            ...specialties.values(),
-          ],
-          services: [
-            ...current.services.filter((service) => service.organizationId !== organization.id),
-            ...services.values(),
-          ],
-          patients: [
-            ...current.patients.filter((patient) => patient.organizationId !== organization.id),
-            ...patients.values(),
-          ],
-          professionals: [
-            ...current.professionals.filter(
-              (professional) => professional.organizationId !== organization.id,
-            ),
-            ...professionals.values(),
-          ],
-        }));
+        setAllData((current) => {
+          const mergeById = <T extends { id: string }>(
+            existing: T[],
+            incoming: Iterable<T>,
+          ) => {
+            const next = [...incoming];
+            const nextIds = new Set(next.map((item) => item.id));
+
+            return [...existing.filter((item) => !nextIds.has(item.id)), ...next];
+          };
+
+          return {
+            ...current,
+            // No ocultamos datos mock o fichas ya visibles si la agenda real
+            // todavía no tiene citas; solo reemplazamos recursos con el mismo id.
+            appointments: mergeById(current.appointments, appointments),
+            specialties: mergeById(current.specialties, specialties.values()),
+            services: mergeById(current.services, services.values()),
+            patients: mergeById(current.patients, patients.values()),
+            professionals: mergeById(current.professionals, professionals.values()),
+          };
+        });
       })
       .catch((error) => {
         console.error("No fue posible cargar la agenda real de recepción:", error);
