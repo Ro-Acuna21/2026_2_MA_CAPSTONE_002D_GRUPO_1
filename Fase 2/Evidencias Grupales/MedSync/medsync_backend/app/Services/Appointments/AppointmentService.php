@@ -136,7 +136,7 @@ class AppointmentService
      * Crea una reserva validando nuevamente todas las reglas de negocio
      * (README_RESERVAS_DISPONIBILIDAD_BD.md, secciones 13-18 y 27).
      */
-    public function createAppointment(Patient $patient, array $data, User $actor): Appointment
+    public function createAppointment(Patient $patient, array $data, User $actor, string $source = 'WEB'): Appointment
     {
         $service = $this->findActiveService((int) $data['service_id']);
         $professional = $this->findActiveProfessional((int) $data['professional_id']);
@@ -151,7 +151,7 @@ class AppointmentService
 
         $this->ensureWithinAvailability($professional->id, $weekday, $startTime, $endTime);
 
-        return DB::connection('center')->transaction(function () use ($patient, $professional, $service, $date, $startTime, $endTime, $actor) {
+        return DB::connection('center')->transaction(function () use ($patient, $professional, $service, $date, $startTime, $endTime, $actor, $source) {
             // Laravel vuelve a validar el solapamiento inmediatamente
             // antes del INSERT, ya dentro de la transacción, porque dos
             // pacientes pueden haber visto la misma hora disponible.
@@ -165,7 +165,7 @@ class AppointmentService
                 'start_time' => $startTime,
                 'end_time' => $endTime,
                 'status' => 'PENDIENTE',
-                'source' => 'WEB',
+                'source' => $source,
                 'overbook' => false,
                 'created_by' => $actor->id,
             ]);

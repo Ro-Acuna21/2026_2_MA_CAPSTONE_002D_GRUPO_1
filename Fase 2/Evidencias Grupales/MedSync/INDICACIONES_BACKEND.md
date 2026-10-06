@@ -34,6 +34,14 @@ Recepción puede reasignar una cita pendiente o confirmada cuando el profesional
 - Autorizar solo a recepción; no exponer el cambio de profesional en las rutas de paciente. Devolver la cita con sus resúmenes de prestación y profesional actualizados.
 - Añadir feature tests para permisos, aislamiento de tenant, especialidad incompatible, profesional inactivo, horario ocupado, historial y reasignación fuera de la ventana de 24 horas por recepción.
 
+### Agenda real de recepción
+
+El frontend de recepción ya no debe usar pacientes, prestaciones, profesionales ni horas mock para reservar o reprogramar. El backend debe entregar `GET /api/v1/patients` exclusivamente a `RECEPCIONISTA`, con el mínimo necesario para seleccionar un paciente activo (`id`, nombre y RUT), y aceptar `patient_id` únicamente cuando una recepción hace `POST /api/v1/appointments`.
+
+- Para recepción, el servidor resuelve y valida el paciente activo dentro del tenant y crea la cita con `source = RECEPCION`.
+- Para paciente, `patient_id` no se acepta: el servidor mantiene la resolución desde la sesión y crea con `source = WEB`.
+- Catálogo, profesionales compatibles y horarios continúan saliendo de `/v1/services`, `/v1/services/{service}/professionals` y `/v1/appointments/available-slots`; toda validación final permanece en el servidor.
+
 ### Informes clínicos
 
 El profesional responsable carga, publica y administra sus informes. Un informe publicado no se borra físicamente en producción: se anula con estado `VOIDED`, motivo, fecha y usuario responsable; el paciente deja de verlo. Los borradores pueden eliminarse o archivarse según la política clínica. Recepción, si tiene permiso de carga, nunca publica y debe recibir solo el acceso mínimo necesario.
@@ -63,7 +71,7 @@ El permiso opcional `results.upload` puede habilitar a recepción a cargar borra
 Usar prefijo `/api/v1`, respuestas de recursos como `{ "data": ... }`, paginación estándar de Laravel y errores de validación como `{ "message": "...", "errors": { "campo": ["..."] } }`.
 
 - Autenticación: `GET /sanctum/csrf-cookie`, `POST /api/login`, `POST /api/logout`, `GET /api/v1/me`, `POST /api/register`. El login clínico recibe `email`, `password` y `center_slug`; Laravel valida el slug y la membresía antes de guardar el centro activo en sesión.
-- Agenda: `GET/POST/PATCH /api/v1/appointments`, `GET /api/v1/appointments/{id}`, `GET /api/v1/slots`.
+- Agenda: `GET/POST/PATCH /api/v1/appointments`, `GET /api/v1/appointments/{id}`, `GET /api/v1/slots`; recepción obtiene sus pacientes activos desde `GET /api/v1/patients`.
 - Gestión del centro: `GET/POST/PATCH /api/v1/patients`, `/professionals`, `/specialties`, `/services`, `/availability`, `/result-types`.
 - Resultados: `GET/POST /api/v1/results`, `POST /api/v1/results/{id}/publish`, `GET /api/v1/results/{id}/document`.
 - Plataforma: `GET/POST/PATCH /api/v1/platform/centers` y `PUT /api/v1/platform/centers/{id}/administrator`.

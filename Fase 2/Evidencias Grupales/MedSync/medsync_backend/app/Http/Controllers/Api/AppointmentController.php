@@ -60,19 +60,34 @@ class AppointmentController extends Controller
      */
     public function store(Request $request)
     {
-        $data = $request->validate([
+        $centerUser = $this->tenantContext->centerUser();
+
+        $rules = [
             'service_id' => ['required', 'integer'],
             'professional_id' => ['required', 'integer'],
             'appointment_date' => ['required', 'date_format:Y-m-d'],
             'start_time' => ['required', 'date_format:H:i'],
-        ]);
+        ];
 
-        $patient = $this->resolvePatient($request);
+        if ($centerUser->role === 'RECEPCIONISTA') {
+            $rules['patient_id'] = ['required', 'integer', 'exists:center.patients,id'];
+        }
+
+        $data = $request->validate($rules);
+
+        if ($centerUser->role === 'RECEPCIONISTA') {
+            $patient = Patient::where('is_active', true)->findOrFail($data['patient_id']);
+            $source = 'RECEPCION';
+        } else {
+            $patient = $this->resolvePatient($request);
+            $source = 'WEB';
+        }
 
         $appointment = $this->appointmentService->createAppointment(
             $patient,
             $data,
-            $request->user()
+            $request->user(),
+            $source,
         );
 
         return response()->json([

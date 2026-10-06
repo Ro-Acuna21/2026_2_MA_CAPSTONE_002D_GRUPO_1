@@ -91,6 +91,10 @@ Para los reportes económicos, agregar índices por `(medical_center_id, appoint
 
 El paciente puede cancelar o reprogramar hasta 24 horas antes de `appointment_date + start_time`. Recepción puede gestionar la agenda fuera de ese plazo. Una cita solo puede pasar a `ATENDIDA` desde su hora de inicio y a `NO_SHOW` después de su hora de término. Estas reglas se validan en backend con la zona horaria del centro, además de ocultarse en la interfaz.
 
+### Reserva creada por recepción
+
+Una recepción selecciona un `patients.id` existente y activo del centro resuelto. La API debe validar esa fila en la conexión clínica del tenant y guardar `appointments.patient_id` con `source = RECEPCION`; el paciente autenticado nunca puede enviar ni sustituir ese identificador y sus reservas se crean con `source = WEB`. No se requieren tablas nuevas: se reutilizan `patients`, `appointments` y `appointment_history`, preservando las FKs, trazabilidad e índices ya definidos.
+
 ### Reasignación por ausencia de profesional
 
 Cuando recepción reasigne una cita, conservar la cita original y actualizar solo su `professional_id` dentro de una transacción. Crear una fila inmutable en `appointment_history` con `event_type = REASIGNACION`, los identificadores anterior y nuevo del profesional, y `reason` obligatorio (máximo 300 caracteres). El payload HTTP usa `reassignment_reason`, que backend persiste en `reason`. Ambos profesionales deben pertenecer al mismo centro que la cita; el reemplazo debe estar activo y relacionado con la especialidad de la prestación.

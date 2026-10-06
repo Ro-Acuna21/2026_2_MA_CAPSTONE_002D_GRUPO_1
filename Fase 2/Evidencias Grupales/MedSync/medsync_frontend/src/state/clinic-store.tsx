@@ -125,42 +125,9 @@ function loadData(): ClinicData {
 
     const old = JSON.parse(value) as ClinicData;
 
-    const demo = createMockData();
-
-    /*
-     * Una versión anterior de la sincronización de agenda reemplazaba
-     * colecciones completas con una respuesta vacía del backend. Si el
-     * navegador persistió ese estado, no basta con corregir la carga: al
-     * reiniciar se vuelve a leer el catálogo incompleto. Recuperamos solo
-     * una colección que haya quedado totalmente vacía para Clínica
-     * Horizonte; nunca reemplazamos ni eliminamos registros existentes.
-     */
-    const restoreDemoCollection = <T extends { organizationId: string }>(
-      collection: T[] | undefined,
-      demoCollection: T[],
-    ): T[] => {
-      const current = collection ?? [];
-
-      return current.some((item) => item.organizationId === "org1")
-        ? current
-        : [
-            ...current,
-            ...demoCollection.filter((item) => item.organizationId === "org1"),
-          ];
-    };
-
-    const recovered = {
-      ...old,
-      patients: restoreDemoCollection(old.patients, demo.patients),
-      professionals: restoreDemoCollection(old.professionals, demo.professionals),
-      specialties: restoreDemoCollection(old.specialties, demo.specialties),
-      services: restoreDemoCollection(old.services, demo.services),
-      appointments: restoreDemoCollection(old.appointments, demo.appointments),
-    };
-
-    const withPlatform = recovered.users.some((user) => user.role === "SUPER_ADMIN")
-      ? recovered.users
-      : [...recovered.users, demo.users[0]];
+    const withPlatform = old.users.some((user) => user.role === "SUPER_ADMIN")
+      ? old.users
+      : [...old.users, createMockData().users[0]];
 
     const tenantUsers = withPlatform.flatMap((account) => {
       if (account.role === "SUPER_ADMIN") {
@@ -192,9 +159,9 @@ function loadData(): ClinicData {
     });
 
     return {
-      ...recovered,
+      ...old,
 
-      organizations: recovered.organizations.map((organization) => ({
+      organizations: old.organizations.map((organization) => ({
         ...organization,
         subscription: organization.subscription ?? "ACTIVE",
       })),
@@ -796,9 +763,15 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
 
           return {
             ...current,
-            // No ocultamos datos mock o fichas ya visibles si la agenda real
-            // todavía no tiene citas; solo reemplazamos recursos con el mismo id.
-            appointments: mergeById(current.appointments, appointments),
+            // La agenda de recepción es operacional: no mezclamos las horas
+            // demo con las citas de PostgreSQL. Una respuesta vacía significa
+            // correctamente que aún no hay reservas reales en el centro.
+            appointments: [
+              ...current.appointments.filter(
+                (appointment) => appointment.organizationId !== organization.id,
+              ),
+              ...appointments,
+            ],
             specialties: mergeById(current.specialties, specialties.values()),
             services: mergeById(current.services, services.values()),
             patients: mergeById(current.patients, patients.values()),
@@ -1099,13 +1072,8 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
   );
 
   const createAppointment = async (input: BookingInput) => {
-    /*
-     * El paciente reserva su propia hora contra el backend real.
-     * Recepción todavía crea citas en el catálogo mock (el backend
-     * solo resuelve al paciente autenticado, no permite reservar a
-     * nombre de otra persona todavía).
-     */
-    if (user?.role === "PACIENTE") {
+    // Paciente y recepción crean reservas persistidas en Laravel.
+    if (user?.role === "PACIENTE" || user?.role === "RECEPCIONISTA") {
       if (!organization) {
         return;
       }
@@ -1116,6 +1084,7 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
           professional_id: Number(input.professionalId),
           appointment_date: input.date,
           start_time: input.time,
+          patient_id: input.patientId ? Number(input.patientId) : undefined,
         });
 
         const mapped = mapBackendAppointment(
@@ -1177,7 +1146,7 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
       throw new Error("El horario ya no está disponible.");
     }
 
-    if (input.overbook && user.role !== "RECEPCIONISTA") {
+    if (input.overbook) {
       throw new Error("No puedes crear sobreturnos.");
     }
 

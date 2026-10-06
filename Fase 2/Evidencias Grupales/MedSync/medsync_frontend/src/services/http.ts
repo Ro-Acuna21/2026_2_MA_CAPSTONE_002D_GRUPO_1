@@ -253,6 +253,17 @@ export interface ServiceProfessionalsResponse {
   data: BackendProfessionalSummary[];
 }
 
+export interface BackendPatientSummary {
+  id: number;
+  first_name: string;
+  last_name: string;
+  rut: string;
+}
+
+export interface PatientsResponse {
+  data: BackendPatientSummary[];
+}
+
 export interface AvailableSlotsResponse {
   data: {
     date: string;
@@ -307,6 +318,7 @@ export interface CreateAppointmentPayload {
   professional_id: number;
   appointment_date: string;
   start_time: string;
+  patient_id?: number;
 }
 
 export interface RescheduleAppointmentPayload {
@@ -333,6 +345,8 @@ export const appointmentApi = {
   my: () => apiRequest<AppointmentsResponse>("/api/v1/appointments/my"),
 
   list: () => apiRequest<AppointmentsResponse>("/api/v1/appointments"),
+
+  patients: () => apiRequest<PatientsResponse>("/api/v1/patients"),
 
   create: (payload: CreateAppointmentPayload) =>
     apiRequest<AppointmentResponse>("/api/v1/appointments", {

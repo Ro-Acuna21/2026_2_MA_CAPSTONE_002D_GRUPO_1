@@ -4,23 +4,21 @@ import { Navigate, useNavigate } from 'react-router-dom'
 import { PageHeading } from '@/components/page-heading'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Field, Input, Select, Textarea } from '@/components/ui/form-controls'
+import { Field, Input, Select } from '@/components/ui/form-controls'
 import { dateFromToday } from '@/lib/utils'
 import { useClinic } from '@/state/clinic-store'
 import { toast } from 'sonner'
 import { useCenterPath } from '@/lib/tenant'
 import type { Slot } from '@/domain/types'
+import { appointmentApi, type BackendPatientSummary, type BackendService } from '@/services/http'
 
 export function BookingPage() {
-  const { data, user, slots, patientSlots, professionalsForService, createAppointment } = useClinic()
+  const { user, patientSlots, professionalsForService, createAppointment } = useClinic()
   const navigate = useNavigate()
   const centerPath = useCenterPath()
 
-  // Recepción reserva a nombre de un paciente y sigue usando el catálogo
-  // mock. El paciente reserva su propia hora contra el backend real, por
-  // lo que el paso "profesional" depende de la prestación elegida (no al
-  // revés), ya que /api/v1/services/{service}/professionals filtra por
-  // especialidad del servicio.
+  // Ambos flujos de reserva usan el catálogo y la disponibilidad reales.
+  // Recepción agrega el paciente existente que recibe la atención.
   const staff = user?.role === 'RECEPCIONISTA'
 
   const [step, setStep] = useState(1)
@@ -30,19 +28,42 @@ export function BookingPage() {
   const [serviceId, setServiceId] = useState('')
   const [date, setDate] = useState('')
   const [time, setTime] = useState('')
-  const [note, setNote] = useState('')
-  const [overbook, setOverbook] = useState(false)
-
+  const [catalog, setCatalog] = useState<BackendService[]>([])
+  const [patients, setPatients] = useState<BackendPatientSummary[]>([])
   const [realProfessionals, setRealProfessionals] = useState<{ id: string; name: string }[]>([])
   const [available, setAvailable] = useState<Slot[]>([])
 
-  const mockProfessionals = data.professionals.filter((p) => p.active && p.specialtyIds.includes(specialtyId))
-  const services = data.services.filter((s) => s.active && s.specialtyId === specialtyId)
-  const professionals = staff ? mockProfessionals : realProfessionals
+  const specialties = Array.from(
+    new Map(catalog.filter((service) => service.specialty).map((service) => [String(service.specialty!.id), service.specialty!])).values(),
+  )
+  const services = catalog.filter((service) => String(service.specialty?.id) === specialtyId)
+  const professionals = realProfessionals
+
+  useEffect(() => {
+    let active = true
+
+    appointmentApi.services().then((response) => {
+      if (active) setCatalog(response.data)
+    }).catch(() => {
+      if (active) toast.error('No fue posible cargar el catálogo de reservas.')
+    })
+
+    if (staff) {
+      appointmentApi.patients().then((response) => {
+        if (active) setPatients(response.data)
+      }).catch(() => {
+        if (active) toast.error('No fue posible cargar los pacientes del centro.')
+      })
+    } else {
+      setPatients([])
+    }
+
+    return () => { active = false }
+  }, [staff])
 
   // Profesionales reales que atienden la prestación seleccionada.
   useEffect(() => {
-    if (staff || !serviceId) {
+    if (!serviceId) {
       setRealProfessionals([])
       return
     }
@@ -56,17 +77,10 @@ export function BookingPage() {
     return () => {
       active = false
     }
-  }, [staff, serviceId, professionalsForService])
+  }, [serviceId, professionalsForService])
 
-  // Horarios disponibles: recepción sigue usando el cálculo mock
-  // (dependiente de la disponibilidad y agenda mock); el paciente
-  // consulta el horario real contra Laravel.
+  // Los horarios siempre provienen de Laravel para evitar solapamientos.
   useEffect(() => {
-    if (staff) {
-      setAvailable(slots(professionalId, serviceId, date))
-      return
-    }
-
     if (!professionalId || !serviceId || !date) {
       setAvailable([])
       return
@@ -81,7 +95,7 @@ export function BookingPage() {
     return () => {
       active = false
     }
-  }, [staff, professionalId, serviceId, date, slots, patientSlots])
+  }, [professionalId, serviceId, date, patientSlots])
 
   if (!['RECEPCIONISTA', 'PACIENTE'].includes(user?.role ?? '')) return <Navigate to="/" replace />
 
@@ -102,8 +116,6 @@ export function BookingPage() {
         serviceId,
         date,
         time,
-        note,
-        overbook,
       })
 
       navigate(centerPath('/citas'))
@@ -112,11 +124,10 @@ export function BookingPage() {
     }
   }
 
-  const selectedProfessionalName = staff
-    ? data.professionals.find((p) => p.id === professionalId)?.name
-    : realProfessionals.find((p) => p.id === professionalId)?.name
+  const selectedProfessionalName = realProfessionals.find((p) => p.id === professionalId)?.name
+  const selectedPatient = patients.find((patient) => String(patient.id) === patientId)
 
-  const selection = `${data.specialties.find((s) => s.id === specialtyId)?.name} · ${selectedProfessionalName}`
+  const selection = `${specialties.find((s) => String(s.id) === specialtyId)?.name} · ${selectedProfessionalName}`
 
   return (
     <>
@@ -161,11 +172,9 @@ export function BookingPage() {
                   <Field className="sm:col-span-2" label="Paciente">
                     <Select required value={patientId} onChange={(e) => setPatientId(e.target.value)}>
                       <option value="">Seleccionar paciente</option>
-                      {data.patients
-                        .filter((p) => p.active)
-                        .map((p) => (
+                      {patients.map((p) => (
                           <option key={p.id} value={p.id}>
-                            {p.rut} · {p.name}
+                            {p.rut} · {p.first_name} {p.last_name}
                           </option>
                         ))}
                     </Select>
@@ -182,9 +191,7 @@ export function BookingPage() {
                     }}
                   >
                     <option value="">Seleccionar</option>
-                    {data.specialties
-                      .filter((s) => s.active)
-                      .map((s) => (
+                    {specialties.map((s) => (
                         <option key={s.id} value={s.id}>
                           {s.name}
                         </option>
@@ -204,7 +211,7 @@ export function BookingPage() {
                     <option value="">Seleccionar</option>
                     {services.map((s) => (
                       <option key={s.id} value={s.id}>
-                        {s.name} · {s.duration} min
+                        {s.name} · {s.duration_minutes} min
                       </option>
                     ))}
                   </Select>
@@ -212,7 +219,7 @@ export function BookingPage() {
                 <Field className="sm:col-span-2" label="Profesional">
                   <Select
                     required
-                    disabled={staff ? !specialtyId : !serviceId}
+                    disabled={!serviceId}
                     value={professionalId}
                     onChange={(e) => setProfessionalId(e.target.value)}
                   >
@@ -262,25 +269,6 @@ export function BookingPage() {
                     )}
                   </div>
                 </div>
-                <Field label="Observación administrativa (opcional)">
-                  <Textarea
-                    value={note}
-                    onChange={(e) => setNote(e.target.value)}
-                    maxLength={300}
-                    placeholder="No ingresar información clínica."
-                  />
-                </Field>
-                {staff && (
-                  <label className="flex items-start gap-3 rounded-lg bg-amber-50 p-4 text-sm text-amber-900">
-                    <input
-                      type="checkbox"
-                      className="mt-1"
-                      checked={overbook}
-                      onChange={(e) => setOverbook(e.target.checked)}
-                    />{' '}
-                    Crear como sobreturno; revisé el impacto en la agenda.
-                  </label>
-                )}
               </div>
             )}
 
@@ -289,12 +277,14 @@ export function BookingPage() {
                 <div>
                   <dt className="text-xs text-muted-foreground">Paciente</dt>
                   <dd className="font-medium">
-                    {staff ? data.patients.find((p) => p.id === patientId)?.name : user?.name}
+                    {staff && selectedPatient
+                      ? `${selectedPatient.first_name} ${selectedPatient.last_name}`
+                      : user?.name}
                   </dd>
                 </div>
                 <div>
                   <dt className="text-xs text-muted-foreground">Atención</dt>
-                  <dd className="font-medium">{data.services.find((s) => s.id === serviceId)?.name}</dd>
+                  <dd className="font-medium">{catalog.find((s) => String(s.id) === serviceId)?.name}</dd>
                 </div>
                 <div>
                   <dt className="text-xs text-muted-foreground">Profesional</dt>
