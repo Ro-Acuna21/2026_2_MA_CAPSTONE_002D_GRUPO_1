@@ -125,9 +125,42 @@ function loadData(): ClinicData {
 
     const old = JSON.parse(value) as ClinicData;
 
-    const withPlatform = old.users.some((user) => user.role === "SUPER_ADMIN")
-      ? old.users
-      : [...old.users, createMockData().users[0]];
+    const demo = createMockData();
+
+    /*
+     * Una versión anterior de la sincronización de agenda reemplazaba
+     * colecciones completas con una respuesta vacía del backend. Si el
+     * navegador persistió ese estado, no basta con corregir la carga: al
+     * reiniciar se vuelve a leer el catálogo incompleto. Recuperamos solo
+     * una colección que haya quedado totalmente vacía para Clínica
+     * Horizonte; nunca reemplazamos ni eliminamos registros existentes.
+     */
+    const restoreDemoCollection = <T extends { organizationId: string }>(
+      collection: T[] | undefined,
+      demoCollection: T[],
+    ): T[] => {
+      const current = collection ?? [];
+
+      return current.some((item) => item.organizationId === "org1")
+        ? current
+        : [
+            ...current,
+            ...demoCollection.filter((item) => item.organizationId === "org1"),
+          ];
+    };
+
+    const recovered = {
+      ...old,
+      patients: restoreDemoCollection(old.patients, demo.patients),
+      professionals: restoreDemoCollection(old.professionals, demo.professionals),
+      specialties: restoreDemoCollection(old.specialties, demo.specialties),
+      services: restoreDemoCollection(old.services, demo.services),
+      appointments: restoreDemoCollection(old.appointments, demo.appointments),
+    };
+
+    const withPlatform = recovered.users.some((user) => user.role === "SUPER_ADMIN")
+      ? recovered.users
+      : [...recovered.users, demo.users[0]];
 
     const tenantUsers = withPlatform.flatMap((account) => {
       if (account.role === "SUPER_ADMIN") {
@@ -159,9 +192,9 @@ function loadData(): ClinicData {
     });
 
     return {
-      ...old,
+      ...recovered,
 
-      organizations: old.organizations.map((organization) => ({
+      organizations: recovered.organizations.map((organization) => ({
         ...organization,
         subscription: organization.subscription ?? "ACTIVE",
       })),
