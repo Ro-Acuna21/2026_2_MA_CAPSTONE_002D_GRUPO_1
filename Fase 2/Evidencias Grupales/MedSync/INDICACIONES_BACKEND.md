@@ -24,6 +24,16 @@ Recepción puede crear una ficha de paciente sin cuenta. Cuando el paciente se r
 
 El paciente puede cancelar o reprogramar hasta 24 horas antes de la hora de inicio. Recepción puede hacerlo fuera de ese plazo. Una cita no puede marcarse `ATENDIDA` antes de su hora de inicio ni `NO_SHOW` antes de su hora de término. Calcular todos los plazos con la zona horaria del centro y repetirlos en Form Requests, servicios y pruebas.
 
+### Reasignación por ausencia de profesional
+
+Recepción puede reasignar una cita pendiente o confirmada cuando el profesional original no puede atender. Extender el endpoint de reprogramación para aceptar `professional_id` y `reassignment_reason` cuando quien ejecuta la acción sea `RECEPCIONISTA`. El servidor debe ignorar esos campos para pacientes y no permitirlos a profesionales.
+
+- Validar que el profesional de reemplazo esté activo, pertenezca al centro resuelto y atienda la especialidad de la prestación de la cita.
+- Validar de forma transaccional la disponibilidad, duración y ausencia de solapamientos del profesional de reemplazo para la fecha y hora solicitadas. No confiar en el horario calculado por React.
+- Recalcular `end_time`, actualizar `professional_id` y registrar un evento inmutable `REASIGNACION` con profesional anterior, nuevo profesional, motivo, actor y fecha. El motivo es obligatorio y de máximo 300 caracteres.
+- Autorizar solo a recepción; no exponer el cambio de profesional en las rutas de paciente. Devolver la cita con sus resúmenes de prestación y profesional actualizados.
+- Añadir feature tests para permisos, aislamiento de tenant, especialidad incompatible, profesional inactivo, horario ocupado, historial y reasignación fuera de la ventana de 24 horas por recepción.
+
 ### Informes clínicos
 
 El profesional responsable carga, publica y administra sus informes. Un informe publicado no se borra físicamente en producción: se anula con estado `VOIDED`, motivo, fecha y usuario responsable; el paciente deja de verlo. Los borradores pueden eliminarse o archivarse según la política clínica. Recepción, si tiene permiso de carga, nunca publica y debe recibir solo el acceso mínimo necesario.
@@ -59,6 +69,19 @@ Usar prefijo `/api/v1`, respuestas de recursos como `{ "data": ... }`, paginaci�
 - Plataforma: `GET/POST/PATCH /api/v1/platform/centers` y `PUT /api/v1/platform/centers/{id}/administrator`.
 
 Las rutas y cargas completas están documentadas en `medsync_frontend/docs/api-contract.md`.
+
+Para reasignación, `PATCH /api/v1/appointments/{appointment}/reschedule` debe admitir opcionalmente:
+
+```json
+{
+  "appointment_date": "2026-10-10",
+  "start_time": "10:30",
+  "professional_id": 42,
+  "reassignment_reason": "Ausencia por licencia médica"
+}
+```
+
+`professional_id` y `reassignment_reason` se procesan como una unidad: ambos son obligatorios si la persona cambia, y ambos se omiten para una reprogramación normal.
 
 ## Validaciones necesarias
 

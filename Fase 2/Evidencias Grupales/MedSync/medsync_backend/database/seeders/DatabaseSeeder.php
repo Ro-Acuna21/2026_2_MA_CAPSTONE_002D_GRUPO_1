@@ -13,6 +13,7 @@ class DatabaseSeeder extends Seeder
             CoreMedicalCenterSeeder::class,
             CenterHealthInsuranceSeeder::class,
             MedSyncDemoSeeder::class,
+            ReceptionistDemoSeeder::class,
             AppointmentsCatalogSeeder::class,
         ]);
     }

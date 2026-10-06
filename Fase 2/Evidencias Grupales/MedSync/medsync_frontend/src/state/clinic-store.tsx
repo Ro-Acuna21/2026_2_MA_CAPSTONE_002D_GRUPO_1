@@ -269,7 +269,13 @@ interface ClinicContextValue {
 
   changeStatus(id: string, status: AppointmentStatus): Promise<void>;
 
-  reschedule(id: string, date: string, time: string): Promise<void>;
+  reschedule(
+    id: string,
+    date: string,
+    time: string,
+    professionalId?: string,
+    reassignmentReason?: string,
+  ): Promise<void>;
 
   createPatient(input: Omit<Patient, "id" | "active" | "organizationId">): void;
 
@@ -1205,7 +1211,13 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
     toast.success("Estado de la cita actualizado");
   };
 
-  const reschedule = async (id: string, date: string, time: string) => {
+  const reschedule = async (
+    id: string,
+    date: string,
+    time: string,
+    professionalId?: string,
+    reassignmentReason?: string,
+  ) => {
     /*
      * Reprogramación real del paciente
      * (PATCH /api/v1/appointments/{id}/reschedule). Laravel vuelve a
@@ -1251,18 +1263,32 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
       (appointment) => appointment.id === id,
     );
 
+    const nextProfessionalId = professionalId ?? target?.professionalId;
+    const isReassignment = nextProfessionalId !== target?.professionalId;
+
     if (
       !target ||
       ["CANCELADA", "ATENDIDA"].includes(target.status) ||
       user?.role === "PROFESIONAL" ||
       date < dateFromToday() ||
-      !slots(target.professionalId, target.serviceId, date, id).some(
+      !nextProfessionalId ||
+      !data.professionals.some(
+        (professional) =>
+          professional.id === nextProfessionalId &&
+          professional.active &&
+          professional.specialtyIds.includes(target.specialtyId),
+      ) ||
+      !slots(nextProfessionalId, target.serviceId, date, id).some(
         (slot) => slot.time === time,
       )
     ) {
       throw new Error(
         "La reprogramación no está permitida o el horario no está disponible.",
       );
+    }
+
+    if (isReassignment && !reassignmentReason?.trim()) {
+      throw new Error("Indica el motivo de la reasignación.");
     }
 
     if (!user || !organization) {
@@ -1290,6 +1316,8 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
             ? {
                 ...item,
 
+                professionalId: nextProfessionalId,
+
                 date,
 
                 time,
@@ -1309,13 +1337,21 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
 
             appointmentId: id,
 
-            type: "REPROGRAMACION",
+                type: isReassignment ? "REASIGNACION" : "REPROGRAMACION",
 
             to: "PENDIENTE",
 
             oldDate: `${appointment.date} ${appointment.time}`,
 
-            newDate: `${date} ${time}`,
+                newDate: `${date} ${time}`,
+
+                oldProfessionalId: appointment.professionalId,
+
+                newProfessionalId: nextProfessionalId,
+
+                reason: isReassignment
+                  ? reassignmentReason?.trim()
+                  : undefined,
 
             userId: user.id,
 

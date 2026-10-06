@@ -125,12 +125,21 @@ php artisan db:seed
 
 Un solo `php artisan migrate` llena las dos bases: cada migración especifica su propia conexión (`Schema::connection('core')` o `Schema::connection('center')`) y `app/Providers/AppServiceProvider.php` registra ambas carpetas (`database/migrations/core` y `database/migrations/center`) con `loadMigrationsFrom()`.
 
-`db:seed` corre, en este orden, `SuperAdminSeeder` → `CoreMedicalCenterSeeder` → `CenterHealthInsuranceSeeder` → `DemoCenterUserSeeder`, y crea automáticamente:
+`db:seed` corre, en este orden, `SuperAdminSeeder` → `CoreMedicalCenterSeeder` → `CenterHealthInsuranceSeeder` → `MedSyncDemoSeeder` → `ReceptionistDemoSeeder` → `AppointmentsCatalogSeeder`, y crea automáticamente:
 
 - Un usuario super administrador.
 - El centro médico fijo "Clínica Horizonte".
 - El catálogo de previsiones Fonasa / Isapre / Particular / Otra.
 - Un paciente y un profesional de prueba (`paciente.prueba@test.cl` / `profesional.prueba@test.cl`, contraseña `Password123`).
+- Una cuenta de recepción de Clínica Horizonte: `recepcion@clinicahorizonte.cl` / `Password123`.
+
+Para incorporar solamente la cuenta de recepción en una base existente, sin migrar ni eliminar datos, ejecutar:
+
+```bash
+php artisan db:seed --class=ReceptionistDemoSeeder
+```
+
+El seeder es idempotente: reutiliza el usuario por correo y su membresía por centro, actualiza el rol a `RECEPCIONISTA` y no crea duplicados.
 
 Levantar el servidor:
 

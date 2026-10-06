@@ -1,6 +1,10 @@
 import type { AppointmentStatus, Role } from "@/domain/types";
 
-const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
+// En desarrollo, API y Vite deben usar el mismo host (localhost o
+// 127.0.0.1) para que el navegador pueda leer la cookie XSRF de Sanctum.
+const API_URL =
+  import.meta.env.VITE_API_URL ??
+  `${window.location.protocol}//${window.location.hostname}:8000`;
 
 export class ApiError extends Error {
   constructor(
