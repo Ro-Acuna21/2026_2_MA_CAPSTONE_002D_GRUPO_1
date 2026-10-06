@@ -1093,9 +1093,33 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
           user,
         );
 
+        const createdProfessional = response.data.professional
+          ? {
+              id: String(response.data.professional.id),
+              organizationId: organization.id,
+              name: `${response.data.professional.first_name} ${response.data.professional.last_name}`,
+              rut: "",
+              email: "",
+              phone: "",
+              specialtyIds: response.data.service?.specialty
+                ? [String(response.data.service.specialty.id)]
+                : [],
+              description: "",
+              active: true,
+            }
+          : null;
+
         setAllData((current) => ({
           ...current,
           appointments: [...current.appointments, mapped],
+          professionals: createdProfessional
+            ? [
+                ...current.professionals.filter(
+                  (professional) => professional.id !== createdProfessional.id,
+                ),
+                createdProfessional,
+              ]
+            : current.professionals,
         }));
 
         toast.success("Reserva creada correctamente");
