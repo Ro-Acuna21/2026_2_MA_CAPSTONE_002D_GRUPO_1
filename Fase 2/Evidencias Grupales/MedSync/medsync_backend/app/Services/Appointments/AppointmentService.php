@@ -254,6 +254,68 @@ class AppointmentService
     }
 
     /**
+     * Reprograma o reasigna una cita desde recepción. A diferencia del
+     * paciente, recepción puede operar fuera de la ventana de 24 horas,
+     * pero sigue sujeta a especialidad, disponibilidad y solapamientos.
+     */
+    public function rescheduleByReception(Appointment $appointment, array $data, User $actor): Appointment
+    {
+        $this->ensureModifiable($appointment, 'reprogramar');
+
+        $service = $this->findActiveService((int) $appointment->service_id);
+        $professional = $this->findActiveProfessional((int) $data['professional_id']);
+        $isReassignment = $appointment->professional_id !== $professional->id;
+
+        if ($isReassignment && empty(trim((string) ($data['reassignment_reason'] ?? '')))) {
+            throw ValidationException::withMessages([
+                'reassignment_reason' => ['Indica el motivo de la reasignación.'],
+            ]);
+        }
+
+        $this->ensureProfessionalOffersService($professional, $service);
+
+        $date = $this->normalizeFutureDate($data['appointment_date']);
+        $weekday = Carbon::parse($date)->dayOfWeekIso;
+        $startTime = $this->normalizeTime($data['start_time']);
+        $endTime = $this->addMinutes($startTime, $service->duration_minutes);
+
+        $this->ensureWithinAvailability($professional->id, $weekday, $startTime, $endTime);
+
+        return DB::connection('center')->transaction(function () use ($appointment, $professional, $date, $startTime, $endTime, $actor, $data, $isReassignment) {
+            $this->ensureNoOverlap($professional->id, $date, $startTime, $endTime, $appointment->id);
+
+            $oldProfessionalId = $appointment->professional_id;
+            $oldDate = $appointment->appointment_date->toDateString();
+            $oldStartTime = $appointment->start_time;
+            $oldEndTime = $appointment->end_time;
+
+            $appointment->update([
+                'professional_id' => $professional->id,
+                'appointment_date' => $date,
+                'start_time' => $startTime,
+                'end_time' => $endTime,
+            ]);
+
+            AppointmentHistory::create([
+                'appointment_id' => $appointment->id,
+                'actor_user_id' => $actor->id,
+                'event_type' => $isReassignment ? 'REASIGNACION' : 'REPROGRAMACION',
+                'old_date' => $oldDate,
+                'old_start_time' => $oldStartTime,
+                'old_end_time' => $oldEndTime,
+                'new_date' => $date,
+                'new_start_time' => $startTime,
+                'new_end_time' => $endTime,
+                'old_professional_id' => $oldProfessionalId,
+                'new_professional_id' => $professional->id,
+                'reason' => $isReassignment ? trim($data['reassignment_reason']) : null,
+            ]);
+
+            return $appointment->fresh();
+        });
+    }
+
+    /**
      * Cancela una reserva sin eliminarla físicamente.
      */
     public function cancelAppointment(Appointment $appointment, Patient $patient, ?string $reason, User $actor): Appointment
@@ -287,6 +349,16 @@ class AppointmentService
     {
         return $patient->appointments()
             ->with(['service.specialty', 'professional'])
+            ->orderBy('appointment_date')
+            ->orderBy('start_time')
+            ->get();
+    }
+
+    /** Reservas visibles para recepción dentro del centro activo. */
+    public function listReceptionAppointments()
+    {
+        return Appointment::query()
+            ->with(['patient', 'service.specialty', 'professional'])
             ->orderBy('appointment_date')
             ->orderBy('start_time')
             ->get();

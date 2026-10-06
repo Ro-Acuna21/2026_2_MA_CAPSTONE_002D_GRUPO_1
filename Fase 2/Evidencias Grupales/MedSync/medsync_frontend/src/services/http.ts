@@ -273,6 +273,12 @@ export interface BackendAppointment {
   overbook: boolean;
   note: string | null;
 
+  patient: {
+    id: number;
+    first_name: string;
+    last_name: string;
+  } | null;
+
   service: {
     id: number;
     name: string;
@@ -306,6 +312,7 @@ export interface CreateAppointmentPayload {
 export interface RescheduleAppointmentPayload {
   service_id?: number;
   professional_id?: number;
+  reassignment_reason?: string;
   appointment_date: string;
   start_time: string;
 }
@@ -324,6 +331,8 @@ export const appointmentApi = {
     ),
 
   my: () => apiRequest<AppointmentsResponse>("/api/v1/appointments/my"),
+
+  list: () => apiRequest<AppointmentsResponse>("/api/v1/appointments"),
 
   create: (payload: CreateAppointmentPayload) =>
     apiRequest<AppointmentResponse>("/api/v1/appointments", {

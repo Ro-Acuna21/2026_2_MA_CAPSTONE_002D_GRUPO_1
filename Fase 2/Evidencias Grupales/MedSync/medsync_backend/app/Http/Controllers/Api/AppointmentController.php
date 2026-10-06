@@ -100,25 +100,68 @@ class AppointmentController extends Controller
     }
 
     /**
+     * Agenda operativa de recepción. Incluye las reservas del centro
+     * resuelto por el middleware de tenant.
+     */
+    public function index(Request $request)
+    {
+        abort_unless(
+            $this->tenantContext->centerUser()->role === 'RECEPCIONISTA',
+            403,
+            'No tienes permisos para consultar la agenda del centro.'
+        );
+
+        $appointments = $this->appointmentService->listReceptionAppointments();
+
+        return response()->json([
+            'data' => $appointments->map(
+                fn (Appointment $appointment) => $this->presentAppointment($appointment)
+            ),
+        ]);
+    }
+
+    /**
      * PATCH /api/v1/appointments/{appointment}/reschedule
      */
     public function reschedule(Request $request, Appointment $appointment)
     {
-        $data = $request->validate([
-            'service_id' => ['sometimes', 'integer'],
-            'professional_id' => ['sometimes', 'integer'],
-            'appointment_date' => ['required', 'date_format:Y-m-d'],
-            'start_time' => ['required', 'date_format:H:i'],
-        ]);
+        $centerUser = $this->tenantContext->centerUser();
 
-        $patient = $this->resolvePatient($request);
+        if ($centerUser->role === 'RECEPCIONISTA') {
+            $data = $request->validate([
+                'professional_id' => ['required', 'integer'],
+                'reassignment_reason' => ['nullable', 'string', 'max:300'],
+                'appointment_date' => ['required', 'date_format:Y-m-d'],
+                'start_time' => ['required', 'date_format:H:i'],
+            ]);
 
-        $appointment = $this->appointmentService->rescheduleAppointment(
-            $appointment,
-            $patient,
-            $data,
-            $request->user()
-        );
+            $appointment = $this->appointmentService->rescheduleByReception(
+                $appointment,
+                $data,
+                $request->user()
+            );
+        } else {
+            abort_unless(
+                $centerUser->role === 'PACIENTE',
+                403,
+                'No tienes permisos para reprogramar citas.'
+            );
+
+            $data = $request->validate([
+                'professional_id' => ['prohibited'],
+                'reassignment_reason' => ['prohibited'],
+                'service_id' => ['prohibited'],
+                'appointment_date' => ['required', 'date_format:Y-m-d'],
+                'start_time' => ['required', 'date_format:H:i'],
+            ]);
+
+            $appointment = $this->appointmentService->rescheduleAppointment(
+                $appointment,
+                $this->resolvePatient($request),
+                $data,
+                $request->user()
+            );
+        }
 
         return response()->json([
             'message' => 'La reserva fue reprogramada correctamente.',
@@ -172,7 +215,7 @@ class AppointmentController extends Controller
 
     private function presentAppointment(Appointment $appointment): array
     {
-        $appointment->loadMissing(['service.specialty', 'professional']);
+        $appointment->loadMissing(['patient', 'service.specialty', 'professional']);
 
         return [
             'id' => $appointment->id,
@@ -183,6 +226,12 @@ class AppointmentController extends Controller
             'source' => $appointment->source,
             'overbook' => $appointment->overbook,
             'note' => $appointment->note,
+
+            'patient' => $appointment->patient ? [
+                'id' => $appointment->patient->id,
+                'first_name' => $appointment->patient->first_name,
+                'last_name' => $appointment->patient->last_name,
+            ] : null,
             'service' => $appointment->service ? [
                 'id' => $appointment->service->id,
                 'name' => $appointment->service->name,

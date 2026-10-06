@@ -22,7 +22,7 @@ export function AppointmentHistoryPage() {
 
 export function ReschedulePage() {
   const { id } = useParams()
-  const { data, user, slots, patientSlots, reschedule } = useClinic()
+  const { data, user, slots, patientSlots, professionalsForService, reschedule } = useClinic()
   const navigate = useNavigate()
   const centerPath = useCenterPath()
   const appointment = data.appointments.find((a) => a.id === id)
@@ -31,10 +31,29 @@ export function ReschedulePage() {
   const [professionalId, setProfessionalId] = useState(() => appointment?.professionalId ?? '')
   const [reassignmentReason, setReassignmentReason] = useState('')
   const [available, setAvailable] = useState<Slot[]>([])
-  const replacementProfessionals = appointment
+  const [realProfessionals, setRealProfessionals] = useState<{ id: string; name: string }[]>([])
+  const mockReplacementProfessionals = appointment
     ? data.professionals.filter((professional) => professional.active && professional.specialtyIds.includes(appointment.specialtyId))
     : []
+  const replacementProfessionals = user?.role === 'RECEPCIONISTA' ? realProfessionals : mockReplacementProfessionals
   const isReassignment = user?.role === 'RECEPCIONISTA' && professionalId !== appointment?.professionalId
+
+  useEffect(() => {
+    if (!appointment || user?.role !== 'RECEPCIONISTA') {
+      setRealProfessionals([])
+      return
+    }
+
+    let active = true
+
+    professionalsForService(appointment.serviceId).then((professionals) => {
+      if (active) setRealProfessionals(professionals)
+    })
+
+    return () => {
+      active = false
+    }
+  }, [appointment, professionalsForService, user?.role])
 
   // El paciente consulta horarios reales contra Laravel; recepción
   // sigue usando el cálculo mock.
@@ -44,10 +63,10 @@ export function ReschedulePage() {
       return
     }
 
-    if (user?.role === 'PACIENTE') {
+    if (user?.role === 'PACIENTE' || user?.role === 'RECEPCIONISTA') {
       let active = true
 
-      patientSlots(appointment.serviceId, appointment.professionalId, date).then((result) => {
+      patientSlots(appointment.serviceId, professionalId, date).then((result) => {
         if (active) setAvailable(result)
       })
 
@@ -75,5 +94,5 @@ export function ReschedulePage() {
     }
   }
 
-  return <><PageHeading title="Reprogramar cita" description="El horario anterior se conservará en el historial." /><Card className="max-w-2xl"><CardContent className="p-6"><form onSubmit={submit}>{user?.role === 'RECEPCIONISTA' && <><Field label="Profesional responsable"><Select required value={professionalId} onChange={(event) => { setProfessionalId(event.target.value); setTime('') }}><option value="">Seleccionar profesional</option>{replacementProfessionals.map((professional) => <option key={professional.id} value={professional.id}>{professional.name}{professional.id === appointment.professionalId ? ' · profesional original' : ''}</option>)}</Select></Field><p className="mt-2 text-sm text-muted-foreground">Solo se muestran profesionales activos que atienden la especialidad de esta cita.</p>{isReassignment && <Field className="mt-5" label="Motivo de la reasignación"><Textarea required maxLength={300} value={reassignmentReason} onChange={(event) => setReassignmentReason(event.target.value)} placeholder="Ej.: profesional ausente por licencia médica." /></Field>}</>}<Field className="mt-5" label="Nueva fecha"><Input type="date" min={dateFromToday(1)} required value={date} onChange={(e) => { setDate(e.target.value); setTime('') }} /></Field><div className="my-6"><p className="mb-3 text-sm font-medium">Horarios disponibles</p><div className="flex min-h-16 flex-wrap gap-2 rounded-xl bg-muted p-4">{available.map((slot) => <Button type="button" key={slot.time} size="sm" variant={time === slot.time ? 'default' : 'outline'} onClick={() => setTime(slot.time)}>{slot.time}</Button>)}{!date && <p className="text-sm text-muted-foreground">Selecciona una fecha.</p>}{date && !available.length && <p className="text-sm text-muted-foreground">No hay horas disponibles.</p>}</div></div><div className="flex justify-end gap-3"><Button type="button" variant="ghost" onClick={() => navigate(centerPath('/citas'))}>Cancelar</Button><Button disabled={!time || !professionalId}>Guardar reprogramación</Button></div></form></CardContent></Card></>
+  return <><PageHeading title="Reprogramar cita" description="El horario anterior se conservará en el historial." /><Card className="max-w-2xl"><CardContent className="p-6"><form onSubmit={submit}>{user?.role === 'RECEPCIONISTA' && <><Field label="Profesional responsable"><Select required value={professionalId} onChange={(event) => { setProfessionalId(event.target.value); setTime('') }}><option value="">Seleccionar profesional</option>{replacementProfessionals.map((professional) => <option key={professional.id} value={professional.id}>{professional.name}{professional.id === appointment.professionalId ? ' · profesional original' : ''}</option>)}</Select></Field><p className="mt-2 text-sm text-muted-foreground">Solo se muestran profesionales activos que atienden la especialidad de esta cita.</p>{isReassignment && <Field className="mt-5" label="Motivo de la reasignación"><Textarea required maxLength={300} value={reassignmentReason} onChange={(event) => setReassignmentReason(event.target.value)} placeholder="Ej.: profesional ausente por licencia médica." /></Field>}</>}<Field className="mt-5" label="Nueva fecha"><Input type="date" min={dateFromToday(1)} required value={date} onChange={(e) => { setDate(e.target.value); setTime('') }} /></Field><div className="my-6"><p className="mb-3 text-sm font-medium">Horarios disponibles</p><div className="flex min-h-16 flex-wrap gap-2 rounded-xl bg-muted p-4">{available.map((slot) => <Button type="button" key={slot.time} size="sm" variant={time === slot.time ? 'default' : 'outline'} onClick={() => setTime(slot.time)}>{slot.time}</Button>)}{!date && <p className="text-sm text-muted-foreground">Selecciona una fecha para consultar.</p>}{date && !available.length && <p className="text-sm text-muted-foreground">No hay horas disponibles para este profesional.</p>}</div></div><div className="flex justify-end gap-3"><Button type="button" variant="ghost" onClick={() => navigate(centerPath('/citas'))}>Cancelar</Button><Button disabled={!time || !professionalId}>Guardar reprogramación</Button></div></form></CardContent></Card></>
 }

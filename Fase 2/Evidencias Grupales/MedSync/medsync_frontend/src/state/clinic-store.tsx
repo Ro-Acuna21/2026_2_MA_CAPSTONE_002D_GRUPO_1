@@ -84,7 +84,7 @@ function mapBackendAppointment(
 
     organizationId,
 
-    patientId: user.patientId ?? "",
+    patientId: item.patient ? String(item.patient.id) : (user.patientId ?? ""),
 
     professionalId: item.professional ? String(item.professional.id) : "",
 
@@ -676,6 +676,115 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
       });
   }, [authLoading, user, organization]);
 
+  /*
+   * La agenda de recepción consulta las reservas reales del centro. Esto
+   * permite que una reasignación persistida en Laravel se refleje tanto en
+   * recepción como en la cuenta del paciente cuando éste actualice Mis citas.
+   */
+  useEffect(() => {
+    if (authLoading || !user || !organization || user.role !== "RECEPCIONISTA") {
+      return;
+    }
+
+    appointmentApi
+      .list()
+      .then((response) => {
+        const specialties = new Map<string, ClinicData["specialties"][number]>();
+        const services = new Map<string, ClinicData["services"][number]>();
+        const patients = new Map<string, Patient>();
+        const professionals = new Map<string, Professional>();
+
+        const appointments = response.data.map((item) => {
+          if (item.service?.specialty) {
+            specialties.set(String(item.service.specialty.id), {
+              id: String(item.service.specialty.id),
+              organizationId: organization.id,
+              name: item.service.specialty.name,
+              description: "",
+              active: true,
+            });
+          }
+
+          if (item.service) {
+            services.set(String(item.service.id), {
+              id: String(item.service.id),
+              organizationId: organization.id,
+              specialtyId: item.service.specialty ? String(item.service.specialty.id) : "",
+              name: item.service.name,
+              duration: item.service.duration_minutes,
+              active: true,
+            });
+          }
+
+          if (item.patient) {
+            const id = String(item.patient.id);
+            patients.set(id, {
+              id,
+              organizationId: organization.id,
+              name: `${item.patient.first_name} ${item.patient.last_name}`,
+              rut: "",
+              email: "",
+              phone: "",
+              birthDate: "",
+              address: "",
+              consent: true,
+              active: true,
+            });
+          }
+
+          if (item.professional) {
+            const id = String(item.professional.id);
+            professionals.set(id, {
+              id,
+              organizationId: organization.id,
+              name: `${item.professional.first_name} ${item.professional.last_name}`,
+              rut: "",
+              email: "",
+              phone: "",
+              specialtyIds: item.service?.specialty ? [String(item.service.specialty.id)] : [],
+              description: "",
+              active: true,
+            });
+          }
+
+          return mapBackendAppointment(item, organization.id, user);
+        });
+
+        setAllData((current) => ({
+          ...current,
+          appointments: [
+            ...current.appointments.filter(
+              (appointment) => appointment.organizationId !== organization.id,
+            ),
+            ...appointments,
+          ],
+          specialties: [
+            ...current.specialties.filter(
+              (specialty) => specialty.organizationId !== organization.id,
+            ),
+            ...specialties.values(),
+          ],
+          services: [
+            ...current.services.filter((service) => service.organizationId !== organization.id),
+            ...services.values(),
+          ],
+          patients: [
+            ...current.patients.filter((patient) => patient.organizationId !== organization.id),
+            ...patients.values(),
+          ],
+          professionals: [
+            ...current.professionals.filter(
+              (professional) => professional.organizationId !== organization.id,
+            ),
+            ...professionals.values(),
+          ],
+        }));
+      })
+      .catch((error) => {
+        console.error("No fue posible cargar la agenda real de recepción:", error);
+      });
+  }, [authLoading, user, organization]);
+
   const commit = useCallback(
     (updater: (current: ClinicData) => ClinicData) => {
       const next = updater(allData);
@@ -1244,6 +1353,40 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
           ...current,
           appointments: current.appointments.map((item) =>
             item.id === id ? mapped : item,
+          ),
+        }));
+
+        toast.success("Cita reprogramada");
+      } catch (error) {
+        throw new Error(
+          firstApiErrorMessage(error, "No fue posible reprogramar la reserva."),
+        );
+      }
+
+      return;
+    }
+
+    if (user?.role === "RECEPCIONISTA") {
+      if (!organization || !professionalId) {
+        throw new Error("No hay un centro o profesional seleccionado.");
+      }
+
+      try {
+        const response = await appointmentApi.reschedule(Number(id), {
+          professional_id: Number(professionalId),
+          reassignment_reason: reassignmentReason?.trim() || undefined,
+          appointment_date: date,
+          start_time: time,
+        });
+
+        const mapped = mapBackendAppointment(response.data, organization.id, user);
+
+        setAllData((current) => ({
+          ...current,
+          appointments: current.appointments.map((item) =>
+            item.id === id
+              ? { ...mapped, patientId: item.patientId }
+              : item,
           ),
         }));
 

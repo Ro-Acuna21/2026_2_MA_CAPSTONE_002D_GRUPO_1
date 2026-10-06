@@ -26,7 +26,7 @@ El paciente puede cancelar o reprogramar hasta 24 horas antes de la hora de inic
 
 ### Reasignación por ausencia de profesional
 
-Recepción puede reasignar una cita pendiente o confirmada cuando el profesional original no puede atender. Extender el endpoint de reprogramación para aceptar `professional_id` y `reassignment_reason` cuando quien ejecuta la acción sea `RECEPCIONISTA`. El servidor debe ignorar esos campos para pacientes y no permitirlos a profesionales.
+Recepción puede reasignar una cita pendiente o confirmada cuando el profesional original no puede atender. El endpoint de reprogramación acepta `professional_id` y `reassignment_reason` cuando quien ejecuta la acción sea `RECEPCIONISTA`; pacientes y profesionales no pueden enviar esos campos.
 
 - Validar que el profesional de reemplazo esté activo, pertenezca al centro resuelto y atienda la especialidad de la prestación de la cita.
 - Validar de forma transaccional la disponibilidad, duración y ausencia de solapamientos del profesional de reemplazo para la fecha y hora solicitadas. No confiar en el horario calculado por React.

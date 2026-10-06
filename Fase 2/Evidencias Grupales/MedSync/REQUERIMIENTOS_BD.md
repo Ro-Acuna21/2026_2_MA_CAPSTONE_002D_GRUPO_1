@@ -45,7 +45,7 @@ El middleware clínico configura `database.connections.center.database`, ejecuta
 | --- | --- | --- |
 | `availabilities` | `id`, `medical_center_id`, `professional_id`, `weekday`, `start_time`, `end_time`, `is_active`, timestamps | `weekday` entre 1 y 7; `start_time < end_time`; profesional del mismo centro. |
 | `appointments` | `id`, `medical_center_id`, `patient_id`, `professional_id`, `specialty_id`, `service_id`, `appointment_date`, `start_time`, `end_time`, `status`, `source`, `note` opcional, `overbook`, `created_by`, timestamps, `deleted_at` | Horas deben ser `TIME`, no `DATE`. `status`: `PENDIENTE`, `CONFIRMADA`, `ATENDIDA`, `CANCELADA`, `NO_SHOW`; `source`: `WEB`, `RECEPCION`, `DEMO`. Validar que paciente, profesional, especialidad y prestación pertenezcan al centro. |
-| `appointment_history` | `id`, `appointment_id`, `actor_user_id`, `event_type`, `previous_status` opcional, `new_status` opcional, `old_date` opcional, `old_start_time` opcional, `new_date` opcional, `new_start_time` opcional, `old_professional_id` opcional, `new_professional_id` opcional, `reassignment_reason` opcional, `created_at` | Inmutable. `event_type`: `CREACION`, `CAMBIO_ESTADO`, `REPROGRAMACION`, `REASIGNACION`, `CANCELACION`. |
+| `appointment_history` | `id`, `appointment_id`, `actor_user_id`, `event_type`, `previous_status` opcional, `new_status` opcional, `old_date` opcional, `old_start_time` opcional, `new_date` opcional, `new_start_time` opcional, `old_professional_id` opcional, `new_professional_id` opcional, `reason` opcional, `created_at` | Inmutable. `event_type`: `CREACION`, `CAMBIO_ESTADO`, `REPROGRAMACION`, `REASIGNACION`, `CANCELACION`. |
 
 ## Informes y resultados médicos
 
@@ -93,7 +93,7 @@ El paciente puede cancelar o reprogramar hasta 24 horas antes de `appointment_da
 
 ### Reasignación por ausencia de profesional
 
-Cuando recepción reasigne una cita, conservar la cita original y actualizar solo su `professional_id` dentro de una transacción. Crear una fila inmutable en `appointment_history` con `event_type = REASIGNACION`, los identificadores anterior y nuevo del profesional, y `reassignment_reason` obligatorio (máximo 300 caracteres). Ambos profesionales deben pertenecer al mismo centro que la cita; el reemplazo debe estar activo y relacionado con la especialidad de la prestación.
+Cuando recepción reasigne una cita, conservar la cita original y actualizar solo su `professional_id` dentro de una transacción. Crear una fila inmutable en `appointment_history` con `event_type = REASIGNACION`, los identificadores anterior y nuevo del profesional, y `reason` obligatorio (máximo 300 caracteres). El payload HTTP usa `reassignment_reason`, que backend persiste en `reason`. Ambos profesionales deben pertenecer al mismo centro que la cita; el reemplazo debe estar activo y relacionado con la especialidad de la prestación.
 
 Agregar claves foráneas desde `appointment_history.old_professional_id` y `appointment_history.new_professional_id` hacia `professionals(id)`, índices para ambas columnas si se consultará el historial por profesional, y una validación de aplicación que impida registrar una reasignación sin el par completo de IDs y motivo. La comprobación de disponibilidad y solapamiento debe ejecutarse antes de actualizar la cita, en la misma transacción.
 
