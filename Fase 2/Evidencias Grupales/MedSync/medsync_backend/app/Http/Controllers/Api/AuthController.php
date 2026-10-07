@@ -26,13 +26,18 @@ class AuthController extends Controller
     ) {
     }
 
-    /**
-     * POST /api/register
-     *
-     * Iteración 1: un solo centro médico fijo ("clinica-horizonte").
-     * Autenticación por sesión/cookies de Sanctum (no token Bearer), tal
-     * como espera el frontend (credentials: 'include' + csrf-cookie).
-     */
+    /** Centros activos visibles antes del registro o login clínico. */
+    public function publicCenters()
+    {
+        return response()->json([
+            'data' => MedicalCenter::query()
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get(['id', 'name', 'slug']),
+        ]);
+    }
+
+    /** Registro público contextual al centro validado en Core. */
     public function register(Request $request)
     {
         // Normaliza el correo y el teléfono antes de validar.
@@ -45,6 +50,7 @@ class AuthController extends Controller
         ]);
 
         $data = $request->validate([
+            'center_slug' => ['required', 'string', 'max:150'],
             'first_name' => ['required', 'string', 'max:100'],
             'last_name' => ['required', 'string', 'max:100'],
             'rut' => ['required', 'string', new ValidRut()],
@@ -57,6 +63,20 @@ class AuthController extends Controller
             'password' => ['required', 'string', 'min:8', 'regex:/[a-z]/', 'regex:/[A-Z]/', 'regex:/\d/', 'confirmed'],
             'consent' => ['required', 'accepted'],
         ]);
+        $medicalCenter = MedicalCenter::query()
+            ->where('slug', $data['center_slug'])
+            ->where('is_active', true)
+            ->first();
+
+        if (! $medicalCenter) {
+            throw ValidationException::withMessages([
+                'center_slug' => ['El centro médico solicitado no está disponible.'],
+            ]);
+        }
+
+        // El nombre de la base clínica proviene únicamente de Core.
+        $this->connectionResolver->connect($medicalCenter);
+
         $existingUser = User::query()
     ->whereRaw('LOWER(TRIM(email)) = ?', [$data['email']])
     ->exists();
@@ -71,14 +91,6 @@ if ($existingUser) {
 
         $rut = ValidRut::normalize($data['rut']);
 
-        $medicalCenter = MedicalCenter::where('slug', 'clinica-horizonte')->first();
-
-        if (! $medicalCenter) {
-            throw ValidationException::withMessages([
-                'email' => ['El centro médico no está configurado. Ejecuta el seeder de MedicalCenterSeeder.'],
-            ]);
-        }
-
         $healthInsurance = HealthInsurance::where('name', $data['health_insurance'])->first();
 
         if (! $healthInsurance) {
@@ -87,7 +99,7 @@ if ($existingUser) {
             ]);
         }
 
-        $patient = DB::transaction(function () use ($data, $rut, $medicalCenter, $healthInsurance) {
+        [$patient, $centerUser] = DB::transaction(function () use ($data, $rut, $medicalCenter, $healthInsurance) {
             $existingPatient = Patient::where(function ($query) use ($rut, $data) {
     $query->where('rut', $rut)
         ->orWhereRaw(
@@ -152,7 +164,7 @@ if ($existingUser) {
     );
 }
 
-            CenterUser::firstOrCreate(
+            $centerUser = CenterUser::firstOrCreate(
                 [
                     'medical_center_id' => $medicalCenter->id,
                     'user_id' => $user->id,
@@ -164,11 +176,11 @@ if ($existingUser) {
                 ]
             );
 
-            return $patient;
+            return [$patient, $centerUser];
         });
 
         return response()->json([
-            'data' => $this->presentUser($patient->user()->first()),
+            'data' => $this->presentUser($patient->user()->first(), $centerUser),
         ], 201);
     }
 
@@ -323,7 +335,11 @@ if ($existingUser) {
             'role' => $user->system_role === 'SUPER_ADMIN'
             ? 'SUPER_ADMIN'
             : $centerUser?->role,
-            'medical_center' => $centerUser?->medicalCenter,
+            'medical_center' => $centerUser?->medicalCenter ? [
+                'id' => $centerUser->medicalCenter->id,
+                'name' => $centerUser->medicalCenter->name,
+                'slug' => $centerUser->medicalCenter->slug,
+            ] : null,
             'patient' => $centerUser?->patient,
             'professional' => $centerUser?->professional,
         ];

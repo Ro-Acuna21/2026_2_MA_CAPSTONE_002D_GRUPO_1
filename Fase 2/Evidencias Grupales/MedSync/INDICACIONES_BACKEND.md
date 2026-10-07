@@ -24,6 +24,26 @@ Recepción puede crear una ficha de paciente sin cuenta. Cuando el paciente se r
 
 El paciente puede cancelar o reprogramar hasta 24 horas antes de la hora de inicio. Recepción puede hacerlo fuera de ese plazo. Una cita no puede marcarse `ATENDIDA` antes de su hora de inicio ni `NO_SHOW` antes de su hora de término. Calcular todos los plazos con la zona horaria del centro y repetirlos en Form Requests, servicios y pruebas.
 
+### Reasignación por ausencia de profesional
+
+Recepción puede reasignar una cita pendiente o confirmada cuando el profesional original no puede atender. El endpoint de reprogramación acepta `professional_id` y `reassignment_reason` cuando quien ejecuta la acción sea `RECEPCIONISTA`; pacientes y profesionales no pueden enviar esos campos.
+
+- Validar que el profesional de reemplazo esté activo, pertenezca al centro resuelto y atienda la especialidad de la prestación de la cita.
+- Validar de forma transaccional la disponibilidad, duración y ausencia de solapamientos del profesional de reemplazo para la fecha y hora solicitadas. No confiar en el horario calculado por React.
+- Recalcular `end_time`, actualizar `professional_id` y registrar un evento inmutable `REASIGNACION` con profesional anterior, nuevo profesional, motivo, actor y fecha. El motivo es obligatorio y de máximo 300 caracteres.
+- Autorizar solo a recepción; no exponer el cambio de profesional en las rutas de paciente. Devolver la cita con sus resúmenes de prestación y profesional actualizados.
+- Añadir feature tests para permisos, aislamiento de tenant, especialidad incompatible, profesional inactivo, horario ocupado, historial y reasignación fuera de la ventana de 24 horas por recepción.
+
+### Agenda real de recepción
+
+El frontend de recepción ya no debe usar pacientes, prestaciones, profesionales ni horas mock para reservar o reprogramar. El backend debe entregar `GET /api/v1/patients` exclusivamente a `RECEPCIONISTA`, con el mínimo necesario para seleccionar un paciente activo (`id`, nombre y RUT), y aceptar `patient_id` únicamente cuando una recepción hace `POST /api/v1/appointments`.
+
+Pacientes de recepción reutiliza ese listado y lo amplía con datos administrativos de la ficha. `POST /api/v1/patients` crea la ficha sin cuenta; `GET/PATCH /api/v1/patients/{id}` consulta y corrige la ficha del tenant resuelto. `PACIENTE` puede consultar y editar únicamente su propia ficha según `center_users.patient_id`, sin modificar RUT, correo de acceso, previsión ni consentimiento. Recepción puede corregir el correo de una ficha sin cuenta; una ficha vinculada requiere un flujo separado para actualizar también `core.users`. `ADMIN`, `PROFESIONAL` y `SUPER_ADMIN` no reciben acceso a estas rutas.
+
+- Para recepción, el servidor resuelve y valida el paciente activo dentro del tenant y crea la cita con `source = RECEPCION`.
+- Para paciente, `patient_id` no se acepta: el servidor mantiene la resolución desde la sesión y crea con `source = WEB`.
+- Catálogo, profesionales compatibles y horarios continúan saliendo de `/v1/services`, `/v1/services/{service}/professionals` y `/v1/appointments/available-slots`; toda validación final permanece en el servidor.
+
 ### Informes clínicos
 
 El profesional responsable carga, publica y administra sus informes. Un informe publicado no se borra físicamente en producción: se anula con estado `VOIDED`, motivo, fecha y usuario responsable; el paciente deja de verlo. Los borradores pueden eliminarse o archivarse según la política clínica. Recepción, si tiene permiso de carga, nunca publica y debe recibir solo el acceso mínimo necesario.
@@ -52,13 +72,26 @@ El permiso opcional `results.upload` puede habilitar a recepción a cargar borra
 
 Usar prefijo `/api/v1`, respuestas de recursos como `{ "data": ... }`, paginación estándar de Laravel y errores de validación como `{ "message": "...", "errors": { "campo": ["..."] } }`.
 
-- Autenticación: `GET /sanctum/csrf-cookie`, `POST /api/login`, `POST /api/logout`, `GET /api/v1/me`, `POST /api/register`. El login clínico recibe `email`, `password` y `center_slug`; Laravel valida el slug y la membresía antes de guardar el centro activo en sesión.
-- Agenda: `GET/POST/PATCH /api/v1/appointments`, `GET /api/v1/appointments/{id}`, `GET /api/v1/slots`.
+- Autenticación: `GET /sanctum/csrf-cookie`, `GET /api/public/centers`, `POST /api/login`, `POST /api/logout`, `GET /api/v1/me`, `POST /api/register`. El login clínico recibe `email`, `password` y `center_slug`; Laravel valida el slug y la membresía antes de guardar el centro activo en sesión. El registro también exige `center_slug`, valida que el centro esté activo en Core y resuelve su base clínica antes de consultar o crear pacientes.
+- Agenda: `GET/POST/PATCH /api/v1/appointments`, `GET /api/v1/appointments/{id}`, `GET /api/v1/slots`; recepción obtiene sus pacientes activos desde `GET /api/v1/patients`.
 - Gestión del centro: `GET/POST/PATCH /api/v1/patients`, `/professionals`, `/specialties`, `/services`, `/availability`, `/result-types`.
 - Resultados: `GET/POST /api/v1/results`, `POST /api/v1/results/{id}/publish`, `GET /api/v1/results/{id}/document`.
 - Plataforma: `GET/POST/PATCH /api/v1/platform/centers` y `PUT /api/v1/platform/centers/{id}/administrator`.
 
 Las rutas y cargas completas están documentadas en `medsync_frontend/docs/api-contract.md`.
+
+Para reasignación, `PATCH /api/v1/appointments/{appointment}/reschedule` debe admitir opcionalmente:
+
+```json
+{
+  "appointment_date": "2026-10-10",
+  "start_time": "10:30",
+  "professional_id": 42,
+  "reassignment_reason": "Ausencia por licencia médica"
+}
+```
+
+`professional_id` y `reassignment_reason` se procesan como una unidad: ambos son obligatorios si la persona cambia, y ambos se omiten para una reprogramación normal.
 
 ## Validaciones necesarias
 

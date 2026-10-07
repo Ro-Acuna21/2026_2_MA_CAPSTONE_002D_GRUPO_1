@@ -26,6 +26,8 @@ Este documento define el modelo objetivo para PostgreSQL y Laravel. Parte del es
 
 El middleware clínico configura `database.connections.center.database`, ejecuta `DB::purge('center')` y `DB::reconnect('center')` cuando cambia de tenant. Nunca se acepta un nombre de base desde URL, headers ni payload. Las rutas clínicas usan esta conexión antes del route-model binding; las rutas públicas no abren una base clínica y `SUPER_ADMIN` no resuelve tenant.
 
+El registro público es la excepción pública que necesita escribir una ficha clínica: recibe solo `center_slug`, consulta en Core un centro activo y reutiliza `TenantConnectionResolver` antes de acceder a `health_insurances` o `patients`. No requiere una migración nueva. Sigue pendiente la decisión de producto sobre correos compartidos entre centros: el esquema actual de `core.users` exige correo globalmente único, aunque el modelo objetivo descrito arriba propone otra política.
+
 `DB_CENTER_DATABASE` no es el mecanismo de selección por petición: puede existir como valor local de arranque, pero no autoriza ni determina el tenant autenticado. Crear una nueva base y aplicar sus migraciones sigue siendo una tarea de provisionamiento explícita, fuera de esta resolución.
 
 ## Catálogos y personas del centro
@@ -45,7 +47,7 @@ El middleware clínico configura `database.connections.center.database`, ejecuta
 | --- | --- | --- |
 | `availabilities` | `id`, `medical_center_id`, `professional_id`, `weekday`, `start_time`, `end_time`, `is_active`, timestamps | `weekday` entre 1 y 7; `start_time < end_time`; profesional del mismo centro. |
 | `appointments` | `id`, `medical_center_id`, `patient_id`, `professional_id`, `specialty_id`, `service_id`, `appointment_date`, `start_time`, `end_time`, `status`, `source`, `note` opcional, `overbook`, `created_by`, timestamps, `deleted_at` | Horas deben ser `TIME`, no `DATE`. `status`: `PENDIENTE`, `CONFIRMADA`, `ATENDIDA`, `CANCELADA`, `NO_SHOW`; `source`: `WEB`, `RECEPCION`, `DEMO`. Validar que paciente, profesional, especialidad y prestación pertenezcan al centro. |
-| `appointment_history` | `id`, `appointment_id`, `actor_user_id`, `event_type`, `previous_status` opcional, `new_status` opcional, `old_date` opcional, `old_start_time` opcional, `new_date` opcional, `new_start_time` opcional, `created_at` | Inmutable. `event_type`: `CREACION`, `CAMBIO_ESTADO`, `REPROGRAMACION`, `CANCELACION`. |
+| `appointment_history` | `id`, `appointment_id`, `actor_user_id`, `event_type`, `previous_status` opcional, `new_status` opcional, `old_date` opcional, `old_start_time` opcional, `new_date` opcional, `new_start_time` opcional, `old_professional_id` opcional, `new_professional_id` opcional, `reason` opcional, `created_at` | Inmutable. `event_type`: `CREACION`, `CAMBIO_ESTADO`, `REPROGRAMACION`, `REASIGNACION`, `CANCELACION`. |
 
 ## Informes y resultados médicos
 
@@ -87,9 +89,21 @@ Para los reportes económicos, agregar índices por `(medical_center_id, appoint
 
 `patients.user_id` debe ser nullable. Cuando recepción cree una ficha, no se crea una cuenta ni contraseña. Si el paciente se registra posteriormente con el mismo `medical_center_id`, RUT y correo, el backend crea el usuario, la fila `center_users` con rol `PACIENTE` y vincula `patients.user_id` a ese usuario. No debe crearse una segunda ficha. Si coincide solo RUT o solo correo, se rechaza el registro y recepción debe corregir los datos. En producción este flujo debe verificar identidad o correo antes de completar la vinculación.
 
+El CRUD de Pacientes usa `patients`, `patient_addresses` y `health_insurances` de la conexión `center`; no necesita migraciones nuevas. La dirección principal se lee y actualiza en `patient_addresses.address_line`, no en una columna `patients.address`. Alta y edición se confirman en una transacción de la base clínica. Una ficha vinculada conserva su correo hasta definir el cambio coordinado con `core.users`; este flujo no introduce escrituras entre las dos bases.
+
 ### Cambios de citas
 
 El paciente puede cancelar o reprogramar hasta 24 horas antes de `appointment_date + start_time`. Recepción puede gestionar la agenda fuera de ese plazo. Una cita solo puede pasar a `ATENDIDA` desde su hora de inicio y a `NO_SHOW` después de su hora de término. Estas reglas se validan en backend con la zona horaria del centro, además de ocultarse en la interfaz.
+
+### Reserva creada por recepción
+
+Una recepción selecciona un `patients.id` existente y activo del centro resuelto. La API debe validar esa fila en la conexión clínica del tenant y guardar `appointments.patient_id` con `source = RECEPCION`; el paciente autenticado nunca puede enviar ni sustituir ese identificador y sus reservas se crean con `source = WEB`. No se requieren tablas nuevas: se reutilizan `patients`, `appointments` y `appointment_history`, preservando las FKs, trazabilidad e índices ya definidos.
+
+### Reasignación por ausencia de profesional
+
+Cuando recepción reasigne una cita, conservar la cita original y actualizar solo su `professional_id` dentro de una transacción. Crear una fila inmutable en `appointment_history` con `event_type = REASIGNACION`, los identificadores anterior y nuevo del profesional, y `reason` obligatorio (máximo 300 caracteres). El payload HTTP usa `reassignment_reason`, que backend persiste en `reason`. Ambos profesionales deben pertenecer al mismo centro que la cita; el reemplazo debe estar activo y relacionado con la especialidad de la prestación.
+
+Agregar claves foráneas desde `appointment_history.old_professional_id` y `appointment_history.new_professional_id` hacia `professionals(id)`, índices para ambas columnas si se consultará el historial por profesional, y una validación de aplicación que impida registrar una reasignación sin el par completo de IDs y motivo. La comprobación de disponibilidad y solapamiento debe ejecutarse antes de actualizar la cita, en la misma transacción.
 
 ### Consentimiento y trazabilidad
 

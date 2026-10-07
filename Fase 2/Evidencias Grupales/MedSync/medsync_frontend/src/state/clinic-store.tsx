@@ -39,7 +39,6 @@ import {
   validatePassword,
   hashPassword,
   validEmail,
-  validPhone,
 } from "@/domain/validation";
 
 import { dateFromToday, toMinutes, toTime, uid } from "@/lib/utils";
@@ -48,8 +47,10 @@ import { canSetAppointmentStatus } from "@/domain/appointment-rules";
 
 import {
   appointmentApi,
+  patientApi,
   firstApiErrorMessage,
   professionalApi,
+  publicCenterApi,
   sanctum,
   type AuthUser,
   type BackendAppointment,
@@ -84,7 +85,7 @@ function mapBackendAppointment(
 
     organizationId,
 
-    patientId: user.patientId ?? "",
+    patientId: item.patient ? String(item.patient.id) : (user.patientId ?? ""),
 
     professionalId: item.professional ? String(item.professional.id) : "",
 
@@ -185,6 +186,7 @@ interface ClinicContextValue {
   organization: Organization | null;
 
   authLoading: boolean;
+  publicCentersLoading: boolean;
 
   login(
     email: string,
@@ -269,13 +271,19 @@ interface ClinicContextValue {
 
   changeStatus(id: string, status: AppointmentStatus): Promise<void>;
 
-  reschedule(id: string, date: string, time: string): Promise<void>;
+  reschedule(
+    id: string,
+    date: string,
+    time: string,
+    professionalId?: string,
+    reassignmentReason?: string,
+  ): Promise<void>;
 
-  createPatient(input: Omit<Patient, "id" | "active" | "organizationId">): void;
+  createPatient(input: Omit<Patient, "id" | "active" | "organizationId">): Promise<void>;
 
   updateProfile(
     input: Pick<Patient, "name" | "email" | "phone" | "address">,
-  ): void;
+  ): Promise<void>;
 }
 
 const ClinicContext = createContext<ClinicContextValue | null>(null);
@@ -304,8 +312,37 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
    * de saber si existe una sesión.
    */
   const [authLoading, setAuthLoading] = useState(true);
+  const [publicCentersLoading, setPublicCentersLoading] = useState(true);
+  const [publicOrganizations, setPublicOrganizations] = useState<Organization[]>([]);
+  const [initialOrganizations] = useState(() => allData.organizations);
 
-  const availableOrganizations = allData.organizations.filter(
+  useEffect(() => {
+    let mounted = true;
+    publicCenterApi.list().then((response) => {
+      if (!mounted) return;
+      const centers: Organization[] = response.data.map((center) => {
+        const known = initialOrganizations.find((item) => item.slug === center.slug);
+        return known
+          ? { ...known, name: center.name, active: true }
+          : { id: `center-${center.id}`, name: center.name, slug: center.slug, plan: "STARTER", subscription: "ACTIVE", active: true };
+      });
+      setPublicOrganizations(centers);
+      setAllData((current) => ({
+        ...current,
+        organizations: [
+          ...current.organizations,
+          ...centers.filter((center) => !current.organizations.some((item) => item.slug === center.slug)),
+        ],
+      }));
+    }).catch((error) => {
+      console.error("No fue posible cargar los centros activos:", error);
+    }).finally(() => {
+      if (mounted) setPublicCentersLoading(false);
+    });
+    return () => { mounted = false; };
+  }, [initialOrganizations]);
+
+  const availableOrganizations = publicOrganizations.filter(
     (item) =>
       user &&
       user.role !== "SUPER_ADMIN" &&
@@ -319,10 +356,6 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
     availableOrganizations.find((item) => item.id === organizationId) ?? null;
 
   const data = scopeData(allData, user, organization?.id);
-
-  const publicOrganizations = allData.organizations.filter(
-    (organization) => organization.active,
-  );
 
   /*
    * Laravel y el frontend utilizan
@@ -352,7 +385,7 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
        * clinica-horizonte
        */
       const center = backendUser.medical_center
-        ? (allData.organizations.find(
+        ? (publicOrganizations.find(
             (item) => item.slug === backendUser.medical_center?.slug,
           ) ?? null)
         : null;
@@ -419,7 +452,7 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
 
       return mappedUser;
     },
-    [allData.organizations],
+    [publicOrganizations],
   );
 
   /*
@@ -430,6 +463,7 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
    * Esto reemplaza SESSION_KEY del mock.
    */
   useEffect(() => {
+    if (publicCentersLoading) return;
     let mounted = true;
 
     sanctum
@@ -461,7 +495,7 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
     return () => {
       mounted = false;
     };
-  }, [applyBackendUser]);
+  }, [applyBackendUser, publicCentersLoading]);
   useEffect(() => {
     if (authLoading || !user || !organization) {
       return;
@@ -667,6 +701,114 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
       })
       .catch((error) => {
         console.error("No fue posible cargar tus reservas:", error);
+      });
+  }, [authLoading, user, organization]);
+
+  /*
+   * La agenda de recepción consulta las reservas reales del centro. Esto
+   * permite que una reasignación persistida en Laravel se refleje tanto en
+   * recepción como en la cuenta del paciente cuando éste actualice Mis citas.
+   */
+  useEffect(() => {
+    if (authLoading || !user || !organization || user.role !== "RECEPCIONISTA") {
+      return;
+    }
+
+    appointmentApi
+      .list()
+      .then((response) => {
+        const specialties = new Map<string, ClinicData["specialties"][number]>();
+        const services = new Map<string, ClinicData["services"][number]>();
+        const patients = new Map<string, Patient>();
+        const professionals = new Map<string, Professional>();
+
+        const appointments = response.data.map((item) => {
+          if (item.service?.specialty) {
+            specialties.set(String(item.service.specialty.id), {
+              id: String(item.service.specialty.id),
+              organizationId: organization.id,
+              name: item.service.specialty.name,
+              description: "",
+              active: true,
+            });
+          }
+
+          if (item.service) {
+            services.set(String(item.service.id), {
+              id: String(item.service.id),
+              organizationId: organization.id,
+              specialtyId: item.service.specialty ? String(item.service.specialty.id) : "",
+              name: item.service.name,
+              duration: item.service.duration_minutes,
+              active: true,
+            });
+          }
+
+          if (item.patient) {
+            const id = String(item.patient.id);
+            patients.set(id, {
+              id,
+              organizationId: organization.id,
+              name: `${item.patient.first_name} ${item.patient.last_name}`,
+              rut: "",
+              email: "",
+              phone: "",
+              birthDate: "",
+              address: "",
+              consent: true,
+              active: true,
+            });
+          }
+
+          if (item.professional) {
+            const id = String(item.professional.id);
+            professionals.set(id, {
+              id,
+              organizationId: organization.id,
+              name: `${item.professional.first_name} ${item.professional.last_name}`,
+              rut: "",
+              email: "",
+              phone: "",
+              specialtyIds: item.service?.specialty ? [String(item.service.specialty.id)] : [],
+              description: "",
+              active: true,
+            });
+          }
+
+          return mapBackendAppointment(item, organization.id, user);
+        });
+
+        setAllData((current) => {
+          const mergeById = <T extends { id: string }>(
+            existing: T[],
+            incoming: Iterable<T>,
+          ) => {
+            const next = [...incoming];
+            const nextIds = new Set(next.map((item) => item.id));
+
+            return [...existing.filter((item) => !nextIds.has(item.id)), ...next];
+          };
+
+          return {
+            ...current,
+            // La agenda de recepción es operacional: no mezclamos las horas
+            // demo con las citas de PostgreSQL. Una respuesta vacía significa
+            // correctamente que aún no hay reservas reales en el centro.
+            appointments: [
+              ...current.appointments.filter(
+                (appointment) => appointment.organizationId !== organization.id,
+              ),
+              ...appointments,
+            ],
+            specialties: mergeById(current.specialties, specialties.values()),
+            services: mergeById(current.services, services.values()),
+            patients: mergeById(current.patients, patients.values()),
+            professionals: mergeById(current.professionals, professionals.values()),
+          };
+        });
+      })
+      .catch((error) => {
+        console.error("No fue posible cargar la agenda real de recepción:", error);
       });
   }, [authLoading, user, organization]);
 
@@ -958,13 +1100,8 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
   );
 
   const createAppointment = async (input: BookingInput) => {
-    /*
-     * El paciente reserva su propia hora contra el backend real.
-     * Recepción todavía crea citas en el catálogo mock (el backend
-     * solo resuelve al paciente autenticado, no permite reservar a
-     * nombre de otra persona todavía).
-     */
-    if (user?.role === "PACIENTE") {
+    // Paciente y recepción crean reservas persistidas en Laravel.
+    if (user?.role === "PACIENTE" || user?.role === "RECEPCIONISTA") {
       if (!organization) {
         return;
       }
@@ -975,6 +1112,7 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
           professional_id: Number(input.professionalId),
           appointment_date: input.date,
           start_time: input.time,
+          patient_id: input.patientId ? Number(input.patientId) : undefined,
         });
 
         const mapped = mapBackendAppointment(
@@ -983,9 +1121,33 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
           user,
         );
 
+        const createdProfessional = response.data.professional
+          ? {
+              id: String(response.data.professional.id),
+              organizationId: organization.id,
+              name: `${response.data.professional.first_name} ${response.data.professional.last_name}`,
+              rut: "",
+              email: "",
+              phone: "",
+              specialtyIds: response.data.service?.specialty
+                ? [String(response.data.service.specialty.id)]
+                : [],
+              description: "",
+              active: true,
+            }
+          : null;
+
         setAllData((current) => ({
           ...current,
           appointments: [...current.appointments, mapped],
+          professionals: createdProfessional
+            ? [
+                ...current.professionals.filter(
+                  (professional) => professional.id !== createdProfessional.id,
+                ),
+                createdProfessional,
+              ]
+            : current.professionals,
         }));
 
         toast.success("Reserva creada correctamente");
@@ -1036,7 +1198,7 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
       throw new Error("El horario ya no está disponible.");
     }
 
-    if (input.overbook && user.role !== "RECEPCIONISTA") {
+    if (input.overbook) {
       throw new Error("No puedes crear sobreturnos.");
     }
 
@@ -1205,7 +1367,13 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
     toast.success("Estado de la cita actualizado");
   };
 
-  const reschedule = async (id: string, date: string, time: string) => {
+  const reschedule = async (
+    id: string,
+    date: string,
+    time: string,
+    professionalId?: string,
+    reassignmentReason?: string,
+  ) => {
     /*
      * Reprogramación real del paciente
      * (PATCH /api/v1/appointments/{id}/reschedule). Laravel vuelve a
@@ -1245,24 +1413,72 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    if (user?.role === "RECEPCIONISTA") {
+      if (!organization || !professionalId) {
+        throw new Error("No hay un centro o profesional seleccionado.");
+      }
+
+      try {
+        const response = await appointmentApi.reschedule(Number(id), {
+          professional_id: Number(professionalId),
+          reassignment_reason: reassignmentReason?.trim() || undefined,
+          appointment_date: date,
+          start_time: time,
+        });
+
+        const mapped = mapBackendAppointment(response.data, organization.id, user);
+
+        setAllData((current) => ({
+          ...current,
+          appointments: current.appointments.map((item) =>
+            item.id === id
+              ? { ...mapped, patientId: item.patientId }
+              : item,
+          ),
+        }));
+
+        toast.success("Cita reprogramada");
+      } catch (error) {
+        throw new Error(
+          firstApiErrorMessage(error, "No fue posible reprogramar la reserva."),
+        );
+      }
+
+      return;
+    }
+
     requirePermission("appointments.update");
 
     const target = data.appointments.find(
       (appointment) => appointment.id === id,
     );
 
+    const nextProfessionalId = professionalId ?? target?.professionalId;
+    const isReassignment = nextProfessionalId !== target?.professionalId;
+
     if (
       !target ||
       ["CANCELADA", "ATENDIDA"].includes(target.status) ||
       user?.role === "PROFESIONAL" ||
       date < dateFromToday() ||
-      !slots(target.professionalId, target.serviceId, date, id).some(
+      !nextProfessionalId ||
+      !data.professionals.some(
+        (professional) =>
+          professional.id === nextProfessionalId &&
+          professional.active &&
+          professional.specialtyIds.includes(target.specialtyId),
+      ) ||
+      !slots(nextProfessionalId, target.serviceId, date, id).some(
         (slot) => slot.time === time,
       )
     ) {
       throw new Error(
         "La reprogramación no está permitida o el horario no está disponible.",
       );
+    }
+
+    if (isReassignment && !reassignmentReason?.trim()) {
+      throw new Error("Indica el motivo de la reasignación.");
     }
 
     if (!user || !organization) {
@@ -1290,6 +1506,8 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
             ? {
                 ...item,
 
+                professionalId: nextProfessionalId,
+
                 date,
 
                 time,
@@ -1309,13 +1527,21 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
 
             appointmentId: id,
 
-            type: "REPROGRAMACION",
+                type: isReassignment ? "REASIGNACION" : "REPROGRAMACION",
 
             to: "PENDIENTE",
 
             oldDate: `${appointment.date} ${appointment.time}`,
 
-            newDate: `${date} ${time}`,
+                newDate: `${date} ${time}`,
+
+                oldProfessionalId: appointment.professionalId,
+
+                newProfessionalId: nextProfessionalId,
+
+                reason: isReassignment
+                  ? reassignmentReason?.trim()
+                  : undefined,
 
             userId: user.id,
 
@@ -1328,109 +1554,46 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
     toast.success("Cita reprogramada");
   };
 
-  const createPatient = (
+  const createPatient = async (
     input: Omit<Patient, "id" | "active" | "organizationId">,
   ) => {
     requirePermission("patients.manage");
-
     validatePatient(input);
-
     if (!input.consent) {
       throw new Error("Confirma el consentimiento del paciente.");
     }
-
-    if (!organization) {
-      return;
-    }
-
-    if (
-      data.patients.some(
-        (patient) =>
-          normalizeRut(patient.rut) === normalizeRut(input.rut) ||
-          patient.email.toLowerCase() === input.email.trim().toLowerCase(),
-      )
-    ) {
-      throw new Error(
-        "Ya existe un paciente con ese RUT o correo en este centro.",
-      );
-    }
-
-    const patient = {
-      ...input,
-
-      rut: formatRut(input.rut),
-
-      email: input.email.trim().toLowerCase(),
-
-      id: uid("c"),
-
-      organizationId: organization.id,
-
-      active: true,
-    };
-
-    commit((current) => ({
-      ...current,
-
-      patients: [...current.patients, patient],
-    }));
-
+    const parts = input.name.trim().split(/\s+/);
+    await patientApi.create({
+      first_name: parts.shift() ?? "",
+      last_name: parts.join(" "),
+      rut: input.rut,
+      birth_date: input.birthDate,
+      email: input.email,
+      phone: input.phone,
+      health_insurance: input.healthInsurance ?? "",
+      medical_insurance: input.medicalInsurance,
+      address: input.address,
+      consent: input.consent,
+    });
     toast.success("Ficha registrada. El acceso se gestiona por separado.");
   };
 
-  const updateProfile = (
+  const updateProfile = async (
     input: Pick<Patient, "name" | "email" | "phone" | "address">,
   ) => {
     if (!user?.patientId) {
-      return;
+      throw new Error("No existe una ficha de paciente activa.");
     }
-
-    if (
-      input.name.trim().length < 3 ||
-      !validEmail(input.email) ||
-      !validPhone(input.phone)
-    ) {
-      throw new Error("Revisa nombre, correo y teléfono.");
+    if (input.email.trim().toLowerCase() !== user.email.toLowerCase()) {
+      throw new Error("El correo de acceso no se puede modificar desde la ficha.");
     }
-
-    if (
-      allData.users.some(
-        (mockUser) =>
-          mockUser.id !== user.id &&
-          mockUser.email.toLowerCase() === input.email.trim().toLowerCase() &&
-          membershipsFor(mockUser).some(
-            (membership) => membership.organizationId === organization?.id,
-          ),
-      )
-    ) {
-      throw new Error("El correo ya tiene una cuenta en este centro.");
-    }
-
-    commit((current) => ({
-      ...current,
-
-      patients: current.patients.map((patient) =>
-        patient.id === user.patientId
-          ? {
-              ...patient,
-              ...input,
-            }
-          : patient,
-      ),
-
-      users: current.users.map((mockUser) =>
-        mockUser.id === user.id
-          ? {
-              ...mockUser,
-
-              name: input.name,
-
-              email: input.email,
-            }
-          : mockUser,
-      ),
-    }));
-
+    const parts = input.name.trim().split(/\s+/);
+    await patientApi.update(Number(user.patientId), {
+      first_name: parts.shift() ?? "",
+      last_name: parts.join(" "),
+      phone: input.phone,
+      address: input.address,
+    });
     toast.success("Datos actualizados");
   };
 
@@ -2207,6 +2370,7 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
     organization,
 
     authLoading,
+    publicCentersLoading,
 
     publicOrganizations,
 

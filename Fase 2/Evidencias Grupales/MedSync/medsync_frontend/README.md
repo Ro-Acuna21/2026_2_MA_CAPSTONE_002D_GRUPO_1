@@ -1,6 +1,6 @@
 # MediSync — frontend
 
-Frontend de gestión de agenda médica construido con **React, TypeScript, Tailwind CSS** y componentes con la convención de **shadcn/ui**. Funciona hoy con datos demo locales y está preparado para conectarse después a una API REST desarrollada en Laravel.
+Frontend de gestión de agenda médica construido con **React, TypeScript, Tailwind CSS** y componentes con la convención de **shadcn/ui**. Algunos módulos siguen usando datos demo locales; autenticación, registro y parte de las reservas se conectan a Laravel.
 
 Incluye flujo SaaS de marca blanca: cada centro tiene su propia dirección, identidad visual, cuentas y datos aislados mediante `organizationId`. Los pacientes y trabajadores no ven qué otras instituciones utilizan la plataforma.
 
@@ -17,7 +17,7 @@ Abre [http://localhost:3000](http://localhost:3000). La raíz es una landing pú
 
 ## Navegación pública y acceso contextual
 
-La experiencia pública usa temporalmente `src/data/public-centers.ts` como fuente de centros. Esta fuente está aislada para sustituirla posteriormente por una API pública sin duplicar páginas ni rutas.
+El selector público de login y registro usa `GET /api/public/centers` como fuente de centros activos. `src/data/public-centers.ts` conserva textos e información comercial estática para las vistas públicas; no determina qué centro puede recibir un registro.
 
 | Ruta | Propósito |
 | --- | --- |
@@ -30,6 +30,8 @@ La experiencia pública usa temporalmente `src/data/public-centers.ts` como fuen
 | `/plataforma/acceso` | Acceso separado y exclusivo de `SUPER_ADMIN`. |
 
 Los accesos genéricos nunca asumen Clínica Horizonte ni otro centro. Los botones dentro de un micrositio sí llevan directamente a su propio `/centro/{slug}/ingresar`.
+
+El formulario de `/centro/{slug}/crear-cuenta` envía ese `slug` como `center_slug` a Laravel y lo reutiliza para el login posterior. Si Core no publica el centro, no se ofrece en el selector. Los centros estáticos del directorio comercial pueden diferir de los centros aprovisionados en Core; mantenerlos sincronizados queda pendiente.
 
 ## Usuarios demo
 
@@ -98,6 +100,8 @@ Cada centro publica `/centro/{slug}/ingresar` y `/centro/{slug}/crear-cuenta`. L
 El mismo correo y RUT pueden registrarse por separado en dos centros. La unicidad se valida como `centro + correo` y `centro + RUT`; las cuentas, contraseñas, citas e informes permanecen independientes. No se implementa verificación de identidad ni envío de correo.
 
 Cuando recepción creó previamente la ficha de un paciente, el paciente puede registrarse usando exactamente el mismo RUT y correo. El sistema vincula la nueva cuenta con esa ficha sin crear un paciente duplicado. Si solo coincide uno de los dos datos, debe corregirlo con recepción.
+
+El módulo Pacientes de recepción carga listado y detalle desde `GET /api/v1/patients` y `GET /api/v1/patients/{id}`. Alta y edición usan `POST` y `PATCH`; el perfil del paciente consulta y edita solo su propia ficha. Estas operaciones persisten en PostgreSQL del centro resuelto por Laravel y no guardan fichas en `localStorage`. El correo de una ficha vinculada a una cuenta queda de solo lectura mientras no exista un flujo coordinado para cambiar también el correo de acceso en Core. Reservas mantiene la selección de pacientes activos mediante el mismo listado.
 
 Los pacientes pueden cancelar o reprogramar una cita hasta 24 horas antes de su inicio. Recepción conserva la capacidad de gestionar la agenda. Una cita solo puede marcarse como atendida desde su hora de inicio y como inasistencia después de su hora de término.
 

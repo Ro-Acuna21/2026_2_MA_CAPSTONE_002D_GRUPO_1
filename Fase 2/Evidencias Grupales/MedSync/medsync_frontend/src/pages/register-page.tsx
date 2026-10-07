@@ -35,9 +35,10 @@ function firstApiError(error: ApiError) {
  * Se comunica directamente
  * con Laravel.
  */
-async function registerWithBackend(values: Record<string, string>) {
+async function registerWithBackend(values: Record<string, string>, centerSlug: string) {
   try {
     return await sanctum.register({
+      center_slug: centerSlug,
       first_name: values.firstName.trim(),
 
       last_name: values.lastName.trim(),
@@ -91,6 +92,7 @@ export function RegisterPage() {
     logout,
     login,
     authLoading,
+    publicCentersLoading,
   } = useClinic();
 
   const navigate = useNavigate();
@@ -115,16 +117,16 @@ export function RegisterPage() {
     }
   }, [incompatibleSession, logout]);
 
-  if (!center) {
-    return <Navigate to="/" replace />;
-  }
-
-  if (authLoading || incompatibleSession) {
+  if (authLoading || publicCentersLoading || incompatibleSession) {
     return (
       <main className="grid min-h-screen place-items-center">
         <p>Cargando sesión…</p>
       </main>
     );
+  }
+
+  if (!center) {
+    return <Navigate to="/" replace />;
   }
 
   /*
@@ -166,14 +168,14 @@ export function RegisterPage() {
               label="Crear mi cuenta"
               onSave={async (values) => {
                 // 1. Crear la cuenta en Laravel/PostgreSQL
-                await registerWithBackend(values);
+                await registerWithBackend(values, center.slug);
 
                 // 2. Iniciar sesión automáticamente
                 const loggedIn = await login(
                   values.email.trim(),
                   values.password,
                   "CENTER",
-                  center.id,
+                  center.slug,
                 );
 
                 // 3. Si por alguna razón el login automático falla,

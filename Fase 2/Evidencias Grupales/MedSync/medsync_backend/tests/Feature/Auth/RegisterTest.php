@@ -10,7 +10,7 @@ beforeEach(function () {
         'name' => 'Clínica Horizonte',
         'slug' => 'clinica-horizonte',
         'rut' => '76543210-3',
-        'database_name' => 'medsync_clinica_horizonte',
+        'database_name' => ':memory:',
         'is_active' => true,
     ]);
 
@@ -20,6 +20,7 @@ beforeEach(function () {
 function validRegisterPayload(array $overrides = []): array
 {
     return array_merge([
+        'center_slug' => 'clinica-horizonte',
         'first_name' => 'Juan',
         'last_name' => 'Pérez',
         'rut' => '12.345.678-5',
@@ -38,12 +39,51 @@ function validRegisterPayload(array $overrides = []): array
 it('registra un paciente nuevo correctamente', function () {
     $response = $this->postJson('/api/register', validRegisterPayload());
 
-    $response->assertCreated()->assertJsonPath('data.role', 'PACIENTE');
+    $response->assertCreated()
+        ->assertJsonPath('data.role', 'PACIENTE')
+        ->assertJsonPath('data.medical_center.slug', 'clinica-horizonte')
+        ->assertJsonMissingPath('data.medical_center.database_name');
 
     expect(User::where('email', 'juan.perez@example.com')->exists())->toBeTrue();
     expect(
         Patient::where('rut', '12345678-5')->exists()
     )->toBeTrue();
+});
+
+it('rechaza un centro inexistente o inactivo sin crear cuentas', function (string $slug) {
+    $this->center->update(['is_active' => false]);
+
+    $this->postJson('/api/register', validRegisterPayload(['center_slug' => $slug]))
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('center_slug');
+
+    expect(User::where('email', 'juan.perez@example.com')->exists())->toBeFalse();
+    expect(Patient::where('rut', '12345678-5')->exists())->toBeFalse();
+})->with(['centro-inexistente', 'clinica-horizonte']);
+
+it('exige la selección explícita del centro', function () {
+    $payload = validRegisterPayload();
+    unset($payload['center_slug']);
+
+    $this->postJson('/api/register', $payload)
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('center_slug');
+});
+
+it('publica únicamente los centros activos sin exponer el nombre de su base', function () {
+    MedicalCenter::create([
+        'name' => 'Centro suspendido',
+        'slug' => 'centro-suspendido',
+        'rut' => '76543211-1',
+        'database_name' => 'otra_base',
+        'is_active' => false,
+    ]);
+
+    $this->getJson('/api/public/centers')
+        ->assertOk()
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.slug', 'clinica-horizonte')
+        ->assertJsonMissingPath('data.0.database_name');
 });
 
 it('rechaza un rut chileno invalido', function () {

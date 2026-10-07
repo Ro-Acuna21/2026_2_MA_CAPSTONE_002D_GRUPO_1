@@ -30,6 +30,7 @@ export function LoginPage({ platform = false }: { platform?: boolean }) {
     logout,
     publicOrganizations,
     authLoading,
+    publicCentersLoading,
   } = useClinic();
 
   const navigate = useNavigate();
@@ -67,21 +68,21 @@ export function LoginPage({ platform = false }: { platform?: boolean }) {
     }
   }, [incompatibleSession, logout]);
 
-  if (!platform && !center) {
-    return <Navigate to="/" replace />;
-  }
-
   /*
    * Esperamos a que Laravel responda
    * /api/v1/me antes de decidir si
    * redirigir al usuario.
    */
-  if (authLoading || incompatibleSession) {
+  if (authLoading || publicCentersLoading || incompatibleSession) {
     return (
       <main className="grid min-h-screen place-items-center">
         <p>Cargando sesión…</p>
       </main>
     );
+  }
+
+  if (!platform && !center) {
+    return <Navigate to="/" replace />;
   }
 
   /*

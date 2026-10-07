@@ -34,8 +34,9 @@ export interface Appointment {
   note?: string; overbook: boolean; createdBy: string
 }
 export interface HistoryEntry {
-  id: string; appointmentId: string; type: 'CREACION' | 'CAMBIO_ESTADO' | 'REPROGRAMACION' | 'CANCELACION'
-  from?: AppointmentStatus; to?: AppointmentStatus; oldDate?: string; newDate?: string; userId: string; at: string
+  id: string; appointmentId: string; type: 'CREACION' | 'CAMBIO_ESTADO' | 'REPROGRAMACION' | 'REASIGNACION' | 'CANCELACION'
+  from?: AppointmentStatus; to?: AppointmentStatus; oldDate?: string; newDate?: string
+  oldProfessionalId?: string; newProfessionalId?: string; reason?: string; userId: string; at: string
 }
 export interface ClinicData {
   organizations: Organization[]; users: User[]; patients: Patient[]; professionals: Professional[]; specialties: Specialty[]

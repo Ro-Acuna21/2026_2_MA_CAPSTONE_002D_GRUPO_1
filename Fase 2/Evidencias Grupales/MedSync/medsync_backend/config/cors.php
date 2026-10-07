@@ -19,8 +19,14 @@ return [
 
     'allowed_methods' => ['*'],
 
-    // El frontend (Vite) corre en el puerto 3000 (ver medsync_frontend/vite.config.ts).
-    'allowed_origins' => ['http://localhost:3000', 'http://127.0.0.1:3000'],
+    // El frontend puede correr en el puerto configurado por Vite (3000) o
+    // en el puerto alternativo usado para la demo local (5173).
+    'allowed_origins' => [
+        'http://localhost:3000',
+        'http://127.0.0.1:3000',
+        'http://localhost:5173',
+        'http://127.0.0.1:5173',
+    ],
 
     'allowed_origins_patterns' => [],
 
