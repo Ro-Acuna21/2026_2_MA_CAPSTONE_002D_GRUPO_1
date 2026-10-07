@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\AccountActivationController;
 use App\Http\Controllers\Api\ServiceController;
 use App\Http\Controllers\Api\AppointmentController;
 use App\Http\Controllers\Api\PatientController;
+Route::get('/public/centers', [AuthController::class, 'publicCenters']);
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 Route::post(
@@ -22,6 +23,9 @@ Route::middleware(['auth:sanctum', 'tenant.center'])->group(function () {
     Route::get('/v1/me', [AuthController::class, 'me']);
     Route::get('/v1/professionals',[ProfessionalController::class,'index']);
     Route::get('/v1/patients', [PatientController::class, 'index']);
+    Route::get('/v1/patients/{patient}', [PatientController::class, 'show'])->whereNumber('patient');
+    Route::post('/v1/patients', [PatientController::class, 'store']);
+    Route::patch('/v1/patients/{patient}', [PatientController::class, 'update'])->whereNumber('patient');
     Route::post('/v1/professionals',[ProfessionalController::class,'store']);
     Route::post('/v1/professionals/{professional}/enable-access',[ProfessionalAccessController::class, 'enable']);
     Route::post('/v1/professionals/{professional}/resend-invitation',[ProfessionalAccessController::class, 'resendInvitation']);

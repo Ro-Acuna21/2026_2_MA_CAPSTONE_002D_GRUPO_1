@@ -26,6 +26,8 @@ Este documento define el modelo objetivo para PostgreSQL y Laravel. Parte del es
 
 El middleware clínico configura `database.connections.center.database`, ejecuta `DB::purge('center')` y `DB::reconnect('center')` cuando cambia de tenant. Nunca se acepta un nombre de base desde URL, headers ni payload. Las rutas clínicas usan esta conexión antes del route-model binding; las rutas públicas no abren una base clínica y `SUPER_ADMIN` no resuelve tenant.
 
+El registro público es la excepción pública que necesita escribir una ficha clínica: recibe solo `center_slug`, consulta en Core un centro activo y reutiliza `TenantConnectionResolver` antes de acceder a `health_insurances` o `patients`. No requiere una migración nueva. Sigue pendiente la decisión de producto sobre correos compartidos entre centros: el esquema actual de `core.users` exige correo globalmente único, aunque el modelo objetivo descrito arriba propone otra política.
+
 `DB_CENTER_DATABASE` no es el mecanismo de selección por petición: puede existir como valor local de arranque, pero no autoriza ni determina el tenant autenticado. Crear una nueva base y aplicar sus migraciones sigue siendo una tarea de provisionamiento explícita, fuera de esta resolución.
 
 ## Catálogos y personas del centro
@@ -86,6 +88,8 @@ Para los reportes económicos, agregar índices por `(medical_center_id, appoint
 ### Activación de fichas creadas por recepción
 
 `patients.user_id` debe ser nullable. Cuando recepción cree una ficha, no se crea una cuenta ni contraseña. Si el paciente se registra posteriormente con el mismo `medical_center_id`, RUT y correo, el backend crea el usuario, la fila `center_users` con rol `PACIENTE` y vincula `patients.user_id` a ese usuario. No debe crearse una segunda ficha. Si coincide solo RUT o solo correo, se rechaza el registro y recepción debe corregir los datos. En producción este flujo debe verificar identidad o correo antes de completar la vinculación.
+
+El CRUD de Pacientes usa `patients`, `patient_addresses` y `health_insurances` de la conexión `center`; no necesita migraciones nuevas. La dirección principal se lee y actualiza en `patient_addresses.address_line`, no en una columna `patients.address`. Alta y edición se confirman en una transacción de la base clínica. Una ficha vinculada conserva su correo hasta definir el cambio coordinado con `core.users`; este flujo no introduce escrituras entre las dos bases.
 
 ### Cambios de citas
 

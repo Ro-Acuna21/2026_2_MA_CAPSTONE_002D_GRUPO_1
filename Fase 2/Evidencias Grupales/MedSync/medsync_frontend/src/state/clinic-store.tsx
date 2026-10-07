@@ -39,7 +39,6 @@ import {
   validatePassword,
   hashPassword,
   validEmail,
-  validPhone,
 } from "@/domain/validation";
 
 import { dateFromToday, toMinutes, toTime, uid } from "@/lib/utils";
@@ -48,8 +47,10 @@ import { canSetAppointmentStatus } from "@/domain/appointment-rules";
 
 import {
   appointmentApi,
+  patientApi,
   firstApiErrorMessage,
   professionalApi,
+  publicCenterApi,
   sanctum,
   type AuthUser,
   type BackendAppointment,
@@ -185,6 +186,7 @@ interface ClinicContextValue {
   organization: Organization | null;
 
   authLoading: boolean;
+  publicCentersLoading: boolean;
 
   login(
     email: string,
@@ -277,11 +279,11 @@ interface ClinicContextValue {
     reassignmentReason?: string,
   ): Promise<void>;
 
-  createPatient(input: Omit<Patient, "id" | "active" | "organizationId">): void;
+  createPatient(input: Omit<Patient, "id" | "active" | "organizationId">): Promise<void>;
 
   updateProfile(
     input: Pick<Patient, "name" | "email" | "phone" | "address">,
-  ): void;
+  ): Promise<void>;
 }
 
 const ClinicContext = createContext<ClinicContextValue | null>(null);
@@ -310,8 +312,37 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
    * de saber si existe una sesión.
    */
   const [authLoading, setAuthLoading] = useState(true);
+  const [publicCentersLoading, setPublicCentersLoading] = useState(true);
+  const [publicOrganizations, setPublicOrganizations] = useState<Organization[]>([]);
+  const [initialOrganizations] = useState(() => allData.organizations);
 
-  const availableOrganizations = allData.organizations.filter(
+  useEffect(() => {
+    let mounted = true;
+    publicCenterApi.list().then((response) => {
+      if (!mounted) return;
+      const centers: Organization[] = response.data.map((center) => {
+        const known = initialOrganizations.find((item) => item.slug === center.slug);
+        return known
+          ? { ...known, name: center.name, active: true }
+          : { id: `center-${center.id}`, name: center.name, slug: center.slug, plan: "STARTER", subscription: "ACTIVE", active: true };
+      });
+      setPublicOrganizations(centers);
+      setAllData((current) => ({
+        ...current,
+        organizations: [
+          ...current.organizations,
+          ...centers.filter((center) => !current.organizations.some((item) => item.slug === center.slug)),
+        ],
+      }));
+    }).catch((error) => {
+      console.error("No fue posible cargar los centros activos:", error);
+    }).finally(() => {
+      if (mounted) setPublicCentersLoading(false);
+    });
+    return () => { mounted = false; };
+  }, [initialOrganizations]);
+
+  const availableOrganizations = publicOrganizations.filter(
     (item) =>
       user &&
       user.role !== "SUPER_ADMIN" &&
@@ -325,10 +356,6 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
     availableOrganizations.find((item) => item.id === organizationId) ?? null;
 
   const data = scopeData(allData, user, organization?.id);
-
-  const publicOrganizations = allData.organizations.filter(
-    (organization) => organization.active,
-  );
 
   /*
    * Laravel y el frontend utilizan
@@ -358,7 +385,7 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
        * clinica-horizonte
        */
       const center = backendUser.medical_center
-        ? (allData.organizations.find(
+        ? (publicOrganizations.find(
             (item) => item.slug === backendUser.medical_center?.slug,
           ) ?? null)
         : null;
@@ -425,7 +452,7 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
 
       return mappedUser;
     },
-    [allData.organizations],
+    [publicOrganizations],
   );
 
   /*
@@ -436,6 +463,7 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
    * Esto reemplaza SESSION_KEY del mock.
    */
   useEffect(() => {
+    if (publicCentersLoading) return;
     let mounted = true;
 
     sanctum
@@ -467,7 +495,7 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
     return () => {
       mounted = false;
     };
-  }, [applyBackendUser]);
+  }, [applyBackendUser, publicCentersLoading]);
   useEffect(() => {
     if (authLoading || !user || !organization) {
       return;
@@ -1526,109 +1554,46 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
     toast.success("Cita reprogramada");
   };
 
-  const createPatient = (
+  const createPatient = async (
     input: Omit<Patient, "id" | "active" | "organizationId">,
   ) => {
     requirePermission("patients.manage");
-
     validatePatient(input);
-
     if (!input.consent) {
       throw new Error("Confirma el consentimiento del paciente.");
     }
-
-    if (!organization) {
-      return;
-    }
-
-    if (
-      data.patients.some(
-        (patient) =>
-          normalizeRut(patient.rut) === normalizeRut(input.rut) ||
-          patient.email.toLowerCase() === input.email.trim().toLowerCase(),
-      )
-    ) {
-      throw new Error(
-        "Ya existe un paciente con ese RUT o correo en este centro.",
-      );
-    }
-
-    const patient = {
-      ...input,
-
-      rut: formatRut(input.rut),
-
-      email: input.email.trim().toLowerCase(),
-
-      id: uid("c"),
-
-      organizationId: organization.id,
-
-      active: true,
-    };
-
-    commit((current) => ({
-      ...current,
-
-      patients: [...current.patients, patient],
-    }));
-
+    const parts = input.name.trim().split(/\s+/);
+    await patientApi.create({
+      first_name: parts.shift() ?? "",
+      last_name: parts.join(" "),
+      rut: input.rut,
+      birth_date: input.birthDate,
+      email: input.email,
+      phone: input.phone,
+      health_insurance: input.healthInsurance ?? "",
+      medical_insurance: input.medicalInsurance,
+      address: input.address,
+      consent: input.consent,
+    });
     toast.success("Ficha registrada. El acceso se gestiona por separado.");
   };
 
-  const updateProfile = (
+  const updateProfile = async (
     input: Pick<Patient, "name" | "email" | "phone" | "address">,
   ) => {
     if (!user?.patientId) {
-      return;
+      throw new Error("No existe una ficha de paciente activa.");
     }
-
-    if (
-      input.name.trim().length < 3 ||
-      !validEmail(input.email) ||
-      !validPhone(input.phone)
-    ) {
-      throw new Error("Revisa nombre, correo y teléfono.");
+    if (input.email.trim().toLowerCase() !== user.email.toLowerCase()) {
+      throw new Error("El correo de acceso no se puede modificar desde la ficha.");
     }
-
-    if (
-      allData.users.some(
-        (mockUser) =>
-          mockUser.id !== user.id &&
-          mockUser.email.toLowerCase() === input.email.trim().toLowerCase() &&
-          membershipsFor(mockUser).some(
-            (membership) => membership.organizationId === organization?.id,
-          ),
-      )
-    ) {
-      throw new Error("El correo ya tiene una cuenta en este centro.");
-    }
-
-    commit((current) => ({
-      ...current,
-
-      patients: current.patients.map((patient) =>
-        patient.id === user.patientId
-          ? {
-              ...patient,
-              ...input,
-            }
-          : patient,
-      ),
-
-      users: current.users.map((mockUser) =>
-        mockUser.id === user.id
-          ? {
-              ...mockUser,
-
-              name: input.name,
-
-              email: input.email,
-            }
-          : mockUser,
-      ),
-    }));
-
+    const parts = input.name.trim().split(/\s+/);
+    await patientApi.update(Number(user.patientId), {
+      first_name: parts.shift() ?? "",
+      last_name: parts.join(" "),
+      phone: input.phone,
+      address: input.address,
+    });
     toast.success("Datos actualizados");
   };
 
@@ -2405,6 +2370,7 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
     organization,
 
     authLoading,
+    publicCentersLoading,
 
     publicOrganizations,
 

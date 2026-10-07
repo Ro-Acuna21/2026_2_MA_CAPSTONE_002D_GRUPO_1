@@ -70,6 +70,7 @@ export function firstApiErrorMessage(error: unknown, fallback: string): string {
 }
 
 export interface PatientRegisterPayload {
+  center_slug: string;
   first_name: string;
   last_name: string;
   rut: string;
@@ -156,6 +157,12 @@ export interface ActivateAccountPayload {
 export interface MessageResponse {
   message: string;
 }
+export interface PublicCentersResponse {
+  data: { id: number; name: string; slug: string }[];
+}
+export const publicCenterApi = {
+  list: () => apiRequest<PublicCentersResponse>("/api/public/centers"),
+};
 export const sanctum = {
   csrf: () => apiRequest<void>("/sanctum/csrf-cookie"),
   activateAccount: async (payload: ActivateAccountPayload) => {
@@ -259,6 +266,44 @@ export interface BackendPatientSummary {
   last_name: string;
   rut: string;
 }
+
+export interface BackendPatient extends BackendPatientSummary {
+  birth_date: string | null;
+  email: string;
+  phone: string;
+  health_insurance: string | null;
+  medical_insurance: string | null;
+  address: string | null;
+  consent: boolean;
+  is_active: boolean;
+  has_account: boolean;
+}
+
+export interface PatientPayload {
+  first_name: string;
+  last_name: string;
+  rut: string;
+  birth_date: string;
+  email: string;
+  phone: string;
+  health_insurance: string;
+  medical_insurance?: string | null;
+  address?: string | null;
+  consent: boolean;
+}
+
+export type PatientUpdatePayload = Partial<Omit<PatientPayload, 'rut' | 'consent'>>;
+
+export const patientApi = {
+  list: () => apiRequest<{ data: BackendPatient[] }>("/api/v1/patients"),
+  show: (id: number) => apiRequest<{ data: BackendPatient }>(`/api/v1/patients/${id}`),
+  create: (payload: PatientPayload) => apiRequest<{ data: BackendPatient }>("/api/v1/patients", {
+    method: "POST", body: JSON.stringify(payload),
+  }),
+  update: (id: number, payload: PatientUpdatePayload) => apiRequest<{ data: BackendPatient }>(`/api/v1/patients/${id}`, {
+    method: "PATCH", body: JSON.stringify(payload),
+  }),
+};
 
 export interface PatientsResponse {
   data: BackendPatientSummary[];

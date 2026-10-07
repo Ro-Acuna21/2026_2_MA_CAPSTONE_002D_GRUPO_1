@@ -49,8 +49,10 @@ function ResetTenantSession() {
   );
 }
 function CenterProtectedRoute() {
-  const { user, organization, publicOrganizations } = useClinic();
+  const { user, organization, publicOrganizations, authLoading, publicCentersLoading } = useClinic();
   const { centerSlug = "" } = useParams();
+  if (authLoading || publicCentersLoading)
+    return <main className="grid min-h-screen place-items-center"><p>Cargando sesión…</p></main>;
   const center = publicOrganizations.find((item) => item.slug === centerSlug);
   if (!center)
     return (

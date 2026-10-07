@@ -5,6 +5,8 @@ Prefijo: `/api/v1`. Las respuestas de recursos usan `{ "data": ... }` y los erro
 ## Autenticación con Sanctum
 
 - `GET /sanctum/csrf-cookie`
+- `GET /api/public/centers` — `{ data: [{ id, name, slug }] }`; solo centros activos, sin `database_name`.
+- `POST /api/register` — registro público: datos del paciente y `center_slug` obligatorio; devuelve `201` o `422` de validación.
 - `POST /api/login` — login clínico contextual: `{ email, password, center_slug }`
 - `POST /api/logout`
 - `GET /api/v1/me` — usuario, rol y permisos de Spatie
@@ -21,7 +23,8 @@ El frontend envía cookies con `credentials: include`. Configura `SANCTUM_STATEF
 | GET | `/api/v1/appointments/{id}` | Detalle e historial |
 | PATCH | `/api/v1/appointments/{id}` | Estado o reprogramación |
 | GET | `/api/v1/slots` | Disponibilidad por profesional, prestación y fecha |
-| GET/POST/PATCH | `/api/v1/patients` | Gestión de pacientes |
+| GET/POST | `/api/v1/patients` | Listado de pacientes activos y alta por recepción; implementado |
+| GET/PATCH | `/api/v1/patients/{id}` | Detalle y edición por recepción o del propio paciente; implementado |
 | GET/POST/PATCH | `/api/v1/professionals` | Gestión de profesionales |
 | GET/POST/PATCH | `/api/v1/specialties` | Catálogo de especialidades |
 | GET/POST/PATCH | `/api/v1/services` | Catálogo de prestaciones |
@@ -29,9 +32,13 @@ El frontend envía cookies con `credentials: include`. Configura `SANCTUM_STATEF
 
 La API es responsable de validar disponibilidad, prevenir solapamientos, registrar historial y aplicar permisos. Nunca debe confiar en los controles visuales del frontend.
 
+Pacientes usa `{ data: ... }` con identificador, nombres, RUT, nacimiento, correo, teléfono, previsión, seguro complementario, dirección, consentimiento, estado y vínculo de cuenta. El listado conserva `id`, `first_name`, `last_name` y `rut` para Reservas. `POST` devuelve `201`; las lecturas y `PATCH`, `200`. RUT, consentimiento, vínculo de cuenta y estado no son editables. El paciente solo accede a su propia ficha y no cambia correo ni previsión; recepción puede corregir el correo antes de vincular una cuenta. Se usan `401`, `403`, `404` y `422` según autenticación, permisos, existencia y validación. La conexión clínica se resuelve desde Core, nunca desde el navegador.
+
 ## Aislamiento por centro
 
 El centro se selecciona públicamente antes del login y React envía únicamente `center_slug` a `POST /api/login`. Laravel busca el slug en `core.medical_centers`, exige que esté activo y comprueba la membresía activa en `core.center_users`. Si es correcto guarda `active_medical_center_id` en la sesión. Un slug no autoriza por sí solo a una cuenta.
+
+Para `POST /api/register`, Laravel valida el `center_slug` contra centros activos de Core y configura `center` desde `medical_centers.database_name` antes de consultar previsiones o pacientes. El navegador no envía el nombre de la base. El registro crea la ficha clínica y la membresía únicamente en el centro resuelto. El esquema PostgreSQL no cambió para este flujo.
 
 En cada ruta clínica autenticada, Laravel recupera ese centro desde la sesión y configura la conexión `center` con `medical_centers.database_name` antes del route-model binding y de los controladores. No debe confiar en `organization_id`, `medical_center_id` o nombre de base enviado desde el navegador. El acceso de plataforma `SUPER_ADMIN` es independiente y no abre una conexión clínica.
 
@@ -39,7 +46,7 @@ Las cuentas de pacientes y trabajadores son independientes por centro. El correo
 
 ## Ampliación propuesta: plataforma, registro e informes
 
-Estas rutas son un contrato futuro; el proveedor del frontend continúa siendo local. El rol global `SUPER_ADMIN` administra la plataforma. Las cuentas `ADMIN`, `RECEPCIONISTA`, `PROFESIONAL` y `PACIENTE` pertenecen a un solo centro. La respuesta de sesión deberá incluir el centro, sus permisos y la ficha vinculada.
+Las rutas de esta sección son propuestas para otros módulos; Pacientes y Reservas ya usan API. El rol global `SUPER_ADMIN` administra la plataforma. Las cuentas `ADMIN`, `RECEPCIONISTA`, `PROFESIONAL` y `PACIENTE` pertenecen a un solo centro. La respuesta de sesión incluye el centro, sus permisos y la ficha vinculada.
 
 El acceso visual separado (`/plataforma/acceso`) mejora la navegación, pero la seguridad depende del backend. Laravel debe rechazar cuentas de centro en las rutas de plataforma y rechazar cuentas `SUPER_ADMIN` en las rutas clínicas. El administrador del centro recibe configuración, usuarios y estadísticas agregadas; las APIs de agenda, reservas, pacientes y documentos clínicos no deben autorizarlo.
 

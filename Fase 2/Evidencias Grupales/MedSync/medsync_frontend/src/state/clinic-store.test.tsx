@@ -1,96 +1,117 @@
 // @vitest-environment jsdom
-import { webcrypto } from 'node:crypto'
-import { act, cleanup, renderHook } from '@testing-library/react'
+import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ClinicProvider, useClinic } from './clinic-store'
 import { createMockData } from '@/data/mock-data'
+import { backendUser, centers, stubLaravelApi } from '@/test/laravel-api'
+import { appointmentApi } from '@/services/http'
+import type { AuthUser } from '@/services/http'
 
-beforeEach(() => { localStorage.clear(); sessionStorage.clear(); vi.stubGlobal('crypto', webcrypto) })
+beforeEach(() => { localStorage.clear(); sessionStorage.clear() })
 afterEach(() => { cleanup(); vi.unstubAllGlobals() })
-const patient = { name: 'Paciente Prueba', rut: '12345678-5', email: 'nuevo@example.com', phone: '+56 9 1234 5678', birthDate: '1990-02-20', address: '', consent: true, healthInsurance: 'Fonasa', medicalInsurance: '' }
 const mount = () => renderHook(() => useClinic(), { wrapper: ClinicProvider })
-const centerFor = (email: string) => ['admin.alameda@demo.cl', 'recepcion.alameda@demo.cl', 'emilia.silva@demo.cl', 'sofia@demo.cl'].includes(email) ? 'org2' : 'org1'
-const signIn = async (result: ReturnType<typeof mount>['result'], email: string) => { await act(async () => { expect(await result.current.login(email, 'Demo2026!', email === 'superadmin@demo.cl' ? 'PLATFORM' : 'CENTER', email === 'superadmin@demo.cl' ? undefined : centerFor(email))).toBe(true) }) }
+const ready = async (result: ReturnType<typeof mount>['result']) => {
+  await waitFor(() => expect(result.current.authLoading && result.current.publicCentersLoading).toBe(false))
+}
+const account = (role: AuthUser['role'], slug: string | undefined, email: string, id: number) => ({
+  ...backendUser(role!, slug, id), email,
+})
+const patient = { name: 'Paciente Prueba', rut: '12345678-5', email: 'nuevo@example.com', phone: '+56 9 1234 5678', birthDate: '1990-02-20', address: '', consent: true, healthInsurance: 'Fonasa', medicalInsurance: '' }
 
-describe('flujos del proveedor demo', () => {
-  it('registra una cuenta, rechaza duplicados y permite entrar con su contraseña', async () => {
-    const { result } = mount()
-    await act(async () => { await result.current.register(patient, 'Prueba2026', 'Prueba2026', 'org1') })
-    const saved = localStorage.getItem('clinica_horizonte_react_v4')!
-    expect(saved).not.toContain('Prueba2026')
-    await expect(result.current.register(patient, 'Prueba2026', 'Prueba2026', 'org1')).rejects.toThrow('cuenta')
-    await act(async () => { await result.current.register(patient, 'Otra2026', 'Otra2026', 'org2') })
-    expect(JSON.parse(localStorage.getItem('clinica_horizonte_react_v4')!).users.filter((u: { email: string }) => u.email === patient.email)).toHaveLength(2)
-    await act(async () => { expect(await result.current.login(patient.email, 'Demo2026!', 'CENTER', 'org2')).toBe(false); expect(await result.current.login(patient.email, 'Otra2026', 'CENTER', 'org2')).toBe(true) })
-    expect(result.current.user?.role).toBe('PACIENTE')
-    expect(result.current.data.patients[0].healthInsurance).toBe('Fonasa')
-    expect(result.current.data.patients).toHaveLength(1)
-    expect(result.current.data.patients[0].organizationId).toBe('org2')
+describe('ClinicProvider con API Laravel y datos demo aún pendientes', () => {
+  it('autentica por Sanctum y recupera la sesión al montar de nuevo, sin login local', async () => {
+    const user = account('PACIENTE', 'clinica-horizonte', 'ana@example.com', 11)
+    const api = stubLaravelApi({ accounts: { [user.email]: user } })
+    const first = mount()
+    await ready(first.result)
+    expect(first.result.current.user).toBeNull()
+    await act(async () => {
+      expect(await first.result.current.login(user.email, 'Password123', 'CENTER', 'clinica-horizonte')).toBe(true)
+    })
+    expect(first.result.current.user?.role).toBe('PACIENTE')
+    expect(api.requests.find((request) => request.path === '/api/login')?.body?.center_slug).toBe('clinica-horizonte')
+    expect(localStorage.getItem('clinica_horizonte_react_v4')).toBeNull()
+    first.unmount()
+
+    const second = mount()
+    await waitFor(() => expect(second.result.current.user?.email).toBe(user.email))
+    expect(api.requests.filter((request) => request.path === '/api/v1/me')).toHaveLength(2)
   })
-  it('activa una ficha creada por recepción sin duplicar al paciente y protege acciones administrativas', async () => {
-    const { result } = mount(); await signIn(result, 'recepcion@demo.cl')
-    act(() => result.current.createPatient(patient))
-    expect(result.current.data.patients.some((p) => p.email === patient.email)).toBe(true)
-    expect(result.current.data.users.some((u) => u.email === patient.email)).toBe(false)
-    await act(async () => { await result.current.register(patient, 'Prueba2026', 'Prueba2026', 'org1') })
-    expect(result.current.data.patients.filter((p) => p.email === patient.email)).toHaveLength(1)
-    const saved = JSON.parse(localStorage.getItem('clinica_horizonte_react_v4')!)
-    expect(saved.users.find((u: { email: string }) => u.email === patient.email)?.patientId).toBe(result.current.data.patients.find((p) => p.email === patient.email)?.id)
-    await expect(result.current.assignAccess('otro@example.com', 'Otra Persona', { role: 'ADMIN', organizationId: 'org1' }, 'Prueba2026')).rejects.toThrow('permiso')
+
+  it('crea la ficha por API y conserva el contrato de pacientes que consume Reservas', async () => {
+    const user = account('RECEPCIONISTA', 'clinica-horizonte', 'recepcion@example.com', 12)
+    const api = stubLaravelApi({ session: user })
+    const { result } = mount()
+    await waitFor(() => expect(result.current.user?.role).toBe('RECEPCIONISTA'))
+    const before = localStorage.getItem('clinica_horizonte_react_v4')
+    await act(async () => { await result.current.createPatient(patient) })
+    const request = api.requests.find((item) => item.path === '/api/v1/patients' && item.method === 'POST')
+    expect(request?.body).toMatchObject({ first_name: 'Paciente', last_name: 'Prueba', rut: patient.rut, health_insurance: 'Fonasa', consent: true })
+    const bookingList = await appointmentApi.patients()
+    expect(bookingList.data).toEqual([expect.objectContaining({ id: 12, first_name: 'Paciente', last_name: 'Prueba', rut: patient.rut })])
+    expect(localStorage.getItem('clinica_horizonte_react_v4')).toBe(before)
+  })
+
+  it('aplica permisos de rol a los resultados demo que siguen pendientes de backend', async () => {
+    const professional = account('PROFESIONAL', 'clinica-horizonte', 'profesional@example.com', 13)
+    stubLaravelApi({ session: professional })
+    const { result } = mount()
+    await waitFor(() => expect(result.current.user?.role).toBe('PROFESIONAL'))
     expect(() => result.current.addResultType('Biopsia')).toThrow('permiso')
+    expect(result.current.user?.permissions).toContain('results.upload')
+    expect(result.current.user?.permissions).not.toContain('users.manage')
   })
-  it('recorre borrador, publicación, lectura y eliminación por el profesional responsable', async () => {
-    const { result } = mount(); await signIn(result, 'camila.rojas@demo.cl')
-    act(() => result.current.addResult({ patientId: 'c1', professionalId: 'p1', typeId: 'rt1', performedAt: '2026-08-01', filename: 'demo.txt', content: 'data:text/plain;base64,RGVtbw==' }))
-    const id = result.current.data.results.find((r) => r.status === 'DRAFT')!.id
-    await signIn(result, 'admin@demo.cl')
-    expect(() => result.current.publishResult(id)).toThrow('permiso')
-    await signIn(result, 'paciente1@demo.cl'); expect(result.current.data.results.some((r) => r.id === id)).toBe(false)
-    await signIn(result, 'matias.soto@demo.cl'); expect(() => result.current.publishResult(id)).toThrow('responsable')
-    await signIn(result, 'camila.rojas@demo.cl'); act(() => result.current.publishResult(id))
-    await signIn(result, 'paciente1@demo.cl'); expect(result.current.data.results.find((r) => r.id === id)?.status).toBe('PUBLISHED')
-    await signIn(result, 'camila.rojas@demo.cl'); act(() => result.current.deleteResult(id))
-    await signIn(result, 'paciente1@demo.cl'); expect(result.current.data.results.some((r) => r.id === id)).toBe(false)
-  })
-  it('crea centros y asigna su administrador sin acceder a la clínica', async () => {
-    const { result } = mount(); await signIn(result, 'superadmin@demo.cl')
-    act(() => result.current.saveOrganization({ id: '', name: 'Centro Demo', slug: 'centro-demo', plan: 'PRO', subscription: 'TRIAL', active: true }))
-    const center = result.current.data.organizations.find((o) => o.slug === 'centro-demo')!
-    await act(async () => { await result.current.assignAccess('centro@example.com', 'Admin Demo', { organizationId: center.id, role: 'ADMIN' }, 'Prueba2026') })
-    expect(result.current.data.patients).toEqual([])
-    expect(() => result.current.createPatient(patient)).toThrow('permiso')
-    await act(async () => { expect(await result.current.login('centro@example.com', 'Prueba2026', 'CENTER', center.id)).toBe(true) })
-    expect(result.current.organization?.id).toBe(center.id)
-    expect(result.current.user?.permissions).toContain('users.manage')
-  })
-  it('preserva datos anteriores y agrega el acceso de plataforma', async () => {
-    const old = createMockData(); old.users = old.users.filter((u) => u.role !== 'SUPER_ADMIN'); old.patients[0].name = 'Registro anterior'
-    localStorage.setItem('clinica_horizonte_react_v2', JSON.stringify({ ...old, results: undefined, resultTypes: undefined }))
+
+  it('mantiene al SUPER_ADMIN fuera de las operaciones clínicas', async () => {
+    const api = stubLaravelApi({ session: backendUser('SUPER_ADMIN') })
     const { result } = mount()
-    await signIn(result, 'recepcion@demo.cl')
-    expect(result.current.data.patients[0].name).toBe('Registro anterior')
-    expect(result.current.data.results).toEqual([])
-    await signIn(result, 'superadmin@demo.cl')
-    expect(result.current.user?.role).toBe('SUPER_ADMIN')
-    expect(localStorage.getItem('clinica_horizonte_react_v2')).toContain('Registro anterior')
-  })
-  it('deshabilita un centro sin eliminar su información', async () => {
-    const { result } = mount(); await signIn(result, 'superadmin@demo.cl')
-    const center = result.current.data.organizations.find((o) => o.id === 'org1')!
-    act(() => result.current.saveOrganization({ ...center, active: false, subscription: 'SUSPENDED' }))
-    await signIn(result, 'paciente1@demo.cl')
+    await waitFor(() => expect(result.current.user?.role).toBe('SUPER_ADMIN'))
     expect(result.current.organization).toBeNull()
-    expect(result.current.publicOrganizations.some((item) => item.id === 'org1')).toBe(false)
-    expect(JSON.parse(localStorage.getItem('clinica_horizonte_react_v4')!).patients).toHaveLength(11)
+    await expect(result.current.createPatient(patient)).rejects.toThrow('permiso')
+    expect(api.requests.some((item) => item.path === '/api/v1/patients')).toBe(false)
   })
-  it('las horas ocupadas por otros pacientes no se ofrecen al paciente', async () => {
-    const { result } = mount(); await signIn(result, 'paciente2@demo.cl')
-    const reserved = createMockData().appointments.find((a) => a.id === 'a1')!
-    expect(result.current.data.appointments.some((a) => a.id === reserved.id)).toBe(false)
-    expect(result.current.slots(reserved.professionalId, reserved.serviceId, reserved.date).some((s) => s.time === reserved.time)).toBe(false)
-  })
-  it('separa el acceso común del acceso de plataforma', async () => {
+
+  it('ignora una sesión demo antigua cuando Sanctum no autentica al usuario', async () => {
+    sessionStorage.setItem('clinica_horizonte_user', 'platform')
+    stubLaravelApi()
     const { result } = mount()
-    await act(async () => { expect(await result.current.login('superadmin@demo.cl', 'Demo2026!', 'CENTER', 'org1')).toBe(false); expect(await result.current.login('admin@demo.cl', 'Demo2026!', 'PLATFORM')).toBe(false); expect(await result.current.login('superadmin@demo.cl', 'Demo2026!', 'PLATFORM')).toBe(true) })
+    await ready(result)
+    expect(result.current.user).toBeNull()
+    expect(result.current.organization).toBeNull()
+    expect(result.current.publicOrganizations).toHaveLength(2)
+  })
+
+  it('usa centros activos publicados por Core aunque existan organizaciones demo guardadas', async () => {
+    const old = createMockData()
+    localStorage.setItem('clinica_horizonte_react_v4', JSON.stringify(old))
+    stubLaravelApi({ centers: [centers[0]] })
+    const { result } = mount()
+    await ready(result)
+    expect(result.current.publicOrganizations.map((center) => center.slug)).toEqual(['clinica-horizonte'])
+    expect(localStorage.getItem('clinica_horizonte_react_v4')).not.toBeNull()
+  })
+
+  it('obtiene horarios libres del backend sin consultar las citas demo locales', async () => {
+    const user = account('PACIENTE', 'clinica-horizonte', 'paciente@example.com', 14)
+    const api = stubLaravelApi({ session: user, slots: ['09:30', '10:00'] })
+    const { result } = mount()
+    await waitFor(() => expect(result.current.user?.role).toBe('PACIENTE'))
+    const slots = await result.current.patientSlots('3', '4', '2026-10-09')
+    expect(slots).toEqual([{ time: '09:30', end: '10:00' }, { time: '10:00', end: '10:30' }])
+    const request = api.requests.find((item) => item.path === '/api/v1/appointments/available-slots')
+    expect(request).toBeDefined()
+  })
+
+  it('separa el acceso de plataforma del login de un centro incluso ante una respuesta con otro rol', async () => {
+    const platform = account('SUPER_ADMIN', undefined, 'platform@example.com', 15)
+    const admin = account('ADMIN', 'clinica-horizonte', 'admin@example.com', 16)
+    const api = stubLaravelApi({ accounts: { [platform.email]: platform, [admin.email]: admin } })
+    const { result } = mount()
+    await ready(result)
+    await act(async () => { expect(await result.current.login(platform.email, 'Password123', 'CENTER', 'clinica-horizonte')).toBe(false) })
+    await act(async () => { expect(await result.current.login(admin.email, 'Password123', 'PLATFORM')).toBe(false) })
+    await act(async () => { expect(await result.current.login(platform.email, 'Password123', 'PLATFORM')).toBe(true) })
+    expect(result.current.user?.role).toBe('SUPER_ADMIN')
+    expect(api.requests.filter((item) => item.path === '/api/logout')).toHaveLength(2)
   })
 })

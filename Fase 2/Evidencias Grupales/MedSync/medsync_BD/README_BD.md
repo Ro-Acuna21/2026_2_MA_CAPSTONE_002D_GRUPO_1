@@ -123,6 +123,8 @@ Puede almacenar información como:
 
 La columna `user_id` permite relacionar la ficha del paciente con una cuenta existente en `medsync_core.users`.
 
+El módulo Pacientes ahora lista, crea, consulta y edita fichas mediante la API autenticada de Laravel en la conexión clínica resuelta para el centro. Usa las columnas existentes de `patients`, la previsión en `health_insurances` y la dirección principal en `patient_addresses`. No requiere migración ni cambio al respaldo para este flujo. El correo de fichas vinculadas a una cuenta se mantiene fijo hasta implementar una actualización coordinada con Core.
+
 La relación entre ambas bases de datos es lógica y es administrada por la aplicación, ya que PostgreSQL no utiliza claves foráneas directas entre bases de datos independientes.
 
 ### patient_addresses
@@ -188,7 +190,7 @@ patient / professional
 
 Actualmente la aplicación trabaja con Clínica Horizonte como primer centro funcional.
 
-La selección dinámica de diferentes bases de datos de centros médicos será implementada progresivamente en futuras iteraciones.
+El login y registro públicos ya resuelven dinámicamente la conexión clínica mediante el centro activo en `medsync_core.medical_centers`; el navegador envía `center_slug`, nunca `database_name`. `GET /api/public/centers` publica solo identificador, nombre y slug de centros activos. En el entorno local puede estar aprovisionada solo `medsync_clinica_horizonte`. Este cambio de flujo no altera tablas ni datos existentes.
 
 ---
 

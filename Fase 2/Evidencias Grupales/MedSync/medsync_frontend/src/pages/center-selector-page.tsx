@@ -4,16 +4,21 @@ import { Link } from "react-router-dom";
 import { PublicFooter, PublicNavbar } from "@/components/public-site";
 import { Button } from "@/components/ui/button";
 import { publicCenters } from "@/data/public-centers";
+import { useClinic } from "@/state/clinic-store";
 
 export function CenterSelectorPage({ purpose = "login" }: { purpose?: "login" | "register" }) {
+  const { publicOrganizations } = useClinic();
   const [query, setQuery] = useState("");
   const isRegistration = purpose === "register";
   const normalizedQuery = query.trim().toLocaleLowerCase("es-CL");
-  const centers = useMemo(() => publicCenters.filter((center) => {
+  const centers = useMemo(() => publicOrganizations.map((organization) => {
+    const details = publicCenters.find((center) => center.slug === organization.slug);
+    return { ...details, slug: organization.slug, name: organization.name, location: details?.location ?? "Centro médico", description: details?.description ?? "Portal de atención del centro médico.", specialties: details?.specialties ?? [] };
+  }).filter((center) => {
     if (!normalizedQuery) return true;
     return [center.name, center.location, ...center.specialties]
       .some((value) => value.toLocaleLowerCase("es-CL").includes(normalizedQuery));
-  }), [normalizedQuery]);
+  }), [normalizedQuery, publicOrganizations]);
 
   const title = isRegistration ? "¿En qué centro deseas crear tu cuenta?" : "¿A qué centro deseas ingresar?";
   const description = isRegistration ? "Busca tu centro médico para crear una cuenta dentro de su portal seguro." : "Busca tu centro médico para continuar con el acceso seguro de su equipo y pacientes.";

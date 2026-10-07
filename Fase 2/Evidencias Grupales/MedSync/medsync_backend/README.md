@@ -4,7 +4,7 @@ Backend del proyecto **MedSync** (Duoc UC, Capstone). API REST hecha con **Larav
 
 > Este README reemplaza al genérico de Laravel y a `docs/Base_datos_y_modelos.md`, que quedó desactualizado (esquema antiguo, sin timestamps, nombres de tabla en singular). Este documento describe **lo que realmente existe hoy** en el código.
 
-> **Actualización multi-centro:** las secciones históricas que hablan de un centro fijo describen la Iteración 1. El acceso clínico actual es contextual: el login recibe `center_slug`, valida el centro y su membresía en Core, y la conexión clínica se resuelve por solicitud desde `medical_centers.database_name`.
+> **Actualización multi-centro:** las secciones históricas que hablan de un centro fijo describen la Iteración 1. Login y registro reciben `center_slug`; Laravel valida el centro activo en Core y resuelve la conexión clínica desde `medical_centers.database_name`. El selector consulta `GET /api/public/centers`. El despliegue local actualmente puede tener solo Clínica Horizonte aprovisionada.
 
 ---
 
@@ -26,12 +26,13 @@ Lo que ya funciona:
 - Vinculación automática cuando recepción ya creó una ficha de paciente antes de que este cree su cuenta (mismo RUT **y** correo).
 - Login / logout / usuario autenticado (`/api/v1/me`) vía **cookies de sesión de Sanctum** (no Bearer token).
 - CORS y Sanctum configurados para el frontend real (`http://localhost:3000`).
-- El frontend (`register-page.tsx`, `login-page.tsx`) ya llama a esta API real además de su mock local, solo para el centro `clinica-horizonte`.
+- El frontend usa la API real para registro y login contextual. Otros módulos todavía conservan datos demo locales.
+- Pacientes de recepción usa `GET/POST /api/v1/patients` y `GET/PATCH /api/v1/patients/{id}` sobre la base clínica resuelta. La ficha propia del paciente usa detalle y edición con autorización por `center_users.patient_id`. El listado conserva los campos usados por Reservas. RUT y correo se validan dentro del tenant; el correo de una ficha vinculada no se cambia desde este módulo para evitar desincronizar `core.users`.
 - Tests automatizados (Pest) para registro y login.
 
 ⚠️ **Riesgo conocido, pendiente de decidir en equipo** (ver detalle en sección 11): al usar dos bases físicas separadas, una sola transacción de Laravel ya no puede cubrir una operación que escribe en ambas a la vez. Esto afecta el registro de pacientes.
 
-Lo que **todavía no existe** (ver sección 10, próximas iteraciones): roles con Spatie Permission, multi-centro real (hoy sigue fijo a `clinica-horizonte`), resultados médicos, plataforma/suscripciones.
+Lo que **todavía no existe** (ver sección 10, próximas iteraciones): roles con Spatie Permission, resultados médicos y plataforma/suscripciones persistentes. Para usar un segundo centro en producción hay que aprovisionar su base clínica y darlo de alta en Core.
 
 > Actualización: especialidades, prestaciones, disponibilidad y reservas **ya tienen backend real** (el flujo de reserva del propio paciente, de punta a punta). Ver sección 13 para el detalle — la administración del catálogo y la agenda de recepción/profesional siguen pendientes.
 
@@ -244,8 +245,11 @@ Todas las peticiones deben ir con `credentials: 'include'`. Antes de `POST /api/
 
 ### `POST /api/register`
 
+Antes del registro, `GET /api/public/centers` devuelve solo `id`, `name` y `slug` de centros activos. El registro exige `center_slug`; un slug desconocido o inactivo devuelve `422`. Laravel no acepta un nombre de base en el payload: obtiene `database_name` de Core y conecta el tenant antes de consultar `health_insurances` y `patients`.
+
 ```json
 {
+  "center_slug": "clinica-horizonte",
   "first_name": "Juan",
   "last_name": "Pérez",
   "rut": "12.345.678-5",

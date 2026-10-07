@@ -38,6 +38,8 @@ Recepción puede reasignar una cita pendiente o confirmada cuando el profesional
 
 El frontend de recepción ya no debe usar pacientes, prestaciones, profesionales ni horas mock para reservar o reprogramar. El backend debe entregar `GET /api/v1/patients` exclusivamente a `RECEPCIONISTA`, con el mínimo necesario para seleccionar un paciente activo (`id`, nombre y RUT), y aceptar `patient_id` únicamente cuando una recepción hace `POST /api/v1/appointments`.
 
+Pacientes de recepción reutiliza ese listado y lo amplía con datos administrativos de la ficha. `POST /api/v1/patients` crea la ficha sin cuenta; `GET/PATCH /api/v1/patients/{id}` consulta y corrige la ficha del tenant resuelto. `PACIENTE` puede consultar y editar únicamente su propia ficha según `center_users.patient_id`, sin modificar RUT, correo de acceso, previsión ni consentimiento. Recepción puede corregir el correo de una ficha sin cuenta; una ficha vinculada requiere un flujo separado para actualizar también `core.users`. `ADMIN`, `PROFESIONAL` y `SUPER_ADMIN` no reciben acceso a estas rutas.
+
 - Para recepción, el servidor resuelve y valida el paciente activo dentro del tenant y crea la cita con `source = RECEPCION`.
 - Para paciente, `patient_id` no se acepta: el servidor mantiene la resolución desde la sesión y crea con `source = WEB`.
 - Catálogo, profesionales compatibles y horarios continúan saliendo de `/v1/services`, `/v1/services/{service}/professionals` y `/v1/appointments/available-slots`; toda validación final permanece en el servidor.
@@ -70,7 +72,7 @@ El permiso opcional `results.upload` puede habilitar a recepción a cargar borra
 
 Usar prefijo `/api/v1`, respuestas de recursos como `{ "data": ... }`, paginación estándar de Laravel y errores de validación como `{ "message": "...", "errors": { "campo": ["..."] } }`.
 
-- Autenticación: `GET /sanctum/csrf-cookie`, `POST /api/login`, `POST /api/logout`, `GET /api/v1/me`, `POST /api/register`. El login clínico recibe `email`, `password` y `center_slug`; Laravel valida el slug y la membresía antes de guardar el centro activo en sesión.
+- Autenticación: `GET /sanctum/csrf-cookie`, `GET /api/public/centers`, `POST /api/login`, `POST /api/logout`, `GET /api/v1/me`, `POST /api/register`. El login clínico recibe `email`, `password` y `center_slug`; Laravel valida el slug y la membresía antes de guardar el centro activo en sesión. El registro también exige `center_slug`, valida que el centro esté activo en Core y resuelve su base clínica antes de consultar o crear pacientes.
 - Agenda: `GET/POST/PATCH /api/v1/appointments`, `GET /api/v1/appointments/{id}`, `GET /api/v1/slots`; recepción obtiene sus pacientes activos desde `GET /api/v1/patients`.
 - Gestión del centro: `GET/POST/PATCH /api/v1/patients`, `/professionals`, `/specialties`, `/services`, `/availability`, `/result-types`.
 - Resultados: `GET/POST /api/v1/results`, `POST /api/v1/results/{id}/publish`, `GET /api/v1/results/{id}/document`.
