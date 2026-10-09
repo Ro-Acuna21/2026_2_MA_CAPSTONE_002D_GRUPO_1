@@ -405,6 +405,12 @@ export const appointmentApi = {
       body: JSON.stringify(payload),
     }),
 
+  updateStatus: (id: number, payload: { status: string; reason?: string }) =>
+    apiRequest<AppointmentResponse>(`/api/v1/appointments/${id}/status`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+
   cancel: (id: number, reason?: string) =>
     apiRequest<AppointmentResponse>(`/api/v1/appointments/${id}/cancel`, {
       method: "PATCH",

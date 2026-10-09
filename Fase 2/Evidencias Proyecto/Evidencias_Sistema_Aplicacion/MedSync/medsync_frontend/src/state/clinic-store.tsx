@@ -1321,6 +1321,38 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    if (user.role === "RECEPCIONISTA" || user.role === "PROFESIONAL") {
+      try {
+        const response = await appointmentApi.updateStatus(Number(id), {
+          status,
+        });
+
+        const mapped = mapBackendAppointment(
+          response.data,
+          organization.id,
+          user,
+        );
+
+        setAllData((current) => ({
+          ...current,
+          appointments: current.appointments.map((item) =>
+            item.id === id ? mapped : item,
+          ),
+        }));
+
+        toast.success("Estado de la cita actualizado");
+      } catch (error) {
+        throw new Error(
+          firstApiErrorMessage(
+            error,
+            "No fue posible actualizar el estado de la cita.",
+          ),
+        );
+      }
+
+      return;
+    }
+
     commit((current) => {
       const appointment = current.appointments.find(
         (item) => item.id === id && item.organizationId === organization.id,

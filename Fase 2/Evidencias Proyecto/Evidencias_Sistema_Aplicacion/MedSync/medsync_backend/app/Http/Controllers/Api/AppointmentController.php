@@ -185,6 +185,39 @@ class AppointmentController extends Controller
     }
 
     /**
+     * PATCH /api/v1/appointments/{appointment}/status
+     */
+    public function updateStatus(Request $request, Appointment $appointment)
+    {
+        $centerUser = $this->tenantContext->centerUser();
+
+        abort_unless(
+            in_array($centerUser->role, ['RECEPCIONISTA', 'PROFESIONAL'], true),
+            403,
+            'No tienes permisos para cambiar el estado de esta cita.'
+        );
+
+        $data = $request->validate([
+            'status' => ['required', 'string', 'in:CONFIRMADA,ATENDIDA,NO_SHOW,CANCELADA'],
+            'reason' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $appointment = $this->appointmentService->changeStatusByStaff(
+            $appointment,
+            $data['status'],
+            $request->user(),
+            $centerUser->role,
+            $centerUser->professional_id ? (int) $centerUser->professional_id : null,
+            $data['reason'] ?? null,
+        );
+
+        return response()->json([
+            'message' => 'El estado de la cita fue actualizado.',
+            'data' => $this->presentAppointment($appointment),
+        ]);
+    }
+
+    /**
      * PATCH /api/v1/appointments/{appointment}/cancel
      */
     public function cancel(Request $request, Appointment $appointment)

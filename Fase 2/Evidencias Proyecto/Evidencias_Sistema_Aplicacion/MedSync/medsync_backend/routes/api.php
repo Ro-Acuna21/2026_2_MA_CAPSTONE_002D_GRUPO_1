@@ -38,5 +38,6 @@ Route::middleware(['auth:sanctum', 'tenant.center'])->group(function () {
     Route::get('/v1/appointments/my', [AppointmentController::class, 'myAppointments']);
     Route::post('/v1/appointments', [AppointmentController::class, 'store']);
     Route::patch('/v1/appointments/{appointment}/reschedule', [AppointmentController::class, 'reschedule']);
+    Route::patch('/v1/appointments/{appointment}/status', [AppointmentController::class, 'updateStatus']);
     Route::patch('/v1/appointments/{appointment}/cancel', [AppointmentController::class, 'cancel']);
 });
