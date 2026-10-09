@@ -208,16 +208,24 @@ class AppointmentService
 
         $this->ensureWithinAvailability($professional->id, $weekday, $startTime, $endTime);
 
-        return DB::connection('center')->transaction(function () use ($appointment, $professional, $service, $date, $startTime, $endTime, $actor) {
-            $this->ensureNoOverlap($professional->id, $date, $startTime, $endTime, $appointment->id);
+        return DB::connection('center')->transaction(function () use ($appointment, $patient, $professional, $service, $date, $startTime, $endTime, $actor) {
+            $lockedAppointment = Appointment::query()
+                ->whereKey($appointment->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
 
-            $oldDate = $appointment->appointment_date->toDateString();
-            $oldStartTime = $appointment->start_time;
-            $oldEndTime = $appointment->end_time;
-            $oldProfessionalId = $appointment->professional_id;
-            $oldServiceId = $appointment->service_id;
+            $this->ensureOwnership($lockedAppointment, $patient);
+            $this->ensureModifiable($lockedAppointment, 'reprogramar');
+            $this->ensureWithinChangeWindow($lockedAppointment, 'reprogramar');
+            $this->ensureNoOverlap($professional->id, $date, $startTime, $endTime, $lockedAppointment->id);
 
-            $appointment->update([
+            $oldDate = $lockedAppointment->appointment_date->toDateString();
+            $oldStartTime = $lockedAppointment->start_time;
+            $oldEndTime = $lockedAppointment->end_time;
+            $oldProfessionalId = $lockedAppointment->professional_id;
+            $oldServiceId = $lockedAppointment->service_id;
+
+            $lockedAppointment->update([
                 'professional_id' => $professional->id,
                 'service_id' => $service->id,
                 'appointment_date' => $date,
@@ -226,7 +234,7 @@ class AppointmentService
             ]);
 
             $historyData = [
-                'appointment_id' => $appointment->id,
+                'appointment_id' => $lockedAppointment->id,
                 'actor_user_id' => $actor->id,
                 'event_type' => 'REPROGRAMACION',
                 'old_date' => $oldDate,
@@ -249,7 +257,7 @@ class AppointmentService
 
             AppointmentHistory::create($historyData);
 
-            return $appointment->fresh();
+            return $lockedAppointment->fresh();
         });
     }
 
@@ -264,14 +272,6 @@ class AppointmentService
 
         $service = $this->findActiveService((int) $appointment->service_id);
         $professional = $this->findActiveProfessional((int) $data['professional_id']);
-        $isReassignment = $appointment->professional_id !== $professional->id;
-
-        if ($isReassignment && empty(trim((string) ($data['reassignment_reason'] ?? '')))) {
-            throw ValidationException::withMessages([
-                'reassignment_reason' => ['Indica el motivo de la reasignación.'],
-            ]);
-        }
-
         $this->ensureProfessionalOffersService($professional, $service);
 
         $date = $this->normalizeFutureDate($data['appointment_date']);
@@ -281,15 +281,29 @@ class AppointmentService
 
         $this->ensureWithinAvailability($professional->id, $weekday, $startTime, $endTime);
 
-        return DB::connection('center')->transaction(function () use ($appointment, $professional, $date, $startTime, $endTime, $actor, $data, $isReassignment) {
-            $this->ensureNoOverlap($professional->id, $date, $startTime, $endTime, $appointment->id);
+        return DB::connection('center')->transaction(function () use ($appointment, $professional, $date, $startTime, $endTime, $actor, $data) {
+            $lockedAppointment = Appointment::query()
+                ->whereKey($appointment->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
 
-            $oldProfessionalId = $appointment->professional_id;
-            $oldDate = $appointment->appointment_date->toDateString();
-            $oldStartTime = $appointment->start_time;
-            $oldEndTime = $appointment->end_time;
+            $this->ensureModifiable($lockedAppointment, 'reprogramar');
+            $oldProfessionalId = (int) $lockedAppointment->professional_id;
+            $isReassignment = $oldProfessionalId !== (int) $professional->id;
 
-            $appointment->update([
+            if ($isReassignment && empty(trim((string) ($data['reassignment_reason'] ?? '')))) {
+                throw ValidationException::withMessages([
+                    'reassignment_reason' => ['Indica el motivo de la reasignación.'],
+                ]);
+            }
+
+            $this->ensureNoOverlap($professional->id, $date, $startTime, $endTime, $lockedAppointment->id);
+
+            $oldDate = $lockedAppointment->appointment_date->toDateString();
+            $oldStartTime = $lockedAppointment->start_time;
+            $oldEndTime = $lockedAppointment->end_time;
+
+            $lockedAppointment->update([
                 'professional_id' => $professional->id,
                 'appointment_date' => $date,
                 'start_time' => $startTime,
@@ -297,7 +311,7 @@ class AppointmentService
             ]);
 
             AppointmentHistory::create([
-                'appointment_id' => $appointment->id,
+                'appointment_id' => $lockedAppointment->id,
                 'actor_user_id' => $actor->id,
                 'event_type' => $isReassignment ? 'REASIGNACION' : 'REPROGRAMACION',
                 'old_date' => $oldDate,
@@ -311,7 +325,82 @@ class AppointmentService
                 'reason' => $isReassignment ? trim($data['reassignment_reason']) : null,
             ]);
 
-            return $appointment->fresh();
+            return $lockedAppointment->fresh();
+        });
+    }
+
+    /**
+     * Cambia un estado operativo de una cita desde recepción o el profesional asignado.
+     * La cita y su evento histórico se guardan atómicamente en la base del centro.
+     */
+    public function changeStatusByStaff(
+        Appointment $appointment,
+        string $newStatus,
+        User $actor,
+        string $role,
+        ?int $professionalId,
+        ?string $reason = null,
+    ): Appointment {
+        $allowedStatuses = match ($role) {
+            'RECEPCIONISTA' => ['CONFIRMADA', 'ATENDIDA', 'NO_SHOW', 'CANCELADA'],
+            'PROFESIONAL' => ['ATENDIDA', 'NO_SHOW'],
+            default => [],
+        };
+
+        if (! in_array($newStatus, $allowedStatuses, true)) {
+            throw ValidationException::withMessages([
+                'status' => ['No tienes permiso para aplicar ese estado.'],
+            ]);
+        }
+
+        return DB::connection('center')->transaction(function () use (
+            $appointment,
+            $newStatus,
+            $actor,
+            $role,
+            $professionalId,
+            $reason
+        ) {
+            $lockedAppointment = Appointment::query()
+                ->whereKey($appointment->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $this->ensureModifiable($lockedAppointment, 'cambiar el estado');
+
+            if ($lockedAppointment->status === $newStatus) {
+                throw ValidationException::withMessages([
+                    'status' => ['La cita ya tiene ese estado.'],
+                ]);
+            }
+
+            if (
+                $role === 'PROFESIONAL'
+                && (
+                    ! $professionalId
+                    || (int) $lockedAppointment->professional_id !== $professionalId
+                )
+            ) {
+                abort(403, 'Solo puedes cambiar el estado de tus propias citas.');
+            }
+
+            $this->ensureStatusTimeAllowed($lockedAppointment, $newStatus);
+
+            $previousStatus = $lockedAppointment->status;
+            $lockedAppointment->update(['status' => $newStatus]);
+
+            AppointmentHistory::create([
+                'appointment_id' => $lockedAppointment->id,
+                'actor_user_id' => $actor->id,
+                'event_type' => $newStatus === 'CANCELADA'
+                    ? 'CANCELACION'
+                    : 'CAMBIO_ESTADO',
+                'previous_status' => $previousStatus,
+                'new_status' => $newStatus,
+                'reason' => $reason,
+            ]);
+
+            return $lockedAppointment->fresh();
         });
     }
 
@@ -320,17 +409,21 @@ class AppointmentService
      */
     public function cancelAppointment(Appointment $appointment, Patient $patient, ?string $reason, User $actor): Appointment
     {
-        $this->ensureOwnership($appointment, $patient);
-        $this->ensureModifiable($appointment, 'cancelar');
-        $this->ensureWithinChangeWindow($appointment, 'cancelar');
+        return DB::connection('center')->transaction(function () use ($appointment, $patient, $reason, $actor) {
+            $lockedAppointment = Appointment::query()
+                ->whereKey($appointment->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
 
-        return DB::connection('center')->transaction(function () use ($appointment, $reason, $actor) {
-            $previousStatus = $appointment->status;
+            $this->ensureOwnership($lockedAppointment, $patient);
+            $this->ensureModifiable($lockedAppointment, 'cancelar');
+            $this->ensureWithinChangeWindow($lockedAppointment, 'cancelar');
+            $previousStatus = $lockedAppointment->status;
 
-            $appointment->update(['status' => 'CANCELADA']);
+            $lockedAppointment->update(['status' => 'CANCELADA']);
 
             AppointmentHistory::create([
-                'appointment_id' => $appointment->id,
+                'appointment_id' => $lockedAppointment->id,
                 'actor_user_id' => $actor->id,
                 'event_type' => 'CANCELACION',
                 'previous_status' => $previousStatus,
@@ -338,7 +431,7 @@ class AppointmentService
                 'reason' => $reason,
             ]);
 
-            return $appointment->fresh();
+            return $lockedAppointment->fresh();
         });
     }
 
@@ -486,6 +579,37 @@ class AppointmentService
         if (! in_array($appointment->status, self::BLOCKING_STATUSES, true)) {
             throw ValidationException::withMessages([
                 'appointment' => ["No es posible {$action} una reserva en estado {$appointment->status}."],
+            ]);
+        }
+    }
+
+    /**
+     * Valida la hora mínima para registrar atención o inasistencia.
+     */
+    private function ensureStatusTimeAllowed(Appointment $appointment, string $newStatus): void
+    {
+        $date = $appointment->appointment_date->toDateString();
+        $startsAt = Carbon::createFromFormat(
+            'Y-m-d H:i:s',
+            $date.' '.$this->normalizeTime($appointment->start_time),
+            self::CENTER_TIMEZONE
+        );
+        $endsAt = Carbon::createFromFormat(
+            'Y-m-d H:i:s',
+            $date.' '.$this->normalizeTime($appointment->end_time),
+            self::CENTER_TIMEZONE
+        );
+        $now = Carbon::now(self::CENTER_TIMEZONE);
+
+        if ($newStatus === 'ATENDIDA' && $now->lt($startsAt)) {
+            throw ValidationException::withMessages([
+                'status' => ['La cita solo puede marcarse atendida desde su hora de inicio.'],
+            ]);
+        }
+
+        if ($newStatus === 'NO_SHOW' && $now->lt($endsAt)) {
+            throw ValidationException::withMessages([
+                'status' => ['La inasistencia solo puede marcarse después de la hora de término.'],
             ]);
         }
     }
