@@ -522,13 +522,9 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
 
             phone: professional.phone,
 
-            /*
-             * Especialidades todavía siguen
-             * temporalmente en el mock.
-             */
-            specialtyIds: [],
+            specialtyIds: professional.specialty_ids.map(String),
 
-            description: "",
+            description: professional.description ?? "",
 
             active: professional.is_active,
           }),
@@ -1813,14 +1809,6 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
   ) => {
     requirePermission("catalog.manage");
 
-    // Por ahora solo conectamos
-    // la creación real.
-    if (id) {
-      throw new Error(
-        "La edición de profesionales todavía no está conectada al backend.",
-      );
-    }
-
     if (!organization) {
       throw new Error("No hay un centro médico seleccionado.");
     }
@@ -1849,19 +1837,27 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
      * ESTA PARTE GUARDA REALMENTE
      * EN POSTGRESQL.
      */
-    const response = await professionalApi.create({
+    const payload = {
       first_name: firstName,
-
       last_name: lastName,
-
       rut: input.rut,
-
       email: input.email.trim().toLowerCase(),
-
       phone: input.phone,
-
       is_active: input.active,
-    });
+      specialty_ids: input.specialtyIds.map(Number),
+      description: input.description.trim() || null,
+    };
+    const response = id
+      ? await professionalApi.update(Number(id), {
+          first_name: firstName,
+          last_name: lastName,
+          email: payload.email,
+          phone: payload.phone,
+          is_active: payload.is_active,
+          specialty_ids: payload.specialty_ids,
+          description: payload.description,
+        })
+      : await professionalApi.create(payload);
 
     const created = response.data;
 
@@ -1883,13 +1879,9 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
 
       phone: created.phone,
 
-      /*
-       * Especialidades todavía
-       * siguen siendo mock.
-       */
-      specialtyIds: input.specialtyIds,
+      specialtyIds: created.specialty_ids.map(String),
 
-      description: input.description,
+      description: created.description ?? "",
 
       active: created.is_active,
     };
@@ -1910,7 +1902,7 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
       ],
     }));
 
-    toast.success("Profesional registrado en la base de datos.");
+    toast.success(id ? "Ficha del profesional actualizada." : "Profesional registrado en la base de datos.");
   };
 
   const saveCatalog: ClinicContextValue["saveCatalog"] = (kind, input, id) => {

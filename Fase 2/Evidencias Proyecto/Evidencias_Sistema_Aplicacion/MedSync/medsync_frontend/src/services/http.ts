@@ -116,6 +116,8 @@ export interface ProfessionalPayload {
   email: string;
   phone: string;
   is_active?: boolean;
+  specialty_ids?: number[];
+  description?: string | null;
 }
 
 export interface BackendProfessional {
@@ -127,6 +129,9 @@ export interface BackendProfessional {
   email: string;
   phone: string;
   is_active: boolean;
+  specialty_ids: number[];
+  specialties: { id: number; name: string }[];
+  description: string | null;
 }
 
 export interface ProfessionalResponse {
@@ -209,6 +214,12 @@ export const professionalApi = {
   create: (payload: ProfessionalPayload) =>
     apiRequest<ProfessionalResponse>("/api/v1/professionals", {
       method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  update: (id: number, payload: Partial<Omit<ProfessionalPayload, 'rut'>>) =>
+    apiRequest<ProfessionalResponse>(`/api/v1/professionals/${id}`, {
+      method: "PATCH",
       body: JSON.stringify(payload),
     }),
 
