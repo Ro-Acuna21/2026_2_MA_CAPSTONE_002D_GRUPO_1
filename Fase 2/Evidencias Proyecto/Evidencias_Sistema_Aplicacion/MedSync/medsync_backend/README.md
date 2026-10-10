@@ -340,6 +340,7 @@ Orden recomendado según `INDICACIONES_BACKEND.md` y `REQUERIMIENTOS_BD.md`, aju
 - Pendiente: agenda general para recepción/profesional (`GET /api/v1/appointments` con todas las citas del centro, no solo `/my` del paciente autenticado).
 - Pendiente: administración del catálogo (crear/editar especialidades, prestaciones y disponibilidad desde una pantalla, no desde el seeder).
 - Detalle completo en sección 13.
+- 2026_10_10_000001_add_description_to_professionals_table incorpora la columna opcional description a esa tabla.
 
 ### Iteración 5 — Resultados médicos
 - `result_types` y `medical_results` (estados `DRAFT` / `PUBLISHED` / `VOIDED`).
