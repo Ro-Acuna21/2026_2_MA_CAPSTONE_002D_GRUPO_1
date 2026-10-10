@@ -27,6 +27,7 @@ Route::middleware(['auth:sanctum', 'tenant.center'])->group(function () {
     Route::post('/v1/patients', [PatientController::class, 'store']);
     Route::patch('/v1/patients/{patient}', [PatientController::class, 'update'])->whereNumber('patient');
     Route::post('/v1/professionals',[ProfessionalController::class,'store']);
+    Route::patch('/v1/professionals/{professional}', [ProfessionalController::class, 'update'])->whereNumber('professional');
     Route::post('/v1/professionals/{professional}/enable-access',[ProfessionalAccessController::class, 'enable']);
     Route::post('/v1/professionals/{professional}/resend-invitation',[ProfessionalAccessController::class, 'resendInvitation']);
 

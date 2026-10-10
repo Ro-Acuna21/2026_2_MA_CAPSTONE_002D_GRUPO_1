@@ -24,6 +24,7 @@ class Professional extends Model
         'rut',
         'email',
         'phone',
+        'description',
         'is_active',
     ];
     

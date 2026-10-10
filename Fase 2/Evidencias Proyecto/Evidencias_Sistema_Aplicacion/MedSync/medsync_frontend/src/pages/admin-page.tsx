@@ -50,7 +50,7 @@ function ActiveField({ active = true }: { active?: boolean }) {
     </Field>
   );
 }
-function ProfessionalForm({ item }: { item?: Professional }) {
+function ProfessionalForm({ item, linkedAccount = false }: { item?: Professional; linkedAccount?: boolean }) {
   const { data, saveProfessional } = useClinic();
   return (
     <ActionForm
@@ -65,7 +65,7 @@ function ProfessionalForm({ item }: { item?: Professional }) {
             phone: v.phone,
             specialtyIds: [v.specialtyId],
             description: v.description,
-            active: v.active === "true",
+            active: v.active ? v.active === "true" : (item?.active ?? true),
           },
           item?.id,
         )
@@ -75,10 +75,10 @@ function ProfessionalForm({ item }: { item?: Professional }) {
         <Input name="name" defaultValue={item?.name} required />
       </Field>
       <Field label="RUT">
-        <Input name="rut" defaultValue={item?.rut} required />
+        <Input name="rut" defaultValue={item?.rut} readOnly={Boolean(item)} required />
       </Field>
       <Field label="Correo">
-        <Input name="email" type="email" defaultValue={item?.email} required />
+        <Input name="email" type="email" defaultValue={item?.email} readOnly={linkedAccount} required />
       </Field>
       <Field label="Teléfono">
         <Input name="phone" defaultValue={item?.phone} required />
@@ -100,7 +100,13 @@ function ProfessionalForm({ item }: { item?: Professional }) {
       <Field label="Descripción">
         <Input name="description" defaultValue={item?.description} />
       </Field>
-      <ActiveField active={item?.active} />
+      {linkedAccount ? (
+        <Field label="Estado de la ficha">
+          <Input value={item?.active ? "Activo" : "Inactivo"} readOnly />
+        </Field>
+      ) : (
+        <ActiveField active={item?.active} />
+      )}
     </ActionForm>
   );
 }
@@ -449,7 +455,7 @@ export function AdminPage() {
                       onAccessEnabled={handleAccessEnabled}
                     />
 
-                    <ProfessionalForm item={p} />
+                    <ProfessionalForm item={p} linkedAccount={backendProfessional?.user_id != null} />
                   </details>
                 );
               })}
