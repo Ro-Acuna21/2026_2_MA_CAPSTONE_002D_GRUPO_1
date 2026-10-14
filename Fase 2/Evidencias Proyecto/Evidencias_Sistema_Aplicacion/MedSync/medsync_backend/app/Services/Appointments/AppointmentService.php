@@ -457,6 +457,16 @@ class AppointmentService
             ->get();
     }
 
+    /** Reservas asignadas al profesional autenticado. */
+    public function listProfessionalAppointments(Professional $professional)
+    {
+        return $professional->appointments()
+            ->with(['patient', 'service.specialty', 'professional'])
+            ->orderBy('appointment_date')
+            ->orderBy('start_time')
+            ->get();
+    }
+
     private function findActiveService(int $serviceId): Service
     {
         $service = Service::where('is_active', true)->find($serviceId);
