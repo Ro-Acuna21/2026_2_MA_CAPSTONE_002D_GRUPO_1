@@ -114,19 +114,19 @@ class AppointmentController extends Controller
         ]);
     }
 
-    /**
-     * Agenda operativa de recepción. Incluye las reservas del centro
-     * resuelto por el middleware de tenant.
-     */
+    /** Agenda operativa de recepción o del profesional autenticado. */
     public function index(Request $request)
     {
-        abort_unless(
-            $this->tenantContext->centerUser()->role === 'RECEPCIONISTA',
-            403,
-            'No tienes permisos para consultar la agenda del centro.'
-        );
+        $centerUser = $this->tenantContext->centerUser();
 
-        $appointments = $this->appointmentService->listReceptionAppointments();
+        if ($centerUser->role === 'RECEPCIONISTA') {
+            $appointments = $this->appointmentService->listReceptionAppointments();
+        } elseif ($centerUser->role === 'PROFESIONAL' && $centerUser->professional_id) {
+            $professional = Professional::findOrFail($centerUser->professional_id);
+            $appointments = $this->appointmentService->listProfessionalAppointments($professional);
+        } else {
+            abort(403, 'No tienes permisos para consultar esta agenda.');
+        }
 
         return response()->json([
             'data' => $appointments->map(

@@ -701,12 +701,16 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
   }, [authLoading, user, organization]);
 
   /*
-   * La agenda de recepción consulta las reservas reales del centro. Esto
-   * permite que una reasignación persistida en Laravel se refleje tanto en
-   * recepción como en la cuenta del paciente cuando éste actualice Mis citas.
+   * Recepción consulta la agenda del centro y el profesional solo sus propias
+   * citas. El backend aplica el alcance por rol antes de devolver los datos.
    */
   useEffect(() => {
-    if (authLoading || !user || !organization || user.role !== "RECEPCIONISTA") {
+    if (
+      authLoading ||
+      !user ||
+      !organization ||
+      !["RECEPCIONISTA", "PROFESIONAL"].includes(user.role)
+    ) {
       return;
     }
 
@@ -804,7 +808,7 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
         });
       })
       .catch((error) => {
-        console.error("No fue posible cargar la agenda real de recepción:", error);
+        console.error("No fue posible cargar la agenda real:", error);
       });
   }, [authLoading, user, organization]);
 
