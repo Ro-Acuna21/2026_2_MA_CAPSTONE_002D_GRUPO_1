@@ -64,6 +64,11 @@ public function appointments(): HasMany
         'patient_id'
     );
 }
+
+    public function medicalResults(): HasMany
+    {
+        return $this->hasMany(MedicalResult::class, 'patient_id');
+    }
     public function addresses()
 {
     return $this->hasMany(PatientAddress::class, 'patient_id');
