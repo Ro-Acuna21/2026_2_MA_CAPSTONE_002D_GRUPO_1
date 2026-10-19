@@ -81,4 +81,9 @@ class Appointment extends Model
             'appointment_id'
         )->orderBy('created_at');
     }
+
+    public function medicalResults(): HasMany
+    {
+        return $this->hasMany(MedicalResult::class, 'appointment_id');
+    }
 }

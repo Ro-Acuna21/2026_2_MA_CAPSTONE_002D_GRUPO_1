@@ -83,4 +83,9 @@ public function appointments(): HasMany
         'professional_id'
     );
 }
+
+    public function medicalResults(): HasMany
+    {
+        return $this->hasMany(MedicalResult::class, 'professional_id');
+    }
 }
