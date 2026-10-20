@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\AccountActivationController;
 use App\Http\Controllers\Api\ServiceController;
 use App\Http\Controllers\Api\AppointmentController;
 use App\Http\Controllers\Api\PatientController;
+use App\Http\Controllers\Api\AvailabilityController;
 Route::get('/public/centers', [AuthController::class, 'publicCenters']);
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
@@ -34,6 +35,9 @@ Route::middleware(['auth:sanctum', 'tenant.center'])->group(function () {
     // Reservas y disponibilidad (README_RESERVAS_DISPONIBILIDAD_BD.md).
     Route::get('/v1/services', [ServiceController::class, 'index']);
     Route::get('/v1/services/{service}/professionals', [ServiceController::class, 'professionals']);
+    Route::get('/v1/availabilities', [AvailabilityController::class, 'index']);
+    Route::post('/v1/availabilities', [AvailabilityController::class, 'store']);
+    Route::patch('/v1/availabilities/{availability}', [AvailabilityController::class, 'update'])->whereNumber('availability');
     Route::get('/v1/appointments/available-slots', [AppointmentController::class, 'availableSlots']);
     Route::get('/v1/appointments', [AppointmentController::class, 'index']);
     Route::get('/v1/appointments/my', [AppointmentController::class, 'myAppointments']);

@@ -25,6 +25,7 @@ import type {
   Role,
   User,
   Professional,
+  Availability,
   Membership,
   MedicalResult,
   Permission,
@@ -46,6 +47,7 @@ import { dateFromToday, toMinutes, toTime, uid } from "@/lib/utils";
 import { canSetAppointmentStatus } from "@/domain/appointment-rules";
 
 import {
+  availabilityApi,
   appointmentApi,
   patientApi,
   firstApiErrorMessage,
@@ -54,6 +56,7 @@ import {
   sanctum,
   type AuthUser,
   type BackendAppointment,
+  type BackendAvailability,
 } from "@/services/http";
 
 const DATA_KEY = "clinica_horizonte_react_v4";
@@ -110,6 +113,22 @@ function mapBackendAppointment(
     overbook: item.overbook,
 
     createdBy: user.id,
+  };
+}
+
+function mapBackendAvailability(
+  item: BackendAvailability,
+  organizationId: string,
+): Availability {
+  return {
+    id: String(item.id),
+    organizationId,
+    professionalId: String(item.professional_id),
+    // El formulario usa domingo=0 ... sábado=6; Laravel/BD usa ISO lunes=1 ... domingo=7.
+    weekday: item.weekday === 7 ? 0 : item.weekday,
+    start: item.start_time.slice(0, 5),
+    end: item.end_time.slice(0, 5),
+    active: item.is_active,
   };
 }
 
@@ -219,7 +238,7 @@ interface ClinicContextValue {
     kind: "specialty" | "service" | "availability",
     input: Record<string, string>,
     id?: string,
-  ): void;
+  ): Promise<void>;
 
   assignAccess(
     email: string,
@@ -554,14 +573,43 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
       });
   }, [authLoading, user, organization]);
 
+  useEffect(() => {
+    if (authLoading || !user || !organization || user.role !== "ADMIN") {
+      return;
+    }
+
+    availabilityApi
+      .list()
+      .then((response) => {
+        const realAvailabilities = response.data.map((item) =>
+          mapBackendAvailability(item, organization.id),
+        );
+
+        setAllData((current) => ({
+          ...current,
+          availability: [
+            ...current.availability.filter(
+              (item) => item.organizationId !== organization.id,
+            ),
+            ...realAvailabilities,
+          ],
+        }));
+      })
+      .catch((error) => {
+        console.error("No fue posible cargar los horarios del centro:", error);
+        toast.error(
+          firstApiErrorMessage(error, "No fue posible cargar los horarios."),
+        );
+      });
+  }, [authLoading, user, organization]);
+
   /*
    * Catálogo real de especialidades y prestaciones para el paciente.
    *
    * Reemplaza el catálogo mock de este centro por el que devuelve
    * Laravel (README_RESERVAS_DISPONIBILIDAD_BD.md). La administración
-   * de especialidades/prestaciones/disponibilidad sigue siendo mock
-   * por ahora: solo la consulta que ve el paciente al reservar está
-   * conectada al backend real.
+   * de especialidades y prestaciones sigue en estado local. Los
+   * horarios del administrador se cargan y guardan por API en otro efecto.
    */
   useEffect(() => {
     if (authLoading || !user || !organization || user.role !== "PACIENTE") {
@@ -1909,19 +1957,92 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
     toast.success(id ? "Ficha del profesional actualizada." : "Profesional registrado en la base de datos.");
   };
 
-  const saveCatalog: ClinicContextValue["saveCatalog"] = (kind, input, id) => {
+  const saveCatalog: ClinicContextValue["saveCatalog"] = async (kind, input, id) => {
     requirePermission("catalog.manage");
 
-    if (kind !== "availability" && user?.role !== "ADMIN") {
+    if (user?.role !== "ADMIN") {
       throw new Error(
-        "Solo el administrador gestiona especialidades y prestaciones.",
+        "Solo el administrador del centro puede gestionar esta configuración.",
       );
+    }
+
+    if (!organization) {
+      throw new Error("No hay un centro médico seleccionado.");
+    }
+
+    if (kind === "availability") {
+      if (
+        !data.professionals.some(
+          (professional) => professional.id === input.professionalId,
+        ) ||
+        !/^[0-6]$/.test(input.weekday) ||
+        !/^([01]\d|2[0-3]):[0-5]\d$/.test(input.start) ||
+        !/^([01]\d|2[0-3]):[0-5]\d$/.test(input.end) ||
+        input.start >= input.end
+      ) {
+        throw new Error("Revisa profesional, día y horas de inicio y término.");
+      }
+
+      if (
+        id &&
+        !data.availability.some((availability) => availability.id === id)
+      ) {
+        throw new Error("Horario fuera del centro.");
+      }
+
+      const isActive = input.active !== "false";
+      const hasOverlap = data.availability.some(
+        (availability) =>
+          availability.id !== id &&
+          availability.active &&
+          isActive &&
+          availability.professionalId === input.professionalId &&
+          availability.weekday === Number(input.weekday) &&
+          input.start < availability.end &&
+          availability.start < input.end,
+      );
+
+      if (hasOverlap) {
+        throw new Error("Este horario se superpone con otro del profesional.");
+      }
+
+      const payload = {
+        professional_id: Number(input.professionalId),
+        // La base usa ISO 1..7; el selector conserva domingo=0..sábado=6.
+        weekday: Number(input.weekday) === 0 ? 7 : Number(input.weekday),
+        start_time: input.start,
+        end_time: input.end,
+        is_active: isActive,
+      };
+
+      const response = await (
+        id
+          ? availabilityApi.update(Number(id), payload)
+          : availabilityApi.create(payload)
+      ).catch((error: unknown) => {
+        throw new Error(
+          firstApiErrorMessage(error, "No fue posible guardar el horario."),
+        );
+      });
+
+      const item = mapBackendAvailability(response.data, organization.id);
+      commit((current) => ({
+        ...current,
+        availability: id
+          ? current.availability.map((availability) =>
+              availability.id === id ? item : availability,
+            )
+          : [...current.availability, item],
+      }));
+
+      toast.success(id ? "Horario actualizado en el centro." : "Horario guardado en el centro.");
+      return;
     }
 
     const base = {
       id: id ?? uid(kind),
 
-      organizationId: organization!.id,
+      organizationId: organization.id,
 
       active: input.active !== "false",
     };
@@ -1989,62 +2110,6 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
               service.id === id ? item : service,
             )
           : [...current.services, item],
-      }));
-    } else {
-      if (
-        !data.professionals.some(
-          (professional) => professional.id === input.professionalId,
-        ) ||
-        !/^[0-6]$/.test(input.weekday) ||
-        !/^([01]\d|2[0-3]):[0-5]\d$/.test(input.start) ||
-        !/^([01]\d|2[0-3]):[0-5]\d$/.test(input.end) ||
-        input.start >= input.end
-      ) {
-        throw new Error("Revisa profesional, día y horas de inicio y término.");
-      }
-
-      if (
-        id &&
-        !data.availability.some((availability) => availability.id === id)
-      ) {
-        throw new Error("Horario fuera del centro.");
-      }
-
-      if (
-        base.active &&
-        data.availability.some(
-          (availability) =>
-            availability.id !== id &&
-            availability.active &&
-            availability.professionalId === input.professionalId &&
-            availability.weekday === Number(input.weekday) &&
-            input.start < availability.end &&
-            availability.start < input.end,
-        )
-      ) {
-        throw new Error("Este horario se superpone con otro del profesional.");
-      }
-
-      const item = {
-        ...base,
-
-        professionalId: input.professionalId,
-
-        weekday: Number(input.weekday),
-
-        start: input.start,
-
-        end: input.end,
-      };
-
-      commit((current) => ({
-        ...current,
-
-        availability: id
-          ? current.availability.map((availability) =>
-              availability.id === id ? item : availability,
-            )
-          : [...current.availability, item],
       }));
     }
 
