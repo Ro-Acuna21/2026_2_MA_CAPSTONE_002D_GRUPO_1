@@ -469,7 +469,8 @@ export function AdminPage() {
           <CardContent>
             <p className="mb-4 text-sm text-muted-foreground">
               Define la disponibilidad habitual. La agenda diaria y sus reservas
-              pertenecen a recepción.
+              pertenecen a recepción. Los cambios afectan nuevas reservas; las
+              citas ya creadas se conservan.
             </p>
             <details className="mb-4">
               <summary className="cursor-pointer font-medium text-primary">

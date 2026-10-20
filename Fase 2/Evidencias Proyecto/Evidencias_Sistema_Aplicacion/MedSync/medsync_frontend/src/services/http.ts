@@ -238,12 +238,51 @@ export const professionalApi = {
 /*
  * Reservas y disponibilidad (README_RESERVAS_DISPONIBILIDAD_BD.md).
  *
- * Por ahora estos endpoints solo cubren la reserva realizada por el
- * propio paciente autenticado (POST /api/v1/appointments resuelve el
- * paciente desde la sesión). La agenda de recepción/profesional y la
- * administración del catálogo (especialidades, prestaciones,
- * disponibilidad) todavía no están conectadas al backend.
+ * Por ahora la gestión de disponibilidad semanal del centro está
+ * conectada a Laravel. La administración de especialidades y
+ * prestaciones continúa pendiente de conexión con el backend.
  */
+export interface BackendAvailability {
+  id: number;
+  professional_id: number;
+  weekday: number;
+  start_time: string;
+  end_time: string;
+  is_active: boolean;
+}
+
+export interface AvailabilityPayload {
+  professional_id: number;
+  weekday: number;
+  start_time: string;
+  end_time: string;
+  is_active: boolean;
+}
+
+export interface AvailabilitiesResponse {
+  data: BackendAvailability[];
+}
+
+export interface AvailabilityResponse {
+  data: BackendAvailability;
+}
+
+export const availabilityApi = {
+  list: () => apiRequest<AvailabilitiesResponse>("/api/v1/availabilities"),
+
+  create: (payload: AvailabilityPayload) =>
+    apiRequest<AvailabilityResponse>("/api/v1/availabilities", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  update: (id: number, payload: AvailabilityPayload) =>
+    apiRequest<AvailabilityResponse>(`/api/v1/availabilities/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+};
+
 export interface BackendSpecialtySummary {
   id: number;
   name: string;
