@@ -294,11 +294,88 @@ export interface BackendService {
   description: string | null;
   duration_minutes: number;
   specialty: BackendSpecialtySummary | null;
+  // Solo vienen en las respuestas que recibe el administrador del
+  // centro (GET/POST/PATCH /api/v1/services), no en el catálogo del
+  // paciente.
+  is_active?: boolean;
+  specialty_id?: number;
 }
 
 export interface ServicesResponse {
   data: BackendService[];
 }
+
+/*
+ * Administración del centro: especialidades y prestaciones
+ * (README_RESERVAS_DISPONIBILIDAD_BD.md). Solo el rol ADMIN puede
+ * listar, crear o editar estos recursos.
+ */
+export interface BackendSpecialty {
+  id: number;
+  name: string;
+  description: string | null;
+  is_active: boolean;
+}
+
+export interface SpecialtiesResponse {
+  data: BackendSpecialty[];
+}
+
+export interface SpecialtyResponse {
+  data: BackendSpecialty;
+}
+
+export interface SpecialtyPayload {
+  name: string;
+  description?: string | null;
+  is_active?: boolean;
+}
+
+export const specialtyApi = {
+  list: () => apiRequest<SpecialtiesResponse>("/api/v1/specialties"),
+
+  create: (payload: SpecialtyPayload) =>
+    apiRequest<SpecialtyResponse>("/api/v1/specialties", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  update: (id: number, payload: Partial<SpecialtyPayload>) =>
+    apiRequest<SpecialtyResponse>(`/api/v1/specialties/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+};
+
+export interface ServicePayload {
+  specialty_id: number;
+  name: string;
+  description?: string | null;
+  duration_minutes: number;
+  is_active?: boolean;
+}
+
+export interface ServiceResponse {
+  data: BackendService;
+}
+
+export const serviceApi = {
+  // Como administrador, trae todas las prestaciones (activas e
+  // inactivas); como paciente, solo las activas. Ver ServiceController::index.
+  list: () => apiRequest<ServicesResponse>("/api/v1/services"),
+
+  create: (payload: ServicePayload) =>
+    apiRequest<ServiceResponse>("/api/v1/services", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  update: (id: number, payload: Partial<ServicePayload>) =>
+    apiRequest<ServiceResponse>(`/api/v1/services/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+};
 
 export interface BackendProfessionalSummary {
   id: number;

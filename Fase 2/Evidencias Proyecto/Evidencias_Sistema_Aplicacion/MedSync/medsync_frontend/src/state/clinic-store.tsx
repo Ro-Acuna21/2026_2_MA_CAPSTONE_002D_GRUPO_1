@@ -29,6 +29,8 @@ import type {
   Membership,
   MedicalResult,
   Permission,
+  Specialty,
+  Service,
 } from "@/domain/types";
 
 import { membershipsFor, scopeData } from "@/domain/access";
@@ -54,9 +56,13 @@ import {
   professionalApi,
   publicCenterApi,
   sanctum,
+  specialtyApi,
+  serviceApi,
   type AuthUser,
   type BackendAppointment,
   type BackendAvailability,
+  type BackendSpecialty,
+  type BackendService,
 } from "@/services/http";
 
 const DATA_KEY = "clinica_horizonte_react_v4";
@@ -129,6 +135,40 @@ function mapBackendAvailability(
     start: item.start_time.slice(0, 5),
     end: item.end_time.slice(0, 5),
     active: item.is_active,
+  };
+}
+
+/*
+ * Especialidades y prestaciones administradas por el ADMIN del
+ * centro (README_RESERVAS_DISPONIBILIDAD_BD.md). A diferencia del
+ * catálogo que ve el paciente, acá se incluyen también las
+ * inactivas, por eso is_active viene siempre presente en la
+ * respuesta de administración.
+ */
+function mapBackendSpecialty(
+  item: BackendSpecialty,
+  organizationId: string,
+): Specialty {
+  return {
+    id: String(item.id),
+    organizationId,
+    name: item.name,
+    description: item.description ?? "",
+    active: item.is_active,
+  };
+}
+
+function mapBackendService(
+  item: BackendService,
+  organizationId: string,
+): Service {
+  return {
+    id: String(item.id),
+    organizationId,
+    specialtyId: item.specialty ? String(item.specialty.id) : "",
+    name: item.name,
+    duration: item.duration_minutes,
+    active: item.is_active ?? true,
   };
 }
 
@@ -599,6 +639,56 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
         console.error("No fue posible cargar los horarios del centro:", error);
         toast.error(
           firstApiErrorMessage(error, "No fue posible cargar los horarios."),
+        );
+      });
+  }, [authLoading, user, organization]);
+
+  /*
+   * Catálogo real de especialidades y prestaciones para el
+   * administrador del centro (incluye inactivas, a diferencia del
+   * catálogo que ve el paciente). saveCatalog() guarda los cambios
+   * contra la misma API.
+   */
+  useEffect(() => {
+    if (authLoading || !user || !organization || user.role !== "ADMIN") {
+      return;
+    }
+
+    Promise.all([specialtyApi.list(), serviceApi.list()])
+      .then(([specialtiesResponse, servicesResponse]) => {
+        const realSpecialties = specialtiesResponse.data.map((item) =>
+          mapBackendSpecialty(item, organization.id),
+        );
+
+        const realServices = servicesResponse.data.map((item) =>
+          mapBackendService(item, organization.id),
+        );
+
+        setAllData((current) => ({
+          ...current,
+
+          specialties: [
+            ...current.specialties.filter(
+              (specialty) => specialty.organizationId !== organization.id,
+            ),
+            ...realSpecialties,
+          ],
+
+          services: [
+            ...current.services.filter(
+              (service) => service.organizationId !== organization.id,
+            ),
+            ...realServices,
+          ],
+        }));
+      })
+      .catch((error) => {
+        console.error("No fue posible cargar el catálogo del centro:", error);
+        toast.error(
+          firstApiErrorMessage(
+            error,
+            "No fue posible cargar especialidades y prestaciones.",
+          ),
         );
       });
   }, [authLoading, user, organization]);
@@ -2039,14 +2129,6 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const base = {
-      id: id ?? uid(kind),
-
-      organizationId: organization.id,
-
-      active: input.active !== "false",
-    };
-
     if (kind === "specialty") {
       if (!input.name?.trim()) {
         throw new Error("Ingresa el nombre.");
@@ -2056,24 +2138,38 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
         throw new Error("Especialidad fuera del centro.");
       }
 
-      const item = {
-        ...base,
-
+      const payload = {
         name: input.name.trim(),
-
-        description: input.description ?? "",
+        description: input.description || null,
+        is_active: input.active !== "false",
       };
+
+      const response = await (
+        id
+          ? specialtyApi.update(Number(id), payload)
+          : specialtyApi.create(payload)
+      ).catch((error: unknown) => {
+        throw new Error(
+          firstApiErrorMessage(error, "No fue posible guardar la especialidad."),
+        );
+      });
+
+      const item = mapBackendSpecialty(response.data, organization.id);
 
       commit((current) => ({
         ...current,
-
         specialties: id
           ? current.specialties.map((specialty) =>
               specialty.id === id ? item : specialty,
             )
           : [...current.specialties, item],
       }));
-    } else if (kind === "service") {
+
+      toast.success(id ? "Especialidad actualizada." : "Especialidad creada.");
+      return;
+    }
+
+    if (kind === "service") {
       if (
         !input.name?.trim() ||
         !data.specialties.some(
@@ -2092,28 +2188,35 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
         throw new Error("Prestación fuera del centro.");
       }
 
-      const item = {
-        ...base,
-
+      const payload = {
+        specialty_id: Number(input.specialtyId),
         name: input.name.trim(),
-
-        specialtyId: input.specialtyId,
-
-        duration: Number(input.duration),
+        duration_minutes: Number(input.duration),
+        is_active: input.active !== "false",
       };
+
+      const response = await (
+        id ? serviceApi.update(Number(id), payload) : serviceApi.create(payload)
+      ).catch((error: unknown) => {
+        throw new Error(
+          firstApiErrorMessage(error, "No fue posible guardar la prestación."),
+        );
+      });
+
+      const item = mapBackendService(response.data, organization.id);
 
       commit((current) => ({
         ...current,
-
         services: id
           ? current.services.map((service) =>
               service.id === id ? item : service,
             )
           : [...current.services, item],
       }));
-    }
 
-    toast.success("Configuración guardada");
+      toast.success(id ? "Prestación actualizada." : "Prestación creada.");
+      return;
+    }
   };
 
   const assignAccess: ClinicContextValue["assignAccess"] = async (

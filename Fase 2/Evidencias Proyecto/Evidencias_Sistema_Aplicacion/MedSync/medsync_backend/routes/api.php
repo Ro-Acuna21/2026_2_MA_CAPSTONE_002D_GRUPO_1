@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\ProfessionalController;
 use App\Http\Controllers\Api\ProfessionalAccessController;
 use App\Http\Controllers\Api\AccountActivationController;
 use App\Http\Controllers\Api\ServiceController;
+use App\Http\Controllers\Api\SpecialtyController;
 use App\Http\Controllers\Api\AppointmentController;
 use App\Http\Controllers\Api\PatientController;
 use App\Http\Controllers\Api\AvailabilityController;
@@ -45,4 +46,11 @@ Route::middleware(['auth:sanctum', 'tenant.center'])->group(function () {
     Route::patch('/v1/appointments/{appointment}/reschedule', [AppointmentController::class, 'reschedule']);
     Route::patch('/v1/appointments/{appointment}/status', [AppointmentController::class, 'updateStatus']);
     Route::patch('/v1/appointments/{appointment}/cancel', [AppointmentController::class, 'cancel']);
+
+    // Administración del centro: especialidades y prestaciones.
+    Route::get('/v1/specialties', [SpecialtyController::class, 'index']);
+    Route::post('/v1/specialties', [SpecialtyController::class, 'store']);
+    Route::patch('/v1/specialties/{specialty}', [SpecialtyController::class, 'update'])->whereNumber('specialty');
+    Route::post('/v1/services', [ServiceController::class, 'store']);
+    Route::patch('/v1/services/{service}', [ServiceController::class, 'update'])->whereNumber('service');
 });
