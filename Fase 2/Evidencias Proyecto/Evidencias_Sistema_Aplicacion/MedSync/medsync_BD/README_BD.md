@@ -79,6 +79,28 @@ Actualmente se consideran roles como:
 - `PROFESIONAL`
 - `PACIENTE`
 
+### specialties y medical_center_specialties
+
+El catálogo maestro de especialidades se almacena en `medsync_core.specialties`. El administrador de la plataforma mantiene este catálogo; `is_active` indica si la especialidad está disponible globalmente.
+
+La tabla `medical_center_specialties` registra qué especialidades selecciona cada centro. Cada fila contiene el centro, la especialidad y un `is_active` propio del centro. La pareja centro-especialidad es única y ambas referencias tienen claves foráneas dentro de Core.
+
+Las migraciones agregan estas tablas sin retirar todavía `specialties` de las bases de los centros. La tabla local y las referencias existentes de prestaciones y profesionales deben conservarse hasta que backend y datos se migren coordinadamente. No existe una clave foránea directa desde una base de centro a Core, porque son bases PostgreSQL independientes; cualquier ID central almacenado en ellas será una referencia lógica que deberá validar la aplicación.
+
+### Implementación pendiente en backend y retiro de la tabla local
+
+El cambio final es retirar **`specialties` de cada base de centro** (por ejemplo, `medsync_clinica_horizonte.specialties`). No se deben eliminar `services`, `professional_specialty`, `appointments` ni las tablas nuevas de Core. Las columnas `services.specialty_id` y `professional_specialty.specialty_id` se conservan como referencias lógicas a `medsync_core.specialties.id`; no pueden tener una FK entre bases.
+
+El orden acordado para completar la transición es:
+
+1. **Migrar el catálogo y la selección existente.** Consolidar en Core las especialidades locales sin duplicar el catálogo global y crear en `medical_center_specialties` una fila activa para cada especialidad que ya ofrece cada centro. Mantener un mapeo `center_id + local_specialty_id -> core_specialty_id`; no asumir que los IDs locales coinciden con los IDs centrales.
+2. **Actualizar backend antes de borrar la tabla local.** Hugo debe cambiar las consultas/operaciones CRUD de especialidades para leer y administrar `core.specialties` y `core.medical_center_specialties`: el administrador de plataforma crea/desactiva filas del catálogo, y el administrador del centro activa/desactiva su relación. Al operar con prestaciones o profesionales, el backend debe comprobar que la especialidad existe y está activa globalmente y para el centro resuelto. Los modelos y relaciones Eloquent ya no deben consultar `specialties` por la conexión `center`.
+3. **Actualizar las referencias locales.** Usando el mapeo, cambiar `services.specialty_id` y `professional_specialty.specialty_id` a los IDs de Core. Verificar que todas las filas tengan una especialidad central válida y que las citas sigan llegando a sus prestaciones mediante `appointments.service_id`.
+4. **Desplegar y verificar el backend actualizado.** Probar lectura del catálogo, activación por centro, creación/listado de prestaciones, asociación de profesionales y reserva de citas en cada centro migrado.
+5. **Retirar la tabla local mediante una nueva migración Laravel de `center`.** Primero quitar las claves foráneas locales hacia `specialties` (en `services.specialty_id` y `professional_specialty.specialty_id`); conservar esas columnas como referencias lógicas. Luego eliminar `specialties` de la base del centro. Esta migración debe ejecutarse solo después de los pasos anteriores y de verificar el backend actualizado.
+
+La tabla puente `medical_center_specialties` es la que indica qué especialidad ofrece cada centro; la tabla global `specialties` no se elimina en esta transición. No usar `CASCADE` para borrar la tabla local: la migración debe retirar explícitamente las dos restricciones y mantener los IDs asociados.
+
 El `SUPER_ADMIN` no necesita un registro en `center_users`, ya que corresponde a un rol global de la plataforma.
 
 ---
