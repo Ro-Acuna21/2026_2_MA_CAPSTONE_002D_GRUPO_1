@@ -1,5 +1,5 @@
 import { vi } from 'vitest'
-import type { AuthUser } from '@/services/http'
+import type { AuthUser, BackendAvailability, BackendProfessional } from '@/services/http'
 import type { Role } from '@/domain/types'
 
 export const centers = [
@@ -25,11 +25,15 @@ export function stubLaravelApi(options: {
   accounts?: Record<string, AuthUser>
   slots?: string[]
   patients?: { id: number; first_name: string; last_name: string; rut: string }[]
+  professionals?: BackendProfessional[]
+  availabilities?: BackendAvailability[]
+  unauthorizedServices?: boolean
 } = {}) {
   const requests: RequestRecord[] = []
   let session = options.session ?? null
   const publishedCenters = options.centers ?? centers
   const patientRecords = [...(options.patients ?? [])]
+  const availabilityRecords = [...(options.availabilities ?? [])]
   const ok = (data: unknown, status = 200) => ({ ok: true, status, json: async () => structuredClone(data) })
   const fail = (status: number) => ({ ok: false, status, json: async () => ({ message: 'Sin acceso' }) })
 
@@ -51,7 +55,17 @@ export function stubLaravelApi(options: {
     }
     if (path === '/api/logout') { session = null; return { ok: true, status: 204 } }
     if (!session) return fail(401)
-    if (path === '/api/v1/professionals' || path === '/api/v1/services' ||
+    if (path === '/api/v1/professionals') return ok({ data: options.professionals ?? [] })
+    if (path === '/api/v1/availabilities' && method === 'GET') return ok({ data: availabilityRecords })
+    if (path.startsWith('/api/v1/availabilities/') && method === 'PATCH') {
+      const id = Number(path.split('/').at(-1))
+      const index = availabilityRecords.findIndex((item) => item.id === id)
+      if (index < 0) return fail(404)
+      availabilityRecords[index] = { ...availabilityRecords[index], ...body }
+      return ok({ data: availabilityRecords[index] })
+    }
+    if (path === '/api/v1/services' && options.unauthorizedServices) return fail(401)
+    if (path === '/api/v1/services' ||
         path === '/api/v1/appointments' || path === '/api/v1/appointments/my') return ok({ data: [] })
     if (path === '/api/v1/patients' && method === 'GET') return ok({ data: patientRecords })
     if (path === '/api/v1/patients' && method === 'POST') {

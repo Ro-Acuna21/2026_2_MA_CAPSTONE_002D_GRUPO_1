@@ -49,6 +49,7 @@ import { dateFromToday, toMinutes, toTime, uid } from "@/lib/utils";
 import { canSetAppointmentStatus } from "@/domain/appointment-rules";
 
 import {
+  AUTH_EXPIRED_EVENT,
   availabilityApi,
   appointmentApi,
   patientApi,
@@ -239,6 +240,8 @@ function loadData(): ClinicData {
 
 interface ClinicContextValue {
   data: ClinicData;
+  availabilityLoad: { status: "loading" | "ready" | "error"; error?: string };
+  reloadAvailability(): void;
 
   user: User | null;
 
@@ -354,6 +357,15 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
    * temporalmente.
    */
   const [allData, setAllData] = useState(loadData);
+  const [availabilityRequest, setAvailabilityRequest] = useState<{
+    organizationId: string;
+    status: "loading" | "ready" | "error";
+    error?: string;
+  } | null>(null);
+  const [availabilityReloadToken, setAvailabilityReloadToken] = useState(0);
+  const reloadAvailability = useCallback(() => {
+    setAvailabilityReloadToken((token) => token + 1);
+  }, []);
 
   /*
    * El usuario autenticado YA NO sale
@@ -371,6 +383,17 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
    * de saber si existe una sesión.
    */
   const [authLoading, setAuthLoading] = useState(true);
+
+  useEffect(() => {
+    const clearExpiredSession = () => {
+      setUser(null);
+      setOrganizationId(null);
+      sessionStorage.removeItem(ORGANIZATION_KEY);
+    };
+
+    window.addEventListener(AUTH_EXPIRED_EVENT, clearExpiredSession);
+    return () => window.removeEventListener(AUTH_EXPIRED_EVENT, clearExpiredSession);
+  }, []);
   const [publicCentersLoading, setPublicCentersLoading] = useState(true);
   const [publicOrganizations, setPublicOrganizations] = useState<Organization[]>([]);
   const [initialOrganizations] = useState(() => allData.organizations);
@@ -618,9 +641,12 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    let cancelled = false;
+    setAvailabilityRequest({ organizationId: organization.id, status: "loading" });
     availabilityApi
       .list()
       .then((response) => {
+        if (cancelled) return;
         const realAvailabilities = response.data.map((item) =>
           mapBackendAvailability(item, organization.id),
         );
@@ -634,14 +660,19 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
             ...realAvailabilities,
           ],
         }));
+        setAvailabilityRequest({ organizationId: organization.id, status: "ready" });
       })
       .catch((error) => {
+        if (cancelled) return;
         console.error("No fue posible cargar los horarios del centro:", error);
-        toast.error(
-          firstApiErrorMessage(error, "No fue posible cargar los horarios."),
-        );
+        setAvailabilityRequest({
+          organizationId: organization.id,
+          status: "error",
+          error: firstApiErrorMessage(error, "No fue posible cargar los horarios."),
+        });
       });
-  }, [authLoading, user, organization]);
+    return () => { cancelled = true; };
+  }, [authLoading, user, organization, availabilityReloadToken]);
 
   /*
    * Catálogo real de especialidades y prestaciones para el
@@ -2560,6 +2591,10 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
 
   const value = {
     data,
+    availabilityLoad: organization && availabilityRequest?.organizationId === organization.id
+      ? { status: availabilityRequest.status, error: availabilityRequest.error }
+      : { status: "loading" as const },
+    reloadAvailability,
 
     user,
 

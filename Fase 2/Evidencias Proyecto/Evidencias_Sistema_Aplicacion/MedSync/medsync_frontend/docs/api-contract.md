@@ -56,7 +56,7 @@ El acceso visual separado (`/plataforma/acceso`) mejora la navegación, pero la 
 | GET/POST/PATCH | `/api/v1/platform/centers` | Centros, planes, suscripciones y habilitación, exclusivo de plataforma |
 | PUT | `/api/v1/platform/centers/{id}/administrator` | Asignación del administrador de un centro |
 | PUT | `/api/v1/users/{id}/access` | Rol, ficha vinculada y permiso opcional de carga para recepción dentro del centro resuelto |
-| GET/POST/PATCH | `/api/v1/availability` | Horarios recurrentes de profesionales |
+| GET/POST/PATCH | `/api/v1/availabilities` | Horarios recurrentes de profesionales; implementado |
 | GET/POST | `/api/v1/result-types` | Tipos documentales propios del centro, separados de prestaciones |
 | GET/POST | `/api/v1/results` | Lista autorizada y carga de borradores |
 | POST | `/api/v1/results/{id}/publish` | Publicación por el profesional responsable |
@@ -65,3 +65,27 @@ El acceso visual separado (`/plataforma/acceso`) mejora la navegación, pero la 
 En producción, los documentos deben transferirse como archivos y almacenarse privadamente; el contenido `data:` de la demo no forma parte del contrato remoto. El backend debe validar centro, paciente, profesional y atención relacionados, estado borrador/publicado, tipo de archivo, tamaño y permisos. El superadministrador no recibe contenidos clínicos. Una suspensión conserva los datos; las reglas comerciales por estado de suscripción aún deben acordarse.
 
 Registro no equivale a verificar identidad. Las fichas preexistentes requieren un proceso de vinculación autorizado y la verificación de correo deberá implementarse en backend. Todos los controles locales de esta demo deben repetirse y reforzarse en Laravel, Eloquent y Spatie.
+
+## Observación Capstone: horarios y catálogo global (24-10-2026)
+
+### Existente y reutilizable
+
+`GET /api/v1/availabilities` devuelve `{ "data": [{ "id": 1, "professional_id": 17, "weekday": 1, "start_time": "09:00", "end_time": "13:00", "is_active": true }] }`. `weekday` es ISO 1–7. `POST /api/v1/availabilities` y `PATCH /api/v1/availabilities/{id}` reciben `professional_id`, `weekday`, `start_time`, `end_time`, `is_active`; responden `{ "data": <bloque> }`. Solo `ADMIN` del centro. React agrupa estos bloques por `professional_id`. No existe `DELETE`: `is_active: false` desactiva el bloque sin borrarlo.
+
+`GET/POST/PATCH /api/v1/specialties` actualmente trabaja con `center.specialties` y devuelve `{ id, name, description, is_active }`. Es una API **local heredada**, no el catálogo global del PR #19. No se debe reinterpretar silenciosamente su ID como uno de Core. Prestaciones y profesionales todavía referencian los IDs locales.
+
+### Propuesta para backend; ninguna de estas rutas existe todavía
+
+| Rol | Método y ruta propuesta | Solicitud | Respuesta |
+| --- | --- | --- | --- |
+| `SUPER_ADMIN` | `GET /api/v1/platform/specialties` | — | `{ "data": [{ "id": 5, "name": "Cardiología", "description": null, "is_active": true }] }` |
+| `SUPER_ADMIN` | `POST /api/v1/platform/specialties` | `{ "name": "Cardiología", "description": null }` | `201`, `{ "data": <especialidad global> }` |
+| `SUPER_ADMIN` | `PATCH /api/v1/platform/specialties/{id}` | Uno o más de `name`, `description`, `is_active` | `200`, `{ "data": <especialidad global> }` |
+| `ADMIN` | `GET /api/v1/center/specialties` | Centro resuelto desde sesión | `{ "data": [{ "id": 5, "name": "Cardiología", "description": null, "is_active": true, "center_is_active": null }] }` |
+| `ADMIN` | `PUT /api/v1/center/specialties/{id}` | `{ "is_active": true }` o `false` | `200`, `{ "data": <misma fila con center_is_active booleano> }` |
+
+En `GET /center/specialties`, `is_active` es el estado **global** y `center_is_active` es `null` si el centro no la seleccionó, `true` si la ofrece y `false` si la desactivó. La respuesta muestra el catálogo global sin revelar qué seleccionaron otros centros. El `PUT` crea o actualiza solo la fila de `core.medical_center_specialties` del centro autorizado; el cliente nunca envía `medical_center_id` ni nombre de base. Debe rechazarse activar una especialidad global inactiva. Desactivar globalmente no borra historial clínico ni asociaciones.
+
+Autenticación por Sanctum; `401` sin sesión, `403` rol incorrecto o centro no autorizado, `404` ID ausente y `422` validación. Backend debe distinguir rutas de plataforma de rutas clínicas y aplicar el rol en servidor. El frontend muestra un estado de integración pendiente al recibir `404`, `405` o `501` de estas rutas propuestas y solo actualiza la pantalla tras una respuesta exitosa.
+
+En el flujo de reserva existente, `GET /api/v1/services`, `GET /api/v1/services/{id}/professionals` y `GET /api/v1/appointments/available-slots` requieren sesión clínica válida. Si la API responde `401`, React limpia la identidad local y vuelve a `/centro/{slug}/ingresar`; un fallo de catálogo se distingue de una lista legítimamente vacía. Laravel debe devolver `401` JSON para `/api/*` incluso sin la cabecera `Accept` y conservar las validaciones y contratos actuales de estos tres endpoints.

@@ -243,3 +243,22 @@ En caso de existir diferencias entre los respaldos SQL almacenados en esta carpe
 medsync_backend/database/migrations/
 
 Los respaldos SQL cumplen principalmente una función documental y de apoyo.
+
+## Observación Capstone: dependencias del catálogo global (24-10-2026)
+
+La migración versionada `medsync_backend/database/migrations/core/2026_10_24_000001_create_specialty_catalog_tables.php` crea en **Core** `specialties(id, name, description, is_active, timestamps)` y `medical_center_specialties(id, medical_center_id, specialty_id, is_active, timestamps)`. La segunda tabla tiene claves foráneas hacia `medical_centers` y `specialties` de Core y una restricción única centro-especialidad. Esta es la ubicación adecuada para el catálogo común y las selecciones; un centro no debe administrar nombres globales ni consultar las selecciones de otro centro.
+
+El esquema operacional actual conserva `center.specialties`; `center.services.specialty_id` y `center.professional_specialty.specialty_id` la referencian mediante claves foráneas. Las migraciones nuevas de Core no convierten automáticamente estas referencias. El respaldo Core fechado 15-10-2026 precede a la migración global y no prueba que las dos tablas estén aplicadas en la base en uso. Esta entrega no ejecuta SQL, migraciones ni seeders.
+
+Para el compañero de BD: inventariar especialidades locales en **cada** centro; decidir correspondencias por concepto clínico, no solo por nombre o ID; registrar el mapeo `(medical_center_id, local_specialty_id, core_specialty_id)` y detectar duplicados/conflictos; respaldar antes de cualquier transformación. Poblar `core.medical_center_specialties` según las prestaciones ofrecidas y preservar tanto selecciones inactivas como historial. Coordinar con backend el cambio de lectura/autorización y solo después actualizar `services.specialty_id` y `professional_specialty.specialty_id`. Al ser bases PostgreSQL distintas, la referencia al ID Core será lógica y backend deberá validarla; no crear una FK entre bases ni borrar `center.specialties` mientras haya referencias locales. Diseñar una migración posterior, reversible y probada para retirar las FK y la tabla local cuando la transición esté verificada.
+
+Pruebas necesarias antes de aplicar a datos reales: integridad de todos los IDs mapeados; dos centros que eligen subconjuntos distintos; activación/desactivación independiente por centro; rechazo de especialidad global inactiva; prestaciones y profesionales válidos solo si la selección está activa; citas históricas legibles; reservas y disponibilidad sin regresión. `center.availabilities` no cambia: la agrupación por profesional se realiza en React con `professional_id`; el bloque se desactiva con `is_active` y no se borra físicamente.
+
+### Entrega pendiente para el responsable de BD
+
+1. Verificar por entorno la aplicación de la migración Core del catálogo global y documentar respaldo, cantidad de filas y restricciones únicas/FK. No asumir que el respaldo SQL anterior contiene esas tablas.
+2. Preparar un inventario por centro de `center.specialties`, `services.specialty_id` y `professional_specialty.specialty_id`; definir y revisar el mapeo hacia `core.specialties.id`. Resolver colisiones semánticas antes de poblar asociaciones.
+3. Diseñar una migración de datos repetible y reversible que cree las selecciones en `core.medical_center_specialties` y preserve estados inactivos e historial. Coordinar la sustitución de referencias con backend; las bases Core y Center no pueden compartir FK PostgreSQL.
+4. Registrar consultas de comprobación para referencias huérfanas, duplicados centro-especialidad, reservas y citas históricas. Retirar las FK y la tabla local únicamente cuando backend lea los IDs globales y las pruebas de dos centros y reservas pasen.
+
+La corrección frontend de sesión caducada y carga de reservas no requiere cambios de esquema ni datos. En esta rama no se aplicaron migraciones, seeders ni escrituras SQL.

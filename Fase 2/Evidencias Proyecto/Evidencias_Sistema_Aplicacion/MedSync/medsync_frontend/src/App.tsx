@@ -26,10 +26,13 @@ import { ActivateAccountPage } from "@/pages/activate-account-page";
 import { CentersPage, LandingPage } from "@/pages/landing-page";
 import { PublicCenterPage } from "@/pages/public-center-page";
 import { CenterSelectorPage } from "@/pages/center-selector-page";
+import { PlatformSpecialtiesPage } from "@/pages/platform-specialties-page";
 
 function PlatformProtectedRoute() {
-  const { user, organization } = useClinic();
-  return !user ? (
+  const { user, organization, authLoading } = useClinic();
+  return authLoading ? (
+    <main className="grid min-h-screen place-items-center"><p>Cargando sesión…</p></main>
+  ) : !user ? (
     <Navigate to="/plataforma/acceso" replace />
   ) : user.role === "SUPER_ADMIN" ? (
     <Outlet />
@@ -107,6 +110,7 @@ export default function App() {
         <Route element={<AppLayout />}>
           <Route path="/plataforma" element={<PlatformPage />} />
           <Route path="/plataforma/planes" element={<PlansPage />} />
+          <Route path="/plataforma/especialidades" element={<PlatformSpecialtiesPage />} />
         </Route>
       </Route>
       <Route path="/centro/:centerSlug" element={<CenterProtectedRoute />}>
