@@ -16,6 +16,7 @@ it('carga y actualiza el perfil propio mediante API sin persistencia local', asy
     id: 7, first_name: 'Ana', last_name: 'Prueba', rut: '11111111-1',
     birth_date: '1990-01-01', email: 'ana@example.com', phone: '+56912345678',
     health_insurance: 'Fonasa', medical_insurance: null, address: 'Calle 1',
+    region: null, commune: null,
     consent: true, is_active: true, has_account: true,
   }
   const calls: string[] = []

@@ -9,6 +9,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Field, Input, Select } from '@/components/ui/form-controls'
 import { ActionForm } from '@/components/action-form'
 import { ConsentField, PatientFields } from '@/components/patient-fields'
+import { PatientAddressFields } from '@/components/patient-address-fields'
 import { healthInsurances } from '@/domain/validation'
 import { dateFromToday } from '@/lib/utils'
 import { firstApiErrorMessage, patientApi, type BackendPatient } from '@/services/http'
@@ -66,6 +67,7 @@ export function PatientsPage() {
                   birth_date: values.birthDate, email: values.email, phone: values.phone,
                   health_insurance: values.healthInsurance, medical_insurance: values.medicalInsurance,
                   address: values.address, consent: values.consent === 'on',
+                  region_code: values.region_code || null, commune_code: values.commune_code || null,
                 })
                 setPatients((current) => [...current, response.data].sort((a, b) => a.first_name.localeCompare(b.first_name)))
                 setCreating(false)
@@ -91,6 +93,7 @@ export function PatientsPage() {
               first_name: values.firstName, last_name: values.lastName, birth_date: values.birthDate,
               email: values.email, phone: values.phone, health_insurance: values.healthInsurance,
               medical_insurance: values.medicalInsurance, address: values.address,
+              region_code: values.region_code || null, commune_code: values.commune_code || null,
             })
             setSelected(response.data)
             setPatients((current) => current.map((item) => item.id === response.data.id ? response.data : item))
@@ -108,8 +111,8 @@ export function PatientsPage() {
           <Field label="Teléfono"><Input name="phone" type="tel" defaultValue={selected.phone} required /></Field>
           <Field label="Previsión de salud"><Select name="healthInsurance" defaultValue={selected.health_insurance ?? ''} required>{healthInsurances.map((name) => <option key={name}>{name}</option>)}</Select></Field>
           <Field label="Seguro complementario"><Input name="medicalInsurance" defaultValue={selected.medical_insurance ?? ''} /></Field>
-          <Field className="sm:col-span-2" label="Dirección"><Input name="address" defaultValue={selected.address ?? ''} /></Field>
-        </ActionForm> : <div className="mt-6 space-y-3 text-sm"><p><strong>Nombre:</strong> {selected.first_name} {selected.last_name}</p><p><strong>RUT:</strong> {selected.rut}</p><p><strong>Nacimiento:</strong> {selected.birth_date ?? 'Sin registrar'}</p><p><strong>Correo:</strong> {selected.email}</p><p><strong>Teléfono:</strong> {selected.phone}</p><p><strong>Previsión:</strong> {selected.health_insurance ?? 'Sin registrar'}</p><p><strong>Seguro complementario:</strong> {selected.medical_insurance ?? 'Sin registrar'}</p><p><strong>Dirección:</strong> {selected.address ?? 'Sin registrar'}</p><p><strong>Consentimiento:</strong> {selected.consent ? 'Aceptado' : 'Pendiente'}</p><Button onClick={() => setEditing(true)}>Editar ficha</Button></div>)}
+          <PatientAddressFields address={selected.address} region={selected.region} commune={selected.commune} />
+        </ActionForm> : <div className="mt-6 space-y-3 text-sm"><p><strong>Nombre:</strong> {selected.first_name} {selected.last_name}</p><p><strong>RUT:</strong> {selected.rut}</p><p><strong>Nacimiento:</strong> {selected.birth_date ?? 'Sin registrar'}</p><p><strong>Correo:</strong> {selected.email}</p><p><strong>Teléfono:</strong> {selected.phone}</p><p><strong>Previsión:</strong> {selected.health_insurance ?? 'Sin registrar'}</p><p><strong>Seguro complementario:</strong> {selected.medical_insurance ?? 'Sin registrar'}</p><p><strong>Dirección:</strong> {[selected.address, selected.commune, selected.region].filter(Boolean).join(', ') || 'Sin registrar'}</p><p><strong>Consentimiento:</strong> {selected.consent ? 'Aceptado' : 'Pendiente'}</p><Button onClick={() => setEditing(true)}>Editar ficha</Button></div>)}
       </Dialog.Content></Dialog.Portal>
     </Dialog.Root>
   </>

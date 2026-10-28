@@ -18,6 +18,7 @@ it('envía al backend el slug del centro obtenido desde Core y lo reutiliza en e
     const path = new URL(input).pathname
     requests.push({ path, body: init?.body ? JSON.parse(String(init.body)) : undefined })
     if (path === '/api/public/centers') return { ok: true, status: 200, json: async () => ({ data: [{ id: 2, name: 'Centro B', slug: 'centro-b' }] }) }
+    if (path === '/api/public/territorial-catalog') return { ok: true, status: 200, json: async () => ({ data: [{ code: '13', name: 'Metropolitana de Santiago', communes: [{ code: '13119', name: 'Maipú' }] }] }) }
     if (path === '/sanctum/csrf-cookie') return { ok: true, status: 204 }
     if (path === '/api/register') return { ok: true, status: 201, json: async () => ({ data: {} }) }
     if (path === '/api/login') return { ok: true, status: 200, json: async () => ({ data: {
@@ -38,6 +39,7 @@ it('envía al backend el slug del centro obtenido desde Core y lo reutiliza en e
   )
 
   await screen.findByText('Crea tu acceso privado a Centro B.')
+  await screen.findByRole('option', { name: 'Metropolitana de Santiago' })
   fireEvent.change(screen.getByLabelText('Nombres'), { target: { value: 'Juan' } })
   fireEvent.change(screen.getByLabelText('Apellidos'), { target: { value: 'Pérez' } })
   fireEvent.change(screen.getByLabelText('RUT'), { target: { value: '12.345.678-5' } })
@@ -45,6 +47,9 @@ it('envía al backend el slug del centro obtenido desde Core y lo reutiliza en e
   fireEvent.change(screen.getByLabelText('Correo electrónico'), { target: { value: 'juan@example.com' } })
   fireEvent.change(screen.getByLabelText('Teléfono'), { target: { value: '+56 9 1234 5678' } })
   fireEvent.change(screen.getByLabelText('Previsión de salud'), { target: { value: 'Fonasa' } })
+  fireEvent.change(screen.getByLabelText('Dirección (opcional)'), { target: { value: 'Calle Las Flores 123' } })
+  fireEvent.change(screen.getByLabelText('Región (opcional)'), { target: { value: '13' } })
+  fireEvent.change(screen.getByLabelText('Comuna (opcional)'), { target: { value: '13119' } })
   fireEvent.change(screen.getByLabelText('Contraseña'), { target: { value: 'Password123' } })
   fireEvent.change(screen.getByLabelText('Confirmar contraseña'), { target: { value: 'Password123' } })
   fireEvent.click(screen.getByRole('checkbox'))
@@ -52,5 +57,7 @@ it('envía al backend el slug del centro obtenido desde Core y lo reutiliza en e
 
   await waitFor(() => expect(requests.some((request) => request.path === '/api/login')).toBe(true))
   expect(requests.find((request) => request.path === '/api/register')?.body?.center_slug).toBe('centro-b')
+  expect(requests.find((request) => request.path === '/api/register')?.body?.region_code).toBe('13')
+  expect(requests.find((request) => request.path === '/api/register')?.body?.commune_code).toBe('13119')
   expect(requests.find((request) => request.path === '/api/login')?.body?.center_slug).toBe('centro-b')
 })

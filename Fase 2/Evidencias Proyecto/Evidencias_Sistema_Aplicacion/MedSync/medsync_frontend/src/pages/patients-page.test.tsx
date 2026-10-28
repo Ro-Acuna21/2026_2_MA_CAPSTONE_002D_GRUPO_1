@@ -14,17 +14,20 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); localStorage.clear() })
 it('obtiene fichas de API y conserva alta y edición tras montar de nuevo la pantalla', async () => {
   const records: BackendPatient[] = []
   const calls: string[] = []
+  const payloads: Record<string, unknown>[] = []
   vi.stubGlobal('fetch', vi.fn(async (input: string, init?: RequestInit) => {
     const path = new URL(input).pathname
     calls.push(`${init?.method ?? 'GET'} ${path}`)
+    if (path === '/api/public/territorial-catalog') return { ok: true, status: 200, json: async () => ({ data: [{ code: '13', name: 'Metropolitana de Santiago', communes: [{ code: '13119', name: 'Maipú' }] }] }) }
     let data: BackendPatient | BackendPatient[]
     let status = 200
     if (path === '/api/v1/patients' && init?.method === 'POST') {
       const body = JSON.parse(String(init.body))
+      payloads.push(body)
       data = { id: 1, first_name: body.first_name, last_name: body.last_name, rut: body.rut,
         birth_date: body.birth_date, email: body.email, phone: body.phone,
         health_insurance: body.health_insurance, medical_insurance: body.medical_insurance,
-        address: body.address, consent: true, is_active: true, has_account: false }
+        address: body.address, region: 'Metropolitana de Santiago', commune: 'Maipú', consent: true, is_active: true, has_account: false }
       records.push(data)
       status = 201
     } else if (path === '/api/v1/patients' && !init?.method) {
@@ -42,6 +45,7 @@ it('obtiene fichas de API y conserva alta y edición tras montar de nuevo la pan
   const first = mount()
   await screen.findByText('No hay pacientes para mostrar.')
   fireEvent.click(screen.getByRole('button', { name: 'Registrar paciente' }))
+  await screen.findByRole('option', { name: 'Metropolitana de Santiago' })
   fireEvent.change(screen.getByLabelText('Nombres'), { target: { value: 'Carla' } })
   fireEvent.change(screen.getByLabelText('Apellidos'), { target: { value: 'Paciente' } })
   fireEvent.change(screen.getByLabelText('RUT'), { target: { value: '12.345.678-5' } })
@@ -49,9 +53,13 @@ it('obtiene fichas de API y conserva alta y edición tras montar de nuevo la pan
   fireEvent.change(screen.getByLabelText('Correo electrónico'), { target: { value: 'carla@example.com' } })
   fireEvent.change(screen.getByLabelText('Teléfono'), { target: { value: '+56 9 1234 5678' } })
   fireEvent.change(screen.getByLabelText('Previsión de salud'), { target: { value: 'Fonasa' } })
+  fireEvent.change(screen.getByLabelText('Dirección (opcional)'), { target: { value: 'Av. Central 55' } })
+  fireEvent.change(screen.getByLabelText('Región (opcional)'), { target: { value: '13' } })
+  fireEvent.change(screen.getByLabelText('Comuna (opcional)'), { target: { value: '13119' } })
   fireEvent.click(screen.getByRole('checkbox'))
   fireEvent.submit(screen.getByRole('button', { name: 'Guardar paciente' }).closest('form')!)
   await screen.findByText('Carla Paciente')
+  expect(payloads[0]).toMatchObject({ region_code: '13', commune_code: '13119' })
   first.unmount()
 
   const second = mount()
@@ -59,6 +67,7 @@ it('obtiene fichas de API y conserva alta y edición tras montar de nuevo la pan
   fireEvent.click(screen.getByRole('button', { name: 'Ver detalle' }))
   await waitFor(() => expect(calls).toContain('GET /api/v1/patients/1'))
   fireEvent.click(screen.getByRole('button', { name: 'Editar ficha' }))
+  await waitFor(() => expect((screen.getByLabelText('Región (opcional)') as HTMLSelectElement).value).toBe('13'))
   fireEvent.change(screen.getByLabelText('Teléfono'), { target: { value: '+56 9 8765 4321' } })
   fireEvent.submit(screen.getByRole('button', { name: 'Guardar cambios' }).closest('form')!)
   await waitFor(() => expect(records[0].phone).toBe('+56 9 8765 4321'))

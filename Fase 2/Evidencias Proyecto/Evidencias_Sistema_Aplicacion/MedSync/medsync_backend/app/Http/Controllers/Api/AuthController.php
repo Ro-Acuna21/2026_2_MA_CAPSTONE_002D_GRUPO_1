@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use App\Models\Center\PatientAddress;
 use App\Services\Tenants\TenantConnectionResolver;
+use App\Services\TerritorialCatalog;
 use App\Support\TenantContext;
 use Illuminate\Validation\ValidationException;
 
@@ -23,6 +24,7 @@ class AuthController extends Controller
     public function __construct(
         private readonly TenantConnectionResolver $connectionResolver,
         private readonly TenantContext $tenantContext,
+        private readonly TerritorialCatalog $territorialCatalog,
     ) {
     }
 
@@ -60,9 +62,12 @@ class AuthController extends Controller
             'health_insurance' => ['required', Rule::in(['Fonasa', 'Isapre', 'Particular', 'Otra'])],
             'medical_insurance' => ['nullable', 'string', 'max:100'],
             'address' => ['nullable', 'string', 'max:200'],
+            'region_code' => ['nullable', 'string', 'regex:/^\d{2}$/'],
+            'commune_code' => ['nullable', 'string', 'regex:/^\d{5}$/'],
             'password' => ['required', 'string', 'min:8', 'regex:/[a-z]/', 'regex:/[A-Z]/', 'regex:/\d/', 'confirmed'],
             'consent' => ['required', 'accepted'],
         ]);
+        $addressData = $this->patientAddressData($data);
         $medicalCenter = MedicalCenter::query()
             ->where('slug', $data['center_slug'])
             ->where('is_active', true)
@@ -99,7 +104,7 @@ if ($existingUser) {
             ]);
         }
 
-        [$patient, $centerUser] = DB::transaction(function () use ($data, $rut, $medicalCenter, $healthInsurance) {
+        [$patient, $centerUser] = DB::transaction(function () use ($data, $rut, $medicalCenter, $healthInsurance, $addressData) {
             $existingPatient = Patient::where(function ($query) use ($rut, $data) {
     $query->where('rut', $rut)
         ->orWhereRaw(
@@ -152,17 +157,12 @@ if ($existingUser) {
                     'is_active' => true,
                 ]);
             }
-            if (! empty($data['address'])) {
-    PatientAddress::updateOrCreate(
-        [
-            'patient_id' => $patient->id,
-            'is_primary' => true,
-        ],
-        [
-            'address_line' => $data['address'],
-        ]
-    );
-}
+            if ($addressData !== null) {
+                PatientAddress::updateOrCreate(
+                    ['patient_id' => $patient->id, 'is_primary' => true],
+                    $addressData
+                );
+            }
 
             $centerUser = CenterUser::firstOrCreate(
                 [
@@ -317,6 +317,31 @@ if ($existingUser) {
         return response()->json([
             'data' => $this->presentUser($user, $this->tenantContext->centerUser(), false),
         ]);
+    }
+
+    /** @return array{address_line: string, region: ?string, commune: ?string}|null */
+    private function patientAddressData(array $data): ?array
+    {
+        $address = trim((string) ($data['address'] ?? ''));
+        $regionCode = trim((string) ($data['region_code'] ?? ''));
+        $communeCode = trim((string) ($data['commune_code'] ?? ''));
+
+        if ($address === '' && $regionCode === '' && $communeCode === '') {
+            return null;
+        }
+
+        $location = $this->territorialCatalog->resolve($regionCode, $communeCode);
+        if ($address === '') {
+            throw ValidationException::withMessages([
+                'address' => ['Ingresa la calle y número para guardar la dirección.'],
+            ]);
+        }
+
+        return [
+            'address_line' => $address,
+            'region' => $location['region'] ?? null,
+            'commune' => $location['commune'] ?? null,
+        ];
     }
 
     private function presentUser(User $user, ?CenterUser $centerUser = null, bool $fallbackToFirstMembership = true): array
