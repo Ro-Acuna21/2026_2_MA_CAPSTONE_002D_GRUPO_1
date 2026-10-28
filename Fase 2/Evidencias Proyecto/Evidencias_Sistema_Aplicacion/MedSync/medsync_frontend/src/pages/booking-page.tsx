@@ -10,7 +10,7 @@ import { useClinic } from '@/state/clinic-store'
 import { toast } from 'sonner'
 import { useCenterPath } from '@/lib/tenant'
 import type { Slot } from '@/domain/types'
-import { appointmentApi, type BackendPatientSummary, type BackendService } from '@/services/http'
+import { appointmentApi, firstApiErrorMessage, type BackendPatientSummary, type BackendService } from '@/services/http'
 
 export function BookingPage() {
   const { user, patientSlots, professionalsForService, createAppointment } = useClinic()
@@ -29,6 +29,9 @@ export function BookingPage() {
   const [date, setDate] = useState('')
   const [time, setTime] = useState('')
   const [catalog, setCatalog] = useState<BackendService[]>([])
+  const [catalogState, setCatalogState] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [catalogError, setCatalogError] = useState('')
+  const [catalogRetry, setCatalogRetry] = useState(0)
   const [patients, setPatients] = useState<BackendPatientSummary[]>([])
   const [realProfessionals, setRealProfessionals] = useState<{ id: string; name: string }[]>([])
   const [available, setAvailable] = useState<Slot[]>([])
@@ -42,10 +45,20 @@ export function BookingPage() {
   useEffect(() => {
     let active = true
 
+    setCatalogState('loading')
+    setCatalogError('')
+
     appointmentApi.services().then((response) => {
-      if (active) setCatalog(response.data)
-    }).catch(() => {
-      if (active) toast.error('No fue posible cargar el catálogo de reservas.')
+      if (active) {
+        setCatalog(response.data)
+        setCatalogState('ready')
+      }
+    }).catch((error) => {
+      if (active) {
+        setCatalog([])
+        setCatalogState('error')
+        setCatalogError(firstApiErrorMessage(error, 'No fue posible cargar el catálogo de reservas.'))
+      }
     })
 
     if (staff) {
@@ -59,7 +72,7 @@ export function BookingPage() {
     }
 
     return () => { active = false }
-  }, [staff])
+  }, [staff, catalogRetry])
 
   // Profesionales reales que atienden la prestación seleccionada.
   useEffect(() => {
@@ -100,7 +113,7 @@ export function BookingPage() {
   if (!['RECEPCIONISTA', 'PACIENTE'].includes(user?.role ?? '')) return <Navigate to="/" replace />
 
   const next = () => {
-    if (step === 1 && (!specialtyId || !professionalId || !serviceId || (staff && !patientId))) return
+    if (step === 1 && (catalogState !== 'ready' || !specialtyId || !professionalId || !serviceId || (staff && !patientId))) return
     if (step === 2 && (!date || !time)) return
     setStep(Math.min(3, step + 1))
   }
@@ -168,6 +181,14 @@ export function BookingPage() {
           <CardContent>
             {step === 1 && (
               <div className="grid gap-5 sm:grid-cols-2">
+                {catalogState === 'loading' && <p className="sm:col-span-2 text-sm text-muted-foreground">Cargando especialidades y prestaciones…</p>}
+                {catalogState === 'error' && (
+                  <div role="alert" className="sm:col-span-2 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm">
+                    <p>No fue posible cargar las atenciones: {catalogError}</p>
+                    <Button className="mt-3" type="button" variant="outline" onClick={() => setCatalogRetry((value) => value + 1)}>Reintentar</Button>
+                  </div>
+                )}
+                {catalogState === 'ready' && catalog.length === 0 && <p className="sm:col-span-2 text-sm text-muted-foreground">Este centro aún no tiene prestaciones activas para reservar.</p>}
                 {staff && (
                   <Field className="sm:col-span-2" label="Paciente">
                     <Select required value={patientId} onChange={(e) => setPatientId(e.target.value)}>
@@ -304,7 +325,7 @@ export function BookingPage() {
                 <ChevronLeft className="size-4" /> Volver
               </Button>
               {step < 3 ? (
-                <Button type="button" onClick={next}>
+                <Button type="button" onClick={next} disabled={step === 1 && catalogState !== 'ready'}>
                   Continuar <ChevronRight className="size-4" />
                 </Button>
               ) : (

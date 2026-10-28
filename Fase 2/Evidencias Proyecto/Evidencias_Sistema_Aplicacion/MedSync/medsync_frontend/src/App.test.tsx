@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
@@ -60,6 +60,40 @@ describe('navegación por roles con sesión Laravel', () => {
     expect(screen.queryByRole('link', { name: 'Agenda' })).toBeNull()
     expect(screen.queryByRole('link', { name: 'Reservar hora' })).toBeNull()
     expect(screen.queryByRole('link', { name: 'Pacientes' })).toBeNull()
+  })
+
+  it('agrupa horarios reales por profesional y desactiva con la API existente', async () => {
+    const api = stubLaravelApi({
+      session: backendUser('ADMIN', 'clinica-horizonte'),
+      professionals: [{ id: 17, user_id: null, first_name: 'Ana', last_name: 'Rojas', rut: '11111111-1', email: 'ana@example.test', phone: '+56911111111', is_active: true, specialty_ids: [], specialties: [], description: null }],
+      availabilities: [
+        { id: 1, professional_id: 17, weekday: 1, start_time: '09:00', end_time: '12:00', is_active: true },
+        { id: 2, professional_id: 17, weekday: 3, start_time: '10:00', end_time: '13:00', is_active: true },
+      ],
+    })
+    open('/centro/clinica-horizonte/administracion')
+    const summary = await screen.findByText('2 bloques')
+    expect(summary.closest('summary')?.textContent).toContain('Ana Rojas')
+    fireEvent.click(summary.closest('summary')!)
+    expect(screen.getByText((_, element) => element?.tagName === 'P' && element.textContent?.includes('Lunes · 09:00–12:00') === true)).toBeDefined()
+    expect(screen.getByText((_, element) => element?.tagName === 'P' && element.textContent?.includes('Miércoles · 10:00–13:00') === true)).toBeDefined()
+    fireEvent.click(screen.getAllByRole('button', { name: 'Desactivar' })[0])
+    await waitFor(() => expect(api.requests.some((request) => request.path === '/api/v1/availabilities/1' && request.method === 'PATCH' && request.body?.is_active === false)).toBe(true))
+  })
+
+  it('muestra integración pendiente para el catálogo global sin ofrecer guardados ficticios', async () => {
+    stubLaravelApi({ session: backendUser('SUPER_ADMIN') })
+    open('/plataforma/especialidades')
+    expect(await screen.findByRole('heading', { name: 'Catálogo global de especialidades' })).toBeDefined()
+    expect(await screen.findByText(/catálogo global aún no está disponible en el backend/i)).toBeDefined()
+    expect(screen.queryByRole('button', { name: 'Crear especialidad' })).toBeNull()
+  })
+
+  it('vuelve al acceso del centro cuando expira la sesión al cargar reservas', async () => {
+    stubLaravelApi({ session: backendUser('PACIENTE', 'clinica-horizonte'), unauthorizedServices: true })
+    open('/centro/clinica-horizonte/reservar')
+    expect(await screen.findByRole('heading', { name: 'Acceso a Clínica Horizonte' })).toBeDefined()
+    expect(screen.queryByRole('heading', { name: 'Reservar hora' })).toBeNull()
   })
 
   it('no ofrece cambio libre de centro dentro del registro contextual', async () => {

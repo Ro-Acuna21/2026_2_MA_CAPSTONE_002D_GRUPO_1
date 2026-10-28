@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, Input, Select } from "@/components/ui/form-controls";
 import { ActionForm } from "@/components/action-form";
 import { AccessForm } from "@/components/access-form";
+import { CenterSpecialtyCatalog } from "@/components/center-specialty-catalog";
 import { useClinic } from "@/state/clinic-store";
 import {
   ApiError,
@@ -26,7 +27,6 @@ import {
 
 import type {
   Professional,
-  Specialty,
   Service,
   Availability,
 } from "@/domain/types";
@@ -114,8 +114,8 @@ function CatalogForm({
   kind,
   item,
 }: {
-  kind: "specialty" | "service" | "availability";
-  item?: Specialty | Service | Availability;
+  kind: "service" | "availability";
+  item?: Service | Availability;
 }) {
   const { data, saveCatalog } = useClinic();
   const availability = item && "weekday" in item ? item : undefined;
@@ -176,14 +176,6 @@ function CatalogForm({
             />
           </Field>
         </>
-      )}
-      {kind === "specialty" && (
-        <Field label="Descripción">
-          <Input
-            name="description"
-            defaultValue={item && "description" in item ? item.description : ""}
-          />
-        </Field>
       )}
       {kind === "service" && (
         <>
@@ -342,6 +334,50 @@ function ProfessionalAccess({
     </div>
   );
 }
+function AvailabilitySection() {
+  const { data, availabilityLoad, reloadAvailability, saveCatalog } = useClinic();
+  const grouped = new Map<string, Availability[]>();
+  for (const availability of data.availability) {
+    const current = grouped.get(availability.professionalId) ?? [];
+    current.push(availability);
+    grouped.set(availability.professionalId, current);
+  }
+  const professionals = Array.from(grouped, ([id, schedules]) => ({
+    id,
+    name: data.professionals.find((professional) => professional.id === id)?.name ?? `Profesional #${id}`,
+    schedules: schedules.sort((a, b) => a.weekday - b.weekday || a.start.localeCompare(b.start)),
+  })).sort((a, b) => a.name.localeCompare(b.name, "es"));
+
+  async function toggle(availability: Availability) {
+    try {
+      await saveCatalog("availability", {
+        professionalId: availability.professionalId,
+        weekday: String(availability.weekday),
+        start: availability.start,
+        end: availability.end,
+        active: String(!availability.active),
+      }, availability.id);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No fue posible cambiar el horario.");
+    }
+  }
+
+  return <Card>
+    <CardHeader><CardTitle>Horarios base de atención</CardTitle></CardHeader>
+    <CardContent>
+      <p className="mb-4 text-sm text-muted-foreground">Define la disponibilidad habitual. La agenda diaria y sus reservas pertenecen a recepción. Los cambios afectan nuevas reservas; las citas ya creadas se conservan.</p>
+      {availabilityLoad.status === "loading" && <p role="status" className="rounded-lg border p-4 text-sm">Cargando horarios del centro…</p>}
+      {availabilityLoad.status === "error" && <div className="space-y-3 rounded-lg border border-rose-200 bg-rose-50 p-4"><p role="alert" className="text-sm text-rose-700">{availabilityLoad.error}</p><Button type="button" variant="outline" onClick={reloadAvailability}>Reintentar</Button></div>}
+      {availabilityLoad.status === "ready" && <>
+        <details className="mb-5"><summary className="cursor-pointer font-medium text-primary">Agregar horario base</summary><div className="mt-4"><CatalogForm kind="availability" /></div></details>
+        {professionals.length === 0 && <p className="rounded-lg border border-dashed p-5 text-sm text-muted-foreground">Aún no hay horarios configurados para los profesionales de este centro.</p>}
+        <div className="grid gap-3">{professionals.map((professional) => <details key={professional.id} className="rounded-lg border bg-card p-4"><summary className="cursor-pointer font-semibold">{professional.name} <span className="ml-2 text-xs font-normal text-muted-foreground">{professional.schedules.length} {professional.schedules.length === 1 ? "bloque" : "bloques"}</span></summary><div className="mt-4 grid gap-3">{professional.schedules.map((availability) => <div key={availability.id} className="rounded-lg border bg-muted/20 p-3"><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><p className="text-sm"><span className="font-medium">{days[availability.weekday]}</span> · {availability.start}–{availability.end} <span className={availability.active ? "text-emerald-700" : "text-muted-foreground"}>· {availability.active ? "Activo" : "Inactivo"}</span></p><Button type="button" size="sm" variant="outline" className="w-full sm:w-auto" onClick={() => void toggle(availability)}>{availability.active ? "Desactivar" : "Reactivar"}</Button></div><details className="mt-3"><summary className="cursor-pointer text-sm text-primary">Editar bloque</summary><div className="mt-4"><CatalogForm kind="availability" item={availability} /></div></details></div>)}</div></details>)}</div>
+        <p className="mt-4 text-xs text-muted-foreground">La API actual permite desactivar un bloque, pero no eliminarlo físicamente.</p>
+      </>}
+    </CardContent>
+  </Card>;
+}
+
 export function AdminPage() {
   const { data, user, organization } = useClinic();
   const [backendProfessionals, setBackendProfessionals] = useState<
@@ -462,54 +498,14 @@ export function AdminPage() {
             </div>
           </CardContent>
         </Card>
+        <AvailabilitySection />
+        <CenterSpecialtyCatalog />
         <Card>
           <CardHeader>
-            <CardTitle>Horarios base de atención</CardTitle>
+            <CardTitle>Prestaciones del centro</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="mb-4 text-sm text-muted-foreground">
-              Define la disponibilidad habitual. La agenda diaria y sus reservas
-              pertenecen a recepción. Los cambios afectan nuevas reservas; las
-              citas ya creadas se conservan.
-            </p>
-            <details className="mb-4">
-              <summary className="cursor-pointer font-medium text-primary">
-                Agregar horario base
-              </summary>
-              <div className="mt-4">
-                <CatalogForm kind="availability" />
-              </div>
-            </details>
-            {data.availability.map((a) => (
-              <details className="mb-2 rounded-lg border p-3" key={a.id}>
-                <summary className="cursor-pointer text-sm">
-                  {
-                    data.professionals.find((p) => p.id === a.professionalId)
-                      ?.name
-                  }{" "}
-                  · {days[a.weekday]} · {a.start}–{a.end}{" "}
-                  {a.active ? "" : "· Inactivo"}
-                </summary>
-                <div className="mt-4">
-                  <CatalogForm kind="availability" item={a} />
-                </div>
-              </details>
-            ))}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Especialidades y prestaciones</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <details className="mb-4">
-              <summary className="cursor-pointer font-medium text-primary">
-                Nueva especialidad
-              </summary>
-              <div className="mt-4">
-                <CatalogForm kind="specialty" />
-              </div>
-            </details>
+            <p className="mb-4 text-sm text-muted-foreground">Las prestaciones existentes siguen vinculadas a las especialidades locales del backend actual. La selección desde el catálogo global quedará disponible cuando backend migre esas referencias.</p>
             <details className="mb-4">
               <summary className="cursor-pointer font-medium text-primary">
                 Nueva prestación
@@ -518,16 +514,6 @@ export function AdminPage() {
                 <CatalogForm kind="service" />
               </div>
             </details>
-            {data.specialties.map((s) => (
-              <details className="mb-2 rounded-lg border p-3" key={s.id}>
-                <summary className="cursor-pointer">
-                  Especialidad · {s.name}
-                </summary>
-                <div className="mt-4">
-                  <CatalogForm kind="specialty" item={s} />
-                </div>
-              </details>
-            ))}
             {data.services.map((s) => (
               <details className="mb-2 rounded-lg border p-3" key={s.id}>
                 <summary className="cursor-pointer">

@@ -16,6 +16,8 @@ export class ApiError extends Error {
   }
 }
 
+export const AUTH_EXPIRED_EVENT = "medsync:auth-expired";
+
 // Laravel/Sanctum deja el token CSRF en la cookie XSRF-TOKEN.
 // Como usamos fetch(), debemos enviarlo manualmente en el header.
 function xsrfHeader(): Record<string, string> {
@@ -47,6 +49,10 @@ export async function apiRequest<T>(
     const body = await response.json().catch(() => ({
       message: "No fue posible completar la solicitud.",
     }));
+
+    if (response.status === 401) {
+      window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
+    }
 
     throw new ApiError(response.status, body.message, body.errors);
   }
