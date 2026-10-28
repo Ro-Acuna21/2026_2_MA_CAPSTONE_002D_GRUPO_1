@@ -8,6 +8,7 @@ use App\Services\Tenants\TenantConnectionResolver;
 use App\Support\TenantContext;
 use Closure;
 use Illuminate\Http\Request;
+use Spatie\Permission\PermissionRegistrar;
 use Symfony\Component\HttpFoundation\Response;
 
 class ResolveCenterTenant
@@ -21,6 +22,8 @@ class ResolveCenterTenant
     public function handle(Request $request, Closure $next): Response
     {
         $this->tenantContext->reset();
+        $permissionRegistrar = app(PermissionRegistrar::class);
+        $permissionRegistrar->setPermissionsTeamId(null);
 
         $user = $request->user();
 
@@ -28,7 +31,14 @@ class ResolveCenterTenant
 
         // El acceso de plataforma no resuelve ni abre una base clínica.
         if ($user->isSuperAdmin()) {
-            return $next($request);
+            $user->unsetRelation('roles')->unsetRelation('permissions');
+
+            try {
+                return $next($request);
+            } finally {
+                $permissionRegistrar->setPermissionsTeamId(null);
+                $user->unsetRelation('roles')->unsetRelation('permissions');
+            }
         }
 
         abort_unless($request->hasSession(), 403, 'No existe un contexto de centro activo.');
@@ -54,7 +64,14 @@ class ResolveCenterTenant
 
         $this->connectionResolver->connect($medicalCenter);
         $this->tenantContext->set($medicalCenter, $centerUser);
+        $permissionRegistrar->setPermissionsTeamId($medicalCenter->id);
+        $user->unsetRelation('roles')->unsetRelation('permissions');
 
-        return $next($request);
+        try {
+            return $next($request);
+        } finally {
+            $permissionRegistrar->setPermissionsTeamId(null);
+            $user->unsetRelation('roles')->unsetRelation('permissions');
+        }
     }
 }

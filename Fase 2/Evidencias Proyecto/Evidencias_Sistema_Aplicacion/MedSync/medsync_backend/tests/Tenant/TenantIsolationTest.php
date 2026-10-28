@@ -30,6 +30,18 @@ function createTenantProfessionalsDatabase(string $connection, string $path, str
         $table->timestamps();
         $table->softDeletes();
     });
+    Schema::connection($connection)->create('professional_specialty', function (Blueprint $table) {
+        $table->unsignedBigInteger('professional_id');
+        $table->unsignedBigInteger('specialty_id');
+        $table->timestamps();
+        $table->primary(['professional_id', 'specialty_id']);
+    });
+    DB::connection($connection)->table('professional_specialty')->insert([
+        'professional_id' => 1,
+        'specialty_id' => 1,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
 
     DB::connection($connection)->table('professionals')->insert([
         'first_name' => $firstName,

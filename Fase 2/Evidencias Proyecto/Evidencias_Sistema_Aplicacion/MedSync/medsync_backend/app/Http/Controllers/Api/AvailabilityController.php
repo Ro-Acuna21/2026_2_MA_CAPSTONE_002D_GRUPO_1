@@ -134,7 +134,7 @@ class AvailabilityController extends Controller
     private function ensureAdmin(): void
     {
         abort_unless(
-            $this->tenantContext->centerUser()->role === 'ADMIN',
+            auth()->user()?->can('availability.manage'),
             403,
             'Solo el administrador del centro puede gestionar los horarios.'
         );

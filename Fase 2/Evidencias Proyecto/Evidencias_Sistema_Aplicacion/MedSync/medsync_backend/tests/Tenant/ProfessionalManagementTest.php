@@ -2,6 +2,8 @@
 
 use App\Models\Core\CenterUser;
 use App\Models\Core\MedicalCenter;
+use App\Models\Core\MedicalCenterSpecialty;
+use App\Models\Core\Specialty;
 use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
@@ -57,6 +59,18 @@ it('actualiza fichas y especialidades sin alterar credenciales ni membresías de
             'name' => 'Centro de prueba', 'slug' => 'profesionales-'.uniqid(),
             'database_name' => $database, 'rut' => '76543210-3', 'is_active' => true,
         ]);
+        $now = now();
+        DB::connection('core')->table('specialties')->insert([
+            ['id' => 5, 'name' => 'Medicina general', 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
+            ['id' => 6, 'name' => 'Cardiología', 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
+        ]);
+        foreach ([5 => 'Medicina general', 6 => 'Cardiología'] as $id => $name) {
+            MedicalCenterSpecialty::create([
+                'medical_center_id' => $center->id,
+                'specialty_id' => $id,
+                'is_active' => true,
+            ]);
+        }
         $admin = User::create([
             'name' => 'Administración', 'email' => 'admin-prof@example.test',
             'password' => 'Password123', 'is_active' => true,

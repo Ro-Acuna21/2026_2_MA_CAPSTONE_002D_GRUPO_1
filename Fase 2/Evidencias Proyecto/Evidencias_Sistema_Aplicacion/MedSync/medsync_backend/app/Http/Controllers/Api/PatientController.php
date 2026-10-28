@@ -21,9 +21,9 @@ class PatientController extends Controller
         private readonly TerritorialCatalog $territorialCatalog
     ) {}
 
-    public function index()
+    public function index(Request $request)
     {
-        $this->requireReception();
+        $this->requireReception($request);
 
         return response()->json(['data' => Patient::query()
             ->with(['healthInsurance', 'primaryAddress'])
@@ -31,16 +31,16 @@ class PatientController extends Controller
             ->map(fn (Patient $patient) => $this->present($patient))]);
     }
 
-    public function show(int $patient)
+    public function show(Request $request, int $patient)
     {
-        $this->authorizePatient($patient);
+        $this->authorizePatient($patient, $request);
 
         return response()->json(['data' => $this->present($this->findPatient($patient))]);
     }
 
     public function store(Request $request)
     {
-        $this->requireReception();
+        $this->requireReception($request);
         $request->merge([
             'email' => strtolower(trim((string) $request->input('email'))),
             'phone' => preg_replace('/[\s()-]/', '', (string) $request->input('phone')),
@@ -86,9 +86,10 @@ class PatientController extends Controller
 
     public function update(Request $request, int $patient)
     {
-        $this->authorizePatient($patient);
+        $this->authorizePatient($patient, $request);
         $record = $this->findPatient($patient);
-        $isReception = $this->tenantContext->centerUser()->role === 'RECEPCIONISTA';
+        $isReception = $request->user()->can('patients.manage');
+        abort_unless($isReception || $request->user()->can('patients.update.own'), 403);
         if ($request->has('phone')) {
             $request->merge(['phone' => preg_replace('/[\s()-]/', '', (string) $request->input('phone'))]);
         }
@@ -150,16 +151,23 @@ class PatientController extends Controller
         return response()->json(['data' => $this->present($record->fresh(['healthInsurance', 'primaryAddress']))]);
     }
 
-    private function requireReception(): void
+    private function requireReception(Request $request): void
     {
-        abort_unless($this->tenantContext->hasCenter() && $this->tenantContext->centerUser()->role === 'RECEPCIONISTA', 403);
+        abort_unless(
+            $this->tenantContext->hasCenter() && $request->user()?->can('patients.manage'),
+            403
+        );
     }
 
-    private function authorizePatient(int $patient): void
+    private function authorizePatient(int $patient, Request $request): void
     {
         abort_unless($this->tenantContext->hasCenter(), 403);
         $membership = $this->tenantContext->centerUser();
-        abort_unless($membership->role === 'RECEPCIONISTA' || ($membership->role === 'PACIENTE' && (int) $membership->patient_id === $patient), 403);
+        $canManagePatients = $request->user()?->can('patients.manage');
+        $canViewOwnPatient = $request->user()?->can('patients.view.own')
+            && (int) $membership->patient_id === $patient;
+
+        abort_unless($canManagePatients || $canViewOwnPatient, 403);
     }
 
     private function findPatient(int $patient): Patient

@@ -5,10 +5,24 @@ namespace App\Models\Core;
 use App\Models\Center\Patient;
 use App\Models\Center\Professional;
 use App\Models\User;
+use App\Services\Authorization\CenterRolePermissionSync;
 use Illuminate\Database\Eloquent\Model;
 
 class CenterUser extends Model
 {
+    protected static function booted(): void
+    {
+        static::saved(function (CenterUser $membership): void {
+            if ($membership->wasRecentlyCreated || $membership->wasChanged('role')) {
+                app(CenterRolePermissionSync::class)->syncMembership($membership);
+            }
+        });
+
+        static::deleted(function (CenterUser $membership): void {
+            app(CenterRolePermissionSync::class)->removeMembership($membership);
+        });
+    }
+
     protected $connection = 'core';
 
     protected $table = 'center_users';
