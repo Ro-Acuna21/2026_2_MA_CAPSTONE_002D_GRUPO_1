@@ -61,7 +61,6 @@ class DemoCenterUserSeeder extends Seeder
         'address_line' => 'Dirección paciente prueba',
         'commune' => 'Maipú',
         'region' => 'Región Metropolitana',
-        'postal_code' => null,
         'reference' => null,
     ]
 );

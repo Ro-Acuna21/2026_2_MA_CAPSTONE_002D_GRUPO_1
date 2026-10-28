@@ -29,7 +29,7 @@ function preparePatientDatabase(string $connection, string $path): void
     Schema::connection($connection)->create('patient_addresses', function (Blueprint $table) {
         $table->id(); $table->unsignedBigInteger('patient_id'); $table->string('address_line');
         $table->string('commune')->nullable(); $table->string('region')->nullable();
-        $table->string('postal_code')->nullable(); $table->string('reference')->nullable();
+        $table->string('reference')->nullable();
         $table->boolean('is_primary'); $table->timestamps(); $table->softDeletes();
     });
     DB::connection($connection)->table('health_insurances')->insert([

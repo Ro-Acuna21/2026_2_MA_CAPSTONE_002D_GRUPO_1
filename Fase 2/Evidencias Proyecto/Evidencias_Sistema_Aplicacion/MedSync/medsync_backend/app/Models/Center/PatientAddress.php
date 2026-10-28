@@ -18,7 +18,6 @@ class PatientAddress extends Model
         'address_line',
         'commune',
         'region',
-        'postal_code',
         'reference',
         'is_primary',
     ];

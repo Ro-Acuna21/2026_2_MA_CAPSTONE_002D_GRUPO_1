@@ -148,7 +148,6 @@ class MedSyncDemoSeeder extends Seeder
                     'address_line' => $patientData['address'],
                     'commune' => 'Maipú',
                     'region' => 'Región Metropolitana',
-                    'postal_code' => null,
                     'reference' => null,
                 ]
             );
