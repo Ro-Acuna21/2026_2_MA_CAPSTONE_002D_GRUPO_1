@@ -6,7 +6,6 @@ use App\Models\Core\CenterUser;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Professional extends Model
@@ -46,22 +45,10 @@ class Professional extends Model
         return $this->hasOne(CenterUser::class, 'professional_id');
     }
 
-/**
- * Especialidades asociadas al profesional.
- *
- * La relación es muchos-a-muchos mediante
- * professional_specialty.
- */
-public function specialties(): BelongsToMany
+/** IDs globales almacenados en el pivote operacional de este centro. */
+public function specialtyAssignments(): HasMany
 {
-    return $this->belongsToMany(
-        Specialty::class,
-        'professional_specialty',
-        'professional_id',
-        'specialty_id'
-    )
-        ->using(ProfessionalSpecialty::class)
-        ->withTimestamps();
+    return $this->hasMany(ProfessionalSpecialty::class, 'professional_id');
 }
 /**
  * Bloques de disponibilidad configurados para el profesional.

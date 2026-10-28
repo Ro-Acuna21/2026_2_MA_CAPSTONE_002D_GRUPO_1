@@ -8,6 +8,8 @@ use App\Models\Center\Availability;
 use App\Models\Center\Patient;
 use App\Models\Center\Professional;
 use App\Models\Center\Service;
+use App\Models\Center\ProfessionalSpecialty;
+use App\Services\Specialties\CenterSpecialtyCatalog;
 use App\Models\User;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -17,13 +19,15 @@ use Illuminate\Validation\ValidationException;
  * Centraliza toda la lógica de negocio del flujo de reservas,
  * descrita en README_RESERVAS_DISPONIBILIDAD_BD.md.
  *
- * Todas las tablas involucradas (appointments, appointment_history,
- * availabilities, services, specialties, professionals) viven en la
- * conexión "center", por lo que aquí sí es seguro envolver la
- * creación/modificación de una reserva en una única transacción.
+ * Las tablas operativas viven en la conexión "center"; el catálogo de
+ * especialidades se valida por separado en Core mediante el servicio
+ * CenterSpecialtyCatalog.
  */
 class AppointmentService
 {
+    public function __construct(private readonly CenterSpecialtyCatalog $specialtyCatalog)
+    {
+    }
     /**
      * Zona horaria utilizada para calcular la regla de las 24 horas.
      *
@@ -41,7 +45,7 @@ class AppointmentService
     public function listActiveServices()
     {
         return Service::where('is_active', true)
-            ->whereHas('specialty', fn ($query) => $query->where('is_active', true))
+            ->whereIn('specialty_id', $this->specialtyCatalog->activeIds())
             ->with('specialty')
             ->orderBy('name')
             ->get();
@@ -52,11 +56,12 @@ class AppointmentService
      */
     public function listProfessionalsForService(Service $service)
     {
+        $professionalIds = ProfessionalSpecialty::query()
+            ->where('specialty_id', $service->specialty_id)
+            ->pluck('professional_id');
+
         return Professional::where('is_active', true)
-            ->whereHas(
-                'specialties',
-                fn ($query) => $query->whereKey($service->specialty_id)
-            )
+            ->whereIn('id', $professionalIds)
             ->orderBy('first_name')
             ->orderBy('last_name')
             ->get();
@@ -477,7 +482,7 @@ class AppointmentService
             ]);
         }
 
-        if (! $service->specialty || ! $service->specialty->is_active) {
+        if (! $this->specialtyCatalog->isAvailable((int) $service->specialty_id)) {
             throw ValidationException::withMessages([
                 'service_id' => ['La especialidad de esta prestación no está disponible.'],
             ]);
@@ -505,8 +510,9 @@ class AppointmentService
      */
     private function ensureProfessionalOffersService(Professional $professional, Service $service): void
     {
-        $hasSpecialty = $professional->specialties()
-            ->whereKey($service->specialty_id)
+        $hasSpecialty = ProfessionalSpecialty::query()
+            ->where('professional_id', $professional->id)
+            ->where('specialty_id', $service->specialty_id)
             ->exists();
 
         if (! $hasSpecialty) {

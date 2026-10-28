@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  proposedSpecialtyCatalogApi,
+  specialtyCatalogApi,
   specialtyCatalogError,
   type CenterCatalogSpecialty,
 } from "@/services/specialty-catalog-api";
@@ -16,7 +16,7 @@ export function CenterSpecialtyCatalog() {
 
   useEffect(() => {
     let cancelled = false;
-    proposedSpecialtyCatalogApi.centerList()
+    specialtyCatalogApi.centerList()
       .then((response) => {
         if (cancelled) return;
         setItems(response.data);
@@ -34,8 +34,9 @@ export function CenterSpecialtyCatalog() {
     setBusyId(item.id);
     setError("");
     try {
-      const response = await proposedSpecialtyCatalogApi.centerSetActive(item.id, active);
+      const response = await specialtyCatalogApi.centerSetActive(item.id, active);
       setItems((current) => current.map((entry) => entry.id === item.id ? response.data : entry));
+      window.dispatchEvent(new Event("medsync:specialty-catalog-updated"));
     } catch (failure) {
       setError(specialtyCatalogError(failure));
     } finally {

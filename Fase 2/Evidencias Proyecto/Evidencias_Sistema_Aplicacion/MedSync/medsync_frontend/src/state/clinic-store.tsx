@@ -278,7 +278,7 @@ interface ClinicContextValue {
   ): Promise<void>;
 
   saveCatalog(
-    kind: "specialty" | "service" | "availability",
+    kind: "service" | "availability",
     input: Record<string, string>,
     id?: string,
   ): Promise<void>;
@@ -363,6 +363,7 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
     error?: string;
   } | null>(null);
   const [availabilityReloadToken, setAvailabilityReloadToken] = useState(0);
+  const [specialtyReloadToken, setSpecialtyReloadToken] = useState(0);
   const reloadAvailability = useCallback(() => {
     setAvailabilityReloadToken((token) => token + 1);
   }, []);
@@ -674,6 +675,12 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
     return () => { cancelled = true; };
   }, [authLoading, user, organization, availabilityReloadToken]);
 
+  useEffect(() => {
+    const reloadCatalog = () => setSpecialtyReloadToken((value) => value + 1);
+    window.addEventListener("medsync:specialty-catalog-updated", reloadCatalog);
+    return () => window.removeEventListener("medsync:specialty-catalog-updated", reloadCatalog);
+  }, []);
+
   /*
    * Catálogo real de especialidades y prestaciones para el
    * administrador del centro (incluye inactivas, a diferencia del
@@ -722,7 +729,7 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
           ),
         );
       });
-  }, [authLoading, user, organization]);
+  }, [authLoading, user, organization, specialtyReloadToken]);
 
   /*
    * Catálogo real de especialidades y prestaciones para el paciente.
@@ -2157,46 +2164,6 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
       }));
 
       toast.success(id ? "Horario actualizado en el centro." : "Horario guardado en el centro.");
-      return;
-    }
-
-    if (kind === "specialty") {
-      if (!input.name?.trim()) {
-        throw new Error("Ingresa el nombre.");
-      }
-
-      if (id && !data.specialties.some((specialty) => specialty.id === id)) {
-        throw new Error("Especialidad fuera del centro.");
-      }
-
-      const payload = {
-        name: input.name.trim(),
-        description: input.description || null,
-        is_active: input.active !== "false",
-      };
-
-      const response = await (
-        id
-          ? specialtyApi.update(Number(id), payload)
-          : specialtyApi.create(payload)
-      ).catch((error: unknown) => {
-        throw new Error(
-          firstApiErrorMessage(error, "No fue posible guardar la especialidad."),
-        );
-      });
-
-      const item = mapBackendSpecialty(response.data, organization.id);
-
-      commit((current) => ({
-        ...current,
-        specialties: id
-          ? current.specialties.map((specialty) =>
-              specialty.id === id ? item : specialty,
-            )
-          : [...current.specialties, item],
-      }));
-
-      toast.success(id ? "Especialidad actualizada." : "Especialidad creada.");
       return;
     }
 

@@ -463,19 +463,19 @@ tests/
   Feature/Auth/           Tests de registro, login, logout, me
 ```
 
-## Observación Capstone: guía de integración para horarios y catálogo global (24-10-2026)
+## Observación Capstone: horarios y catálogo global (actualización 28-10-2026)
 
-Esta sección describe el estado de `main` tras el PR #19 y las tareas **pendientes** para backend. La entrega de frontend no modifica controladores, modelos, rutas ni migraciones Laravel.
+Esta sección resume las rutas y el estado implementado en la rama de integración. La migración de datos está preparada, pero requiere respaldo y ejecución en cada entorno.
 
 ### Horarios: conservar el contrato actual
 
 `AvailabilityController`, `app/Models/Center/Availability.php` y `database/migrations/center/2026_09_25_174713_create_availabilities_table.php` ya implementan bloques recurrentes por profesional. `GET /api/v1/availabilities` devuelve un arreglo plano de `{ id, professional_id, weekday, start_time, end_time, is_active }` para el `ADMIN` del centro. `weekday` es ISO 1–7. `POST` crea y `PATCH /api/v1/availabilities/{availability}` actualiza con `professional_id`, `weekday`, `start_time`, `end_time`, `is_active`. React agrupa por `professional_id`; no cambiar la forma de la respuesta por motivos visuales. No existe `DELETE`; la pantalla usa `PATCH` con `is_active: false` para desactivar. Si se exige borrado físico, definir primero su regla de historial y sus efectos sobre reservas.
 
-### Especialidades: estado real y trabajo del compañero backend
+### Especialidades globales y selección por centro
 
-La migración `database/migrations/core/2026_10_24_000001_create_specialty_catalog_tables.php` define `core.specialties` y `core.medical_center_specialties`, con unicidad de `(medical_center_id, specialty_id)`. Esto **no implementa** su API ni migra el catálogo local. Actualmente `SpecialtyController` y `app/Models/Center/Specialty.php` operan `center.specialties`; `ServiceController`, `ProfessionalController`, `AppointmentService` y `AppointmentsCatalogSeeder` también dependen de IDs locales. `services.specialty_id` y `professional_specialty.specialty_id` aún tienen claves foráneas locales. No retirar esa tabla antes de migrar datos, código y pruebas coordinadamente.
+El catálogo global vive en `core.specialties`; cada centro habilita su propio conjunto en `core.medical_center_specialties`. El administrador de plataforma gestiona nombres globales y el administrador del centro solo puede activar o desactivar su selección. Las prestaciones y asociaciones de profesionales guardan IDs Core en sus tablas Center; el backend valida el estado en ambos niveles y las reservas solo ofrecen las especialidades activas globalmente y en el centro.
 
-Proponer controladores separados para el catálogo Core de plataforma y la selección del centro, sin reutilizar `POST /api/v1/specialties` como si fuera global:
+Las rutas del catálogo Core están separadas de la lectura operacional de especialidades del centro:
 
 | Ruta propuesta | Rol y operación |
 | --- | --- |
@@ -487,15 +487,8 @@ Proponer controladores separados para el catálogo Core de plataforma y la selec
 
 Respuesta global: `{ "data": [{ "id": 5, "name": "Cardiología", "description": null, "is_active": true }] }`. Respuesta de centro: la misma fila con `"center_is_active": null | true | false`; `null` significa sin asociación, `false` asociación desactivada. `PUT` devuelve `{ "data": <fila actualizada> }`; nunca recibe `medical_center_id` desde React. Resolverlo desde la membresía activa en Core y validar que la especialidad exista y esté activa globalmente antes de ofrecerla. Rechazar `SUPER_ADMIN` en rutas clínicas y `ADMIN` en las de plataforma; la UI por rol no sustituye esta autorización. El código actual usa `center_users.role`; Spatie Permission figura como objetivo de diseño, pero no está instalado ni implementado en este checkout. Alinear políticas y pruebas con el mecanismo que adopte el equipo.
 
-Responder `401` sin sesión, `403` con rol/centro incorrecto, `404` para ID inexistente y `422` para datos inválidos. `POST` retorna `201`; `GET`, `PATCH` y `PUT`, `200`, siempre con `data`. Probar dos centros con distinta selección, especialidad global inactiva, desactivación sin pérdida de historial y ausencia de acceso clínico del superadministrador. El contrato completo y sus estados de integración están en `../medsync_frontend/docs/api-contract.md`.
+Las respuestas conservan `401` sin sesión, `403` con rol/centro incorrecto, `404` para ID inexistente y `422` para datos inválidos. El centro se resuelve desde la sesión y no desde un identificador enviado por React.
 
-**Secuencia recomendada:** verificar el catálogo Core y respaldos; construir un mapeo `(center_id, local_specialty_id) -> core_specialty_id`; poblar las asociaciones; adaptar modelos, controladores, servicios, seeders y validaciones de prestaciones/profesionales; actualizar referencias locales; probar todos los flujos de reserva; solo después planear el retiro de claves foráneas y tabla local. No asumir igualdad entre IDs de bases distintas ni ejecutar esta secuencia sobre datos reales sin el plan de migración del responsable de BD.
+La migración `database/migrations/core/2026_10_28_000001_migrate_center_specialties_to_global_catalog.php` conserva las correspondencias antiguas en `core.medical_center_specialty_mappings`, actualiza los IDs de prestaciones y profesionales y elimina la tabla local al terminar cada centro. Debe revisarse y respaldarse el entorno antes de ejecutarla; las bases Center mantienen referencias lógicas a IDs Core porque PostgreSQL no admite esas claves foráneas entre bases. Esta rama deja preparada la migración pero no la ejecuta.
 
-### Entrega pendiente para backend tras el frontend de esta rama
-
-1. Confirmar con BD que `core.specialties` y `core.medical_center_specialties` existen en cada entorno y que el mapeo de IDs locales a globales está respaldado y validado. La migración versionada del PR #19 no garantiza por sí sola que se haya aplicado.
-2. Implementar las cinco rutas propuestas arriba con controladores y autorización separados para `SUPER_ADMIN` y `ADMIN`. Resolver el centro desde la sesión y `core.center_users`, nunca desde un identificador enviado por React. Mantener el formato JSON de `../medsync_frontend/docs/api-contract.md`; `404`, `405` o `501` aún se muestran en la UI como integración pendiente.
-3. Adaptar `ServiceController`, `ProfessionalController`, `AppointmentService` y seeders para validar la especialidad global y su selección activa en el centro. Mantener legibles las prestaciones, profesionales y citas históricas durante la transición de IDs. Coordinar el cambio de referencias con BD antes de retirar `center.specialties`.
-4. Agregar pruebas de autorización e aislamiento con dos centros, selección independiente, desactivación global y local, IDs ausentes, reservas existentes e historial. Las rutas de reservas actuales (`/api/v1/services`, profesionales y `available-slots`) deben seguir devolviendo los mismos contratos al paciente.
-
-El frontend ya elimina su usuario visible cuando una API responde `401` y envía al login contextual. Backend debe devolver `401` JSON de forma consistente para rutas `/api/*` sin sesión, incluso al abrirlas directamente sin cabecera `Accept: application/json`; hoy esa navegación directa puede intentar la ruta web `login`, que no existe. No relajar el middleware de autenticación para evitar el error. Esta entrega solo modificó código frontend y documentación; no ejecutó migraciones ni cambió datos clínicos.
+El frontend ya elimina su usuario visible cuando una API responde `401` y envía al login contextual. Esta rama modificó backend, frontend, migraciones y documentación; no ejecutó migraciones ni cambió datos clínicos.
