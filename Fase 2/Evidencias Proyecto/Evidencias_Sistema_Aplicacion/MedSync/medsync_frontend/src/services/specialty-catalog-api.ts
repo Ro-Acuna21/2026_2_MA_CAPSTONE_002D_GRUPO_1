@@ -1,6 +1,6 @@
 import { ApiError, apiRequest, firstApiErrorMessage } from "./http";
 
-/** Contrato propuesto: estas rutas aún no existen en Laravel. */
+/** API del catálogo global y de las selecciones habilitadas por centro. */
 export interface GlobalSpecialty {
   id: number;
   name: string;
@@ -16,7 +16,7 @@ export interface CenterCatalogSpecialty extends GlobalSpecialty {
 interface ItemResponse<T> { data: T }
 interface ListResponse<T> { data: T[] }
 
-export const proposedSpecialtyCatalogApi = {
+export const specialtyCatalogApi = {
   globalList: () => apiRequest<ListResponse<GlobalSpecialty>>("/api/v1/platform/specialties"),
   globalCreate: (input: { name: string; description: string | null }) =>
     apiRequest<ItemResponse<GlobalSpecialty>>("/api/v1/platform/specialties", {
@@ -35,7 +35,7 @@ export const proposedSpecialtyCatalogApi = {
 
 export function specialtyCatalogError(error: unknown): string {
   if (error instanceof ApiError && [404, 405, 501].includes(error.status)) {
-    return "El catálogo global aún no está disponible en el backend. La selección y los cambios están pendientes de integración.";
+    return "No fue posible consultar el catálogo global de especialidades.";
   }
   return firstApiErrorMessage(error, "No fue posible consultar el catálogo global.");
 }

@@ -2,6 +2,7 @@
 
 namespace App\Models\Center;
 
+use App\Models\Core\Specialty;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\Pivot;
 

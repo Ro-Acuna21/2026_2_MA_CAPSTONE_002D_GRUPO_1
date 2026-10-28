@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, Input } from "@/components/ui/form-controls";
 import { useClinic } from "@/state/clinic-store";
 import {
-  proposedSpecialtyCatalogApi,
+  specialtyCatalogApi,
   specialtyCatalogError,
   type GlobalSpecialty,
 } from "@/services/specialty-catalog-api";
@@ -23,7 +23,7 @@ export function PlatformSpecialtiesPage() {
   useEffect(() => {
     if (user?.role !== "SUPER_ADMIN") return;
     let cancelled = false;
-    proposedSpecialtyCatalogApi.globalList()
+    specialtyCatalogApi.globalList()
       .then((response) => {
         if (cancelled) return;
         setItems(response.data);
@@ -40,7 +40,7 @@ export function PlatformSpecialtiesPage() {
   if (user?.role !== "SUPER_ADMIN") return <Navigate to="/" replace />;
 
   async function create(values: Record<string, string>) {
-    const response = await proposedSpecialtyCatalogApi.globalCreate({
+    const response = await specialtyCatalogApi.globalCreate({
       name: values.name.trim(),
       description: values.description.trim() || null,
     }).catch((failure: unknown) => { throw new Error(specialtyCatalogError(failure)); });
@@ -48,7 +48,7 @@ export function PlatformSpecialtiesPage() {
   }
 
   async function update(item: GlobalSpecialty, values: Record<string, string>) {
-    const response = await proposedSpecialtyCatalogApi.globalUpdate(item.id, {
+    const response = await specialtyCatalogApi.globalUpdate(item.id, {
       name: values.name.trim(),
       description: values.description.trim() || null,
     }).catch((failure: unknown) => { throw new Error(specialtyCatalogError(failure)); });
@@ -59,7 +59,7 @@ export function PlatformSpecialtiesPage() {
     setBusyId(item.id);
     setError("");
     try {
-      const response = await proposedSpecialtyCatalogApi.globalUpdate(item.id, { is_active: !item.is_active });
+      const response = await specialtyCatalogApi.globalUpdate(item.id, { is_active: !item.is_active });
       setItems((current) => current.map((entry) => entry.id === item.id ? response.data : entry));
     } catch (failure) {
       setError(specialtyCatalogError(failure));

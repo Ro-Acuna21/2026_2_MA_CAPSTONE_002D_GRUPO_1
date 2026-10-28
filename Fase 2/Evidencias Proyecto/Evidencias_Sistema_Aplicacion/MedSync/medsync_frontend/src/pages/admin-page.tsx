@@ -505,7 +505,6 @@ export function AdminPage() {
             <CardTitle>Prestaciones del centro</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="mb-4 text-sm text-muted-foreground">Las prestaciones existentes siguen vinculadas a las especialidades locales del backend actual. La selección desde el catálogo global quedará disponible cuando backend migre esas referencias.</p>
             <details className="mb-4">
               <summary className="cursor-pointer font-medium text-primary">
                 Nueva prestación

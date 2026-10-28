@@ -7,14 +7,15 @@ use App\Models\Center\Service;
 use App\Services\Appointments\AppointmentService;
 use App\Support\TenantContext;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use App\Services\Specialties\CenterSpecialtyCatalog;
 
 class ServiceController extends Controller
 {
     public function __construct(
         private readonly AppointmentService $appointmentService,
-        private readonly TenantContext $tenantContext
+        private readonly TenantContext $tenantContext,
+        private readonly CenterSpecialtyCatalog $specialtyCatalog
     ) {
     }
 
@@ -53,6 +54,10 @@ class ServiceController extends Controller
      */
     public function professionals(Request $request, Service $service)
     {
+        if (! $service->is_active || ! $this->specialtyCatalog->isAvailable((int) $service->specialty_id)) {
+            return response()->json(['data' => []]);
+        }
+
         $professionals = $this->appointmentService->listProfessionalsForService($service);
 
         return response()->json([
@@ -74,11 +79,7 @@ class ServiceController extends Controller
         $this->ensureAdmin();
 
         $data = $request->validate([
-            'specialty_id' => [
-                'required',
-                'integer',
-                Rule::exists('center.specialties', 'id')->where('is_active', true),
-            ],
+            'specialty_id' => ['required', 'integer'],
             'name' => ['required', 'string', 'max:120'],
             'description' => ['nullable', 'string', 'max:2000'],
             'duration_minutes' => ['required', 'integer', 'min:5', 'max:480'],
@@ -86,6 +87,7 @@ class ServiceController extends Controller
         ]);
 
         $name = trim($data['name']);
+        $this->specialtyCatalog->ensureAvailable((int) $data['specialty_id']);
 
         $this->ensureNameAvailable((int) $data['specialty_id'], $name);
 
@@ -117,12 +119,7 @@ class ServiceController extends Controller
         $record = Service::findOrFail($service);
 
         $data = $request->validate([
-            'specialty_id' => [
-                'sometimes',
-                'required',
-                'integer',
-                Rule::exists('center.specialties', 'id')->where('is_active', true),
-            ],
+            'specialty_id' => ['sometimes', 'required', 'integer'],
             'name' => ['sometimes', 'required', 'string', 'max:120'],
             'description' => ['sometimes', 'nullable', 'string', 'max:2000'],
             'duration_minutes' => ['sometimes', 'required', 'integer', 'min:5', 'max:480'],
@@ -130,6 +127,9 @@ class ServiceController extends Controller
         ]);
 
         $specialtyId = (int) ($data['specialty_id'] ?? $record->specialty_id);
+        if (array_key_exists('specialty_id', $data)) {
+            $this->specialtyCatalog->ensureAvailable($specialtyId, (int) $record->specialty_id);
+        }
 
         if (array_key_exists('name', $data)) {
             $name = trim($data['name']);

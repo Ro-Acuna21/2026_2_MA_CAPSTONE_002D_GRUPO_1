@@ -8,8 +8,8 @@ use Illuminate\Database\Eloquent\Model;
  * Catálogo global de especialidades (medsync_core.specialties).
  *
  * Lo administra el SUPER_ADMIN de la plataforma. No confundir con
- * App\Models\Center\Specialty, que es la API local heredada de cada
- * centro (ver medsync_frontend/docs/api-contract.md).
+ * Las referencias guardadas en bases Center son IDs lógicos, validados
+ * por la aplicación porque no hay claves foráneas entre bases.
  */
 class Specialty extends Model
 {

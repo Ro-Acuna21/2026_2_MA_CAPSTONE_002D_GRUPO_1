@@ -59,8 +59,6 @@ Route::middleware(['auth:sanctum', 'tenant.center'])->group(function () {
 
     // Administración del centro: especialidades (API local heredada) y prestaciones.
     Route::get('/v1/specialties', [SpecialtyController::class, 'index']);
-    Route::post('/v1/specialties', [SpecialtyController::class, 'store']);
-    Route::patch('/v1/specialties/{specialty}', [SpecialtyController::class, 'update'])->whereNumber('specialty');
     Route::post('/v1/services', [ServiceController::class, 'store']);
     Route::patch('/v1/services/{service}', [ServiceController::class, 'update'])->whereNumber('service');
 
