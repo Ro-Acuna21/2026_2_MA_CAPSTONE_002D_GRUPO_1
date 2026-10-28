@@ -8,6 +8,7 @@ use App\Models\Center\Patient;
 use App\Models\Center\PatientAddress;
 use App\Rules\ValidRut;
 use App\Support\TenantContext;
+use App\Services\TerritorialCatalog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -15,7 +16,10 @@ use Illuminate\Validation\ValidationException;
 
 class PatientController extends Controller
 {
-    public function __construct(private readonly TenantContext $tenantContext) {}
+    public function __construct(
+        private readonly TenantContext $tenantContext,
+        private readonly TerritorialCatalog $territorialCatalog
+    ) {}
 
     public function index()
     {
@@ -51,8 +55,11 @@ class PatientController extends Controller
             'health_insurance' => ['required', Rule::in(['Fonasa', 'Isapre', 'Particular', 'Otra'])],
             'medical_insurance' => ['nullable', 'string', 'max:100'],
             'address' => ['nullable', 'string', 'max:200'],
+            'region_code' => ['nullable', 'string', 'regex:/^\d{2}$/'],
+            'commune_code' => ['nullable', 'string', 'regex:/^\d{5}$/'],
             'consent' => ['required', 'accepted'],
         ]);
+        $addressData = $this->patientAddressData($data);
         $rut = ValidRut::normalize($data['rut']);
         if (Patient::withTrashed()->where('rut', $rut)->exists()) {
             throw ValidationException::withMessages(['rut' => ['Ya existe una ficha con este RUT en el centro.']]);
@@ -60,7 +67,7 @@ class PatientController extends Controller
         $this->ensureUniqueEmail($data['email']);
         $insurance = $this->insurance($data['health_insurance']);
 
-        $patient = DB::connection('center')->transaction(function () use ($data, $rut, $insurance) {
+        $patient = DB::connection('center')->transaction(function () use ($data, $rut, $insurance, $addressData) {
             $patient = Patient::create([
                 'first_name' => trim($data['first_name']), 'last_name' => trim($data['last_name']),
                 'rut' => $rut, 'birth_date' => $data['birth_date'], 'email' => $data['email'],
@@ -68,8 +75,8 @@ class PatientController extends Controller
                 'medical_insurance' => $data['medical_insurance'] ?? null,
                 'consent_at' => now(), 'consent_version' => 'v1', 'is_active' => true,
             ]);
-            if (! empty($data['address'])) {
-                PatientAddress::create(['patient_id' => $patient->id, 'address_line' => $data['address'], 'is_primary' => true]);
+            if ($addressData !== null) {
+                PatientAddress::create($addressData + ['patient_id' => $patient->id, 'is_primary' => true]);
             }
             return $patient;
         });
@@ -95,6 +102,8 @@ class PatientController extends Controller
             'last_name' => ['sometimes', 'required', 'string', 'min:2', 'max:100'],
             'phone' => ['sometimes', 'required', 'string', 'regex:/^(?:\+?56)?[2-9]\d{8}$/'],
             'address' => ['sometimes', 'nullable', 'string', 'max:200'],
+            'region_code' => ['sometimes', 'nullable', 'string', 'regex:/^\d{2}$/'],
+            'commune_code' => ['sometimes', 'nullable', 'string', 'regex:/^\d{5}$/'],
         ];
         if ($isReception) {
             $rules += [
@@ -112,6 +121,7 @@ class PatientController extends Controller
             ];
         }
         $data = $request->validate($rules);
+        $addressData = $this->updatedPatientAddressData($data, $record->primaryAddress);
         if (array_key_exists('email', $data)) {
             $data['email'] = strtolower(trim($data['email']));
             if ($record->user_id && $data['email'] !== $record->email) {
@@ -123,16 +133,16 @@ class PatientController extends Controller
             $data['health_insurance_id'] = $this->insurance($data['health_insurance'])->id;
         }
 
-        DB::connection('center')->transaction(function () use ($record, $data) {
-            $record->update(collect($data)->except(['address', 'health_insurance'])->all());
-            if (array_key_exists('address', $data)) {
-                if ($data['address']) {
+        DB::connection('center')->transaction(function () use ($record, $data, $addressData) {
+            $record->update(collect($data)->except(['address', 'region_code', 'commune_code', 'health_insurance'])->all());
+            if ($addressData !== null) {
+                if ($addressData === []) {
+                    $record->primaryAddress()->delete();
+                } else {
                     PatientAddress::updateOrCreate(
                         ['patient_id' => $record->id, 'is_primary' => true],
-                        ['address_line' => $data['address']],
+                        $addressData,
                     );
-                } else {
-                    $record->primaryAddress()->delete();
                 }
             }
         });
@@ -166,6 +176,68 @@ class PatientController extends Controller
         return $insurance;
     }
 
+    /** @return array{address_line: string, region: ?string, commune: ?string}|null */
+    private function patientAddressData(array $data): ?array
+    {
+        $address = trim((string) ($data['address'] ?? ''));
+        $regionCode = trim((string) ($data['region_code'] ?? ''));
+        $communeCode = trim((string) ($data['commune_code'] ?? ''));
+
+        if ($address === '' && $regionCode === '' && $communeCode === '') {
+            return null;
+        }
+
+        $location = $this->territorialCatalog->resolve($regionCode, $communeCode);
+        if ($address === '') {
+            throw ValidationException::withMessages([
+                'address' => ['Ingresa la calle y número para guardar la dirección.'],
+            ]);
+        }
+
+        return [
+            'address_line' => $address,
+            'region' => $location['region'] ?? null,
+            'commune' => $location['commune'] ?? null,
+        ];
+    }
+
+    /** @return array{address_line: string, region: ?string, commune: ?string}|array{}|null */
+    private function updatedPatientAddressData(array $data, ?PatientAddress $existing): ?array
+    {
+        $addressWasSent = array_key_exists('address', $data);
+        $regionCode = trim((string) ($data['region_code'] ?? ''));
+        $communeCode = trim((string) ($data['commune_code'] ?? ''));
+        $codesWereSent = $regionCode !== '' || $communeCode !== '';
+
+        if (! $addressWasSent && ! $codesWereSent) {
+            return null;
+        }
+
+        $address = $addressWasSent
+            ? trim((string) ($data['address'] ?? ''))
+            : trim((string) ($existing?->address_line ?? ''));
+
+        if ($address === '') {
+            if ($codesWereSent) {
+                throw ValidationException::withMessages([
+                    'address' => ['Ingresa la calle y número para guardar la dirección.'],
+                ]);
+            }
+
+            return [];
+        }
+
+        $location = $codesWereSent
+            ? $this->territorialCatalog->resolve($regionCode, $communeCode)
+            : null;
+
+        return [
+            'address_line' => $address,
+            'region' => $location['region'] ?? $existing?->region,
+            'commune' => $location['commune'] ?? $existing?->commune,
+        ];
+    }
+
     private function ensureUniqueEmail(string $email, ?int $exceptId = null): void
     {
         if (Patient::withTrashed()->when($exceptId, fn ($query) => $query->where('id', '!=', $exceptId))
@@ -184,6 +256,8 @@ class PatientController extends Controller
             'health_insurance' => $patient->healthInsurance?->name,
             'medical_insurance' => $patient->medical_insurance,
             'address' => $patient->primaryAddress?->address_line,
+            'region' => $patient->primaryAddress?->region,
+            'commune' => $patient->primaryAddress?->commune,
             'consent' => $patient->consent_at !== null,
             'is_active' => $patient->is_active, 'has_account' => $patient->user_id !== null,
         ];

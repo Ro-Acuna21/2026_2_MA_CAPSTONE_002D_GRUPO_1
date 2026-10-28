@@ -50,6 +50,44 @@ it('registra un paciente nuevo correctamente', function () {
     )->toBeTrue();
 });
 
+it('publica las 16 regiones y las 346 comunas del catálogo CUT de SUBDERE', function () {
+    $this->getJson('/api/public/territorial-catalog')
+        ->assertOk()
+        ->assertJsonCount(16, 'data')
+        ->assertJsonPath('data.0.code', '15')
+        ->assertJsonPath('data.0.name', 'Arica y Parinacota')
+        ->assertJsonPath('data.6.name', 'Metropolitana de Santiago');
+
+    $catalog = app(\App\Services\TerritorialCatalog::class);
+    expect(array_sum(array_map(fn ($region) => count($region['communes']), $catalog->regions())))->toBe(346);
+});
+
+it('guarda nombres canónicos cuando el registro envía códigos CUT válidos', function () {
+    $response = $this->postJson('/api/register', validRegisterPayload([
+        'address' => 'Calle de prueba 123',
+        'region_code' => '13',
+        'commune_code' => '13119',
+    ]));
+
+    $response->assertCreated();
+    $patientId = Patient::where('rut', '12345678-5')->value('id');
+    $address = \App\Models\Center\PatientAddress::where('patient_id', $patientId)->firstOrFail();
+    expect($address->region)->toBe('Metropolitana de Santiago')
+        ->and($address->commune)->toBe('Maipú')
+        ->and($address->address_line)->toBe('Calle de prueba 123');
+});
+
+it('rechaza una comuna CUT que no pertenece a la región seleccionada', function () {
+    $this->postJson('/api/register', validRegisterPayload([
+        'email' => 'juan.territorio@example.com',
+        'address' => 'Calle de prueba 123',
+        'region_code' => '13',
+        'commune_code' => '01101',
+    ]))->assertUnprocessable()->assertJsonValidationErrors('commune_code');
+
+    expect(User::where('email', 'juan.territorio@example.com')->exists())->toBeFalse();
+});
+
 it('rechaza un centro inexistente o inactivo sin crear cuentas', function (string $slug) {
     $this->center->update(['is_active' => false]);
 

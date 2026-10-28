@@ -73,16 +73,20 @@ it('persiste CRUD de pacientes en el tenant activo y conserva el listado usado p
             'first_name' => 'Carla', 'last_name' => 'Paciente', 'rut' => '12.345.678-5',
             'birth_date' => '1995-02-03', 'email' => 'carla@example.com',
             'phone' => '+56 9 1234 5678', 'health_insurance' => 'Fonasa',
-            'address' => 'Calle 1', 'consent' => true,
+            'address' => 'Calle 1', 'region_code' => '13', 'commune_code' => '13119', 'consent' => true,
             'database_name' => $pathB,
         ];
         $client->postJson('/api/v1/patients', $payload)->assertCreated()
             ->assertJsonPath('data.email', 'carla@example.com')
-            ->assertJsonPath('data.address', 'Calle 1');
+            ->assertJsonPath('data.address', 'Calle 1')
+            ->assertJsonPath('data.region', 'Metropolitana de Santiago')
+            ->assertJsonPath('data.commune', 'Maipú');
         $id = DB::connection('patient_a')->table('patients')->where('email', 'carla@example.com')->value('id');
         expect(DB::connection('patient_b')->table('patients')->count())->toBe(1);
         $client->patchJson("/api/v1/patients/{$id}", ['phone' => '+56 9 8765 4321', 'address' => 'Calle 2'])
-            ->assertOk()->assertJsonPath('data.address', 'Calle 2');
+            ->assertOk()->assertJsonPath('data.address', 'Calle 2')
+            ->assertJsonPath('data.region', 'Metropolitana de Santiago')
+            ->assertJsonPath('data.commune', 'Maipú');
         expect(DB::connection('patient_a')->table('patients')->where('id', $id)->value('phone'))->toBe('+56987654321');
         $client->getJson("/api/v1/patients/{$id}")->assertOk()->assertJsonPath('data.address', 'Calle 2');
         $client->getJson('/api/v1/patients')->assertOk()->assertJsonCount(2, 'data');
@@ -90,6 +94,8 @@ it('persiste CRUD de pacientes en el tenant activo y conserva el listado usado p
         $client->postJson('/api/v1/patients', $payload)->assertUnprocessable()->assertJsonValidationErrors('rut');
         $client->postJson('/api/v1/patients', array_merge($payload, ['rut' => 'invalido']))->assertUnprocessable()->assertJsonValidationErrors('rut');
         $client->patchJson("/api/v1/patients/{$id}", ['phone' => 'invalido'])->assertUnprocessable()->assertJsonValidationErrors('phone');
+        $client->patchJson("/api/v1/patients/{$id}", ['region_code' => '13', 'commune_code' => '01101'])
+            ->assertUnprocessable()->assertJsonValidationErrors('commune_code');
     } finally {
         DB::purge('center'); DB::purge('patient_a'); DB::purge('patient_b');
         @unlink($pathA); @unlink($pathB);

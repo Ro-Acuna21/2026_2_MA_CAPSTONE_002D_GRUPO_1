@@ -86,10 +86,27 @@ export interface PatientRegisterPayload {
   health_insurance: string;
   medical_insurance?: string | null;
   address?: string | null;
+  region_code?: string | null;
+  commune_code?: string | null;
   password: string;
   password_confirmation: string;
   consent: boolean;
 }
+
+export interface TerritorialCommune {
+  code: string;
+  name: string;
+}
+
+export interface TerritorialRegion {
+  code: string;
+  name: string;
+  communes: TerritorialCommune[];
+}
+
+export const territorialCatalogApi = {
+  list: () => apiRequest<{ data: TerritorialRegion[] }>('/api/public/territorial-catalog'),
+};
 
 export interface AuthUser {
   id: number;
@@ -385,6 +402,8 @@ export interface BackendPatient extends BackendPatientSummary {
   health_insurance: string | null;
   medical_insurance: string | null;
   address: string | null;
+  region: string | null;
+  commune: string | null;
   consent: boolean;
   is_active: boolean;
   has_account: boolean;
@@ -400,6 +419,8 @@ export interface PatientPayload {
   health_insurance: string;
   medical_insurance?: string | null;
   address?: string | null;
+  region_code?: string | null;
+  commune_code?: string | null;
   consent: boolean;
 }
 

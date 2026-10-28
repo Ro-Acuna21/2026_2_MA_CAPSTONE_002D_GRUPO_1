@@ -12,7 +12,9 @@ use App\Http\Controllers\Api\CenterSpecialtyController;
 use App\Http\Controllers\Api\AppointmentController;
 use App\Http\Controllers\Api\PatientController;
 use App\Http\Controllers\Api\AvailabilityController;
+use App\Http\Controllers\Api\TerritorialCatalogController;
 Route::get('/public/centers', [AuthController::class, 'publicCenters']);
+Route::get('/public/territorial-catalog', [TerritorialCatalogController::class, 'index']);
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 Route::post(

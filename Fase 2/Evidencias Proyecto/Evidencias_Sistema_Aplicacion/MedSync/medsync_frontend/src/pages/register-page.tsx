@@ -57,6 +57,10 @@ async function registerWithBackend(values: Record<string, string>, centerSlug: s
 
       address: values.address || null,
 
+      region_code: values.region_code || null,
+
+      commune_code: values.commune_code || null,
+
       password: values.password,
 
       password_confirmation: values.confirmation,
