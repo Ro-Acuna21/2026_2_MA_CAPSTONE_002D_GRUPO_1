@@ -327,30 +327,8 @@ export interface SpecialtiesResponse {
   data: BackendSpecialty[];
 }
 
-export interface SpecialtyResponse {
-  data: BackendSpecialty;
-}
-
-export interface SpecialtyPayload {
-  name: string;
-  description?: string | null;
-  is_active?: boolean;
-}
-
 export const specialtyApi = {
   list: () => apiRequest<SpecialtiesResponse>("/api/v1/specialties"),
-
-  create: (payload: SpecialtyPayload) =>
-    apiRequest<SpecialtyResponse>("/api/v1/specialties", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    }),
-
-  update: (id: number, payload: Partial<SpecialtyPayload>) =>
-    apiRequest<SpecialtyResponse>(`/api/v1/specialties/${id}`, {
-      method: "PATCH",
-      body: JSON.stringify(payload),
-    }),
 };
 
 export interface ServicePayload {

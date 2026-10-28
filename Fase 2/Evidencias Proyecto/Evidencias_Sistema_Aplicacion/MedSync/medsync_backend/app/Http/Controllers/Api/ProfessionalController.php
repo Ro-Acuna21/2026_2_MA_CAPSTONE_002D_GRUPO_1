@@ -4,17 +4,21 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Center\Professional;
-use App\Models\Center\Specialty;
+use App\Models\Core\Specialty;
+use App\Models\Center\ProfessionalSpecialty;
+use App\Services\Specialties\CenterSpecialtyCatalog;
 use App\Rules\ValidRut;
 use App\Support\TenantContext;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class ProfessionalController extends Controller
 {
-    public function __construct(private readonly TenantContext $tenantContext)
+    public function __construct(
+        private readonly TenantContext $tenantContext,
+        private readonly CenterSpecialtyCatalog $specialtyCatalog
+    )
     {
     }
 
@@ -28,10 +32,10 @@ class ProfessionalController extends Controller
         $this->ensureAdmin();
 
         $professionals = Professional::query()
-            ->with('specialties:id,name')
             ->orderBy('first_name')
             ->orderBy('last_name')
             ->get();
+        $this->loadGlobalSpecialties($professionals);
 
         return response()->json([
             'data' => $professionals->map(
@@ -52,7 +56,6 @@ class ProfessionalController extends Controller
     public function store(Request $request)
     {
         $this->ensureAdmin();
-
         // Normaliza el teléfono antes de validarlo.
         $request->merge([
             'phone' => preg_replace(
@@ -98,11 +101,12 @@ class ProfessionalController extends Controller
                 'boolean',
             ],
             'specialty_ids' => ['sometimes', 'array'],
-            'specialty_ids.*' => ['integer', 'distinct', Rule::exists('center.specialties', 'id')->where('is_active', true)],
+            'specialty_ids.*' => ['integer', 'distinct'],
             'description' => ['nullable', 'string', 'max:2000'],
         ]);
 
         $rut = ValidRut::normalize($data['rut']);
+        $this->specialtyCatalog->validateAssignments($data['specialty_ids'] ?? []);
 
         $email = strtolower(trim($data['email']));
 
@@ -143,11 +147,12 @@ class ProfessionalController extends Controller
             ]);
 
             if (array_key_exists('specialty_ids', $data)) {
-                $professional->specialties()->sync($data['specialty_ids']);
+                $this->syncSpecialties($professional, $data['specialty_ids']);
             }
 
-            return $professional->load('specialties:id,name');
+            return $professional;
         });
+        $this->loadGlobalSpecialties(collect([$professional]));
 
         return response()->json([
             'data' => $this->presentProfessional($professional),
@@ -162,7 +167,7 @@ class ProfessionalController extends Controller
     public function update(Request $request, int $professional)
     {
         $this->ensureAdmin();
-        $record = Professional::with('specialties:id,name')->findOrFail($professional);
+        $record = Professional::findOrFail($professional);
 
         $normalized = [];
         if ($request->has('email')) {
@@ -181,7 +186,7 @@ class ProfessionalController extends Controller
             'rut' => ['prohibited'],
             'user_id' => ['prohibited'],
             'specialty_ids' => ['sometimes', 'array'],
-            'specialty_ids.*' => ['integer', 'distinct', Rule::exists('center.specialties', 'id')->where('is_active', true)],
+            'specialty_ids.*' => ['integer', 'distinct'],
             'description' => ['sometimes', 'nullable', 'string', 'max:2000'],
             'is_active' => ['sometimes', 'boolean'],
         ]);
@@ -195,6 +200,14 @@ class ProfessionalController extends Controller
             }
         }
 
+        if (array_key_exists('specialty_ids', $data)) {
+            $existingIds = ProfessionalSpecialty::query()
+                ->where('professional_id', $record->id)
+                ->pluck('specialty_id')
+                ->all();
+            $this->specialtyCatalog->validateAssignments($data['specialty_ids'], $existingIds);
+        }
+
         if (array_key_exists('email', $data) && $data['email'] !== strtolower(trim($record->email))
             && Professional::withTrashed()->where('id', '<>', $record->id)->whereRaw('LOWER(TRIM(email)) = ?', [$data['email']])->exists()) {
             throw ValidationException::withMessages(['email' => ['Ya existe un profesional con ese correo en este centro.']]);
@@ -203,11 +216,40 @@ class ProfessionalController extends Controller
         DB::connection('center')->transaction(function () use ($record, $data) {
             $record->update(collect($data)->except('specialty_ids')->all());
             if (array_key_exists('specialty_ids', $data)) {
-                $record->specialties()->sync($data['specialty_ids']);
+                $this->syncSpecialties($record, $data['specialty_ids']);
             }
         });
 
-        return response()->json(['data' => $this->presentProfessional($record->fresh('specialties:id,name'))]);
+        $record = $record->fresh();
+        $this->loadGlobalSpecialties(collect([$record]));
+        return response()->json(['data' => $this->presentProfessional($record)]);
+    }
+
+    private function syncSpecialties(Professional $professional, array $specialtyIds): void
+    {
+        ProfessionalSpecialty::query()->where('professional_id', $professional->id)->delete();
+        foreach (array_unique(array_map('intval', $specialtyIds)) as $specialtyId) {
+            ProfessionalSpecialty::create([
+                'professional_id' => $professional->id,
+                'specialty_id' => $specialtyId,
+            ]);
+        }
+    }
+
+    private function loadGlobalSpecialties($professionals): void
+    {
+        $ids = ProfessionalSpecialty::query()
+            ->whereIn('professional_id', $professionals->pluck('id'))
+            ->pluck('specialty_id')
+            ->unique();
+        $specialties = Specialty::query()->whereIn('id', $ids)->get()->keyBy('id');
+
+        foreach ($professionals as $professional) {
+            $professionalIds = ProfessionalSpecialty::query()
+                ->where('professional_id', $professional->id)
+                ->pluck('specialty_id');
+            $professional->setRelation('specialties', $specialties->only($professionalIds->all())->values());
+        }
     }
 
     /**

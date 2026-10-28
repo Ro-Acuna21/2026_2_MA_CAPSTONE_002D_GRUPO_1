@@ -7,7 +7,10 @@ use App\Models\Center\Appointment;
 use App\Models\Center\Patient;
 use App\Models\Center\Professional;
 use App\Models\Center\Service;
-use App\Models\Center\Specialty;
+use App\Models\Core\MedicalCenter;
+use App\Models\Core\MedicalCenterSpecialty;
+use App\Models\Core\Specialty;
+use App\Models\Center\ProfessionalSpecialty;
 use App\Models\User;
 use Illuminate\Support\Carbon;
 use Illuminate\Database\Seeder;
@@ -25,6 +28,13 @@ class AppointmentsCatalogSeeder extends Seeder
 {
     public function run(): void
     {
+        $databaseName = config('database.connections.center.database');
+        $centerId = MedicalCenter::where('database_name', $databaseName)->value('id');
+        if (! $centerId) {
+            $this->command->warn("No se encontró el centro correspondiente a {$databaseName}; omitiendo catálogo de reservas.");
+            return;
+        }
+
         $specialtiesData = [
             [
                 'name' => 'Medicina General',
@@ -74,6 +84,10 @@ class AppointmentsCatalogSeeder extends Seeder
                     'is_active' => true,
                 ]
             );
+            MedicalCenterSpecialty::firstOrCreate(
+                ['medical_center_id' => $centerId, 'specialty_id' => $specialty->id],
+                ['is_active' => true]
+            );
 
             foreach ($specialtyData['services'] as $serviceData) {
                 Service::updateOrCreate(
@@ -118,9 +132,10 @@ class AppointmentsCatalogSeeder extends Seeder
 
             foreach ($professionals as $catalogProfessional) {
                 // Vincula la especialidad al profesional (evita duplicar la fila pivote).
-                if (! $catalogProfessional->specialties()->whereKey($specialty->id)->exists()) {
-                    $catalogProfessional->specialties()->attach($specialty->id);
-                }
+                ProfessionalSpecialty::firstOrCreate([
+                    'professional_id' => $catalogProfessional->id,
+                    'specialty_id' => $specialty->id,
+                ]);
 
                 // Disponibilidad de lunes a viernes: 09:00-13:00 y 14:00-18:00.
                 foreach (range(1, 5) as $weekday) {
@@ -157,8 +172,9 @@ class AppointmentsCatalogSeeder extends Seeder
                 ['specialty' => 'Pediatría', 'patient' => 2, 'time' => '11:00'],
             ] as $demoAppointment) {
                 $specialty = Specialty::where('name', $demoAppointment['specialty'])->first();
-                $service = $specialty?->services()->where('is_active', true)->orderBy('id')->first();
-                $professional = $specialty?->professionals()->where('is_active', true)->orderBy('id')->first();
+                $service = $specialty ? Service::where('specialty_id', $specialty->id)->where('is_active', true)->orderBy('id')->first() : null;
+                $professionalId = $specialty ? ProfessionalSpecialty::where('specialty_id', $specialty->id)->pluck('professional_id') : collect();
+                $professional = Professional::whereIn('id', $professionalId)->where('is_active', true)->orderBy('id')->first();
 
                 if (! $service || ! $professional) {
                     continue;

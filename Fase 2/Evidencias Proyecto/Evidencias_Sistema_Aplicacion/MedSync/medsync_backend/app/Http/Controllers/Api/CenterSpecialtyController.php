@@ -15,10 +15,8 @@ use Illuminate\Validation\ValidationException;
  *
  * El administrador del centro solo activa o desactiva su propia fila;
  * nunca crea ni edita el catálogo global (eso es PlatformSpecialtyController,
- * exclusivo de SUPER_ADMIN). No reemplaza ni modifica
- * App\Models\Center\Specialty (API local heredada); prestaciones y
- * profesionales siguen referenciando esos IDs locales hasta la migración
- * coordinada descrita en medsync_BD/README_BD.md.
+ * exclusivo de SUPER_ADMIN). Prestaciones y profesionales usan estos IDs
+ * globales como referencias lógicas en la base operacional del centro.
  */
 class CenterSpecialtyController extends Controller
 {
