@@ -61,6 +61,8 @@ class AppointmentController extends Controller
     public function store(Request $request)
     {
         $centerUser = $this->tenantContext->centerUser();
+        $isReception = $request->user()->can('appointments.create.for_patient');
+        abort_unless($isReception || $request->user()->can('appointments.create.own'), 403);
 
         $rules = [
             'service_id' => ['required', 'integer'],
@@ -69,13 +71,13 @@ class AppointmentController extends Controller
             'start_time' => ['required', 'date_format:H:i'],
         ];
 
-        if ($centerUser->role === 'RECEPCIONISTA') {
+        if ($isReception) {
             $rules['patient_id'] = ['required', 'integer', 'exists:center.patients,id'];
         }
 
         $data = $request->validate($rules);
 
-        if ($centerUser->role === 'RECEPCIONISTA') {
+        if ($isReception) {
             $patient = Patient::where('is_active', true)->findOrFail($data['patient_id']);
             $source = 'RECEPCION';
         } else {
@@ -119,9 +121,13 @@ class AppointmentController extends Controller
     {
         $centerUser = $this->tenantContext->centerUser();
 
-        if ($centerUser->role === 'RECEPCIONISTA') {
+        if ($request->user()->can('appointments.view.all')) {
             $appointments = $this->appointmentService->listReceptionAppointments();
-        } elseif ($centerUser->role === 'PROFESIONAL' && $centerUser->professional_id) {
+        } elseif (
+            $centerUser->role === 'PROFESIONAL'
+            && $centerUser->professional_id
+            && $request->user()->can('appointments.view.own')
+        ) {
             $professional = Professional::findOrFail($centerUser->professional_id);
             $appointments = $this->appointmentService->listProfessionalAppointments($professional);
         } else {
@@ -142,7 +148,7 @@ class AppointmentController extends Controller
     {
         $centerUser = $this->tenantContext->centerUser();
 
-        if ($centerUser->role === 'RECEPCIONISTA') {
+        if ($request->user()->can('appointments.reschedule.for_patient')) {
             $data = $request->validate([
                 'professional_id' => ['required', 'integer'],
                 'reassignment_reason' => ['nullable', 'string', 'max:300'],
@@ -156,6 +162,7 @@ class AppointmentController extends Controller
                 $request->user()
             );
         } else {
+            abort_unless($request->user()->can('appointments.reschedule.own'), 403);
             abort_unless(
                 $centerUser->role === 'PACIENTE',
                 403,
@@ -191,8 +198,12 @@ class AppointmentController extends Controller
     {
         $centerUser = $this->tenantContext->centerUser();
 
+        $statusPermission = $centerUser->role === 'PROFESIONAL'
+            ? 'appointments.status.manage.own'
+            : 'appointments.status.manage';
         abort_unless(
-            in_array($centerUser->role, ['RECEPCIONISTA', 'PROFESIONAL'], true),
+            in_array($centerUser->role, ['RECEPCIONISTA', 'PROFESIONAL'], true)
+                && $request->user()->can($statusPermission),
             403,
             'No tienes permisos para cambiar el estado de esta cita.'
         );
@@ -226,6 +237,7 @@ class AppointmentController extends Controller
             'reason' => ['nullable', 'string', 'max:255'],
         ]);
 
+        abort_unless($request->user()->can('appointments.cancel.own'), 403);
         $patient = $this->resolvePatient($request);
 
         $appointment = $this->appointmentService->cancelAppointment(
@@ -253,7 +265,7 @@ class AppointmentController extends Controller
         $centerUser = $this->tenantContext->centerUser();
 
         abort_unless(
-            $centerUser->role === 'PACIENTE' && $centerUser->patient_id,
+            $request->user()->can('patients.view.own') && $centerUser->patient_id,
             403,
             'No tienes un perfil de paciente asociado a tu cuenta.'
         );

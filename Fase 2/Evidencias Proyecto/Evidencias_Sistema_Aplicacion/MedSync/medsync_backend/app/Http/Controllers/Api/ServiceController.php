@@ -29,7 +29,7 @@ class ServiceController extends Controller
      */
     public function index(Request $request)
     {
-        $isAdmin = $this->tenantContext->centerUser()->role === 'ADMIN';
+        $isAdmin = $request->user()?->can('services.manage') ?? false;
 
         if ($isAdmin) {
             $services = Service::with('specialty')
@@ -177,7 +177,7 @@ class ServiceController extends Controller
         $centerUser = $this->tenantContext->centerUser();
 
         abort_unless(
-            $centerUser->role === 'ADMIN',
+            auth()->user()?->can('services.manage'),
             403,
             'No tienes permisos para gestionar prestaciones.'
         );

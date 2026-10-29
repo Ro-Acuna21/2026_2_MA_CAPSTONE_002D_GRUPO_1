@@ -102,7 +102,7 @@ class CenterSpecialtyController extends Controller
         $centerUser = $this->tenantContext->centerUser();
 
         abort_unless(
-            $centerUser->role === 'ADMIN',
+            auth()->user()?->can('center.specialties.manage'),
             403,
             'No tienes permisos para administrar las especialidades del centro.'
         );

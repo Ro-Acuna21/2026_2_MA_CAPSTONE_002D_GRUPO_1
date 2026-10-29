@@ -261,7 +261,7 @@ class ProfessionalController extends Controller
         $centerUser = $this->tenantContext->centerUser();
 
         abort_unless(
-            $centerUser->role === 'ADMIN',
+            auth()->user()?->can('professionals.manage'),
             403,
             'No tienes permisos para gestionar profesionales.'
         );

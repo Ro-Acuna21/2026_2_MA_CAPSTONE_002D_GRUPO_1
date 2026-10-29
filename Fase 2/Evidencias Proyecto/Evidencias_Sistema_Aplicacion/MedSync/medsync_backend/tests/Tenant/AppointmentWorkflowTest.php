@@ -2,6 +2,8 @@
 
 use App\Models\Core\CenterUser;
 use App\Models\Core\MedicalCenter;
+use App\Models\Core\MedicalCenterSpecialty;
+use App\Models\Core\Specialty;
 use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Carbon;
@@ -155,6 +157,12 @@ function appointmentWorkflowClient(
         'name' => 'Centro de prueba', 'slug' => $slug,
         'database_name' => $databasePath, 'rut' => '76543210-3', 'is_active' => true,
     ]);
+    Specialty::create(['id' => 1, 'name' => 'Medicina general', 'is_active' => true]);
+    MedicalCenterSpecialty::create([
+        'medical_center_id' => $center->id,
+        'specialty_id' => 1,
+        'is_active' => true,
+    ]);
     $user = User::create([
         'name' => 'Usuario de prueba', 'email' => $slug.'@example.test',
         'password' => 'Password123', 'is_active' => true,
@@ -171,6 +179,7 @@ function appointmentWorkflowClient(
 }
 
 it('reasigna una cita de recepción actualizando la misma reserva y conservando el historial', function () {
+    Carbon::setTestNow(Carbon::parse('2026-10-09 10:00:00', 'America/Santiago'));
     $path = tempnam(sys_get_temp_dir(), 'appointment-reassignment-');
     try {
         prepareAppointmentWorkflowDatabase('center', $path);
@@ -192,6 +201,7 @@ it('reasigna una cita de recepción actualizando la misma reserva y conservando 
             ->and(DB::connection('center')->table('appointment_history')->value('event_type'))->toBe('REASIGNACION')
             ->and(DB::connection('center')->table('appointment_history')->value('appointment_id'))->toBe(19);
     } finally {
+        Carbon::setTestNow();
         DB::purge('center');
         DB::purge('center');
         @unlink($path);
@@ -199,6 +209,7 @@ it('reasigna una cita de recepción actualizando la misma reserva y conservando 
 });
 
 it('persiste cambios de estado hechos por recepción con su registro de auditoría', function () {
+    Carbon::setTestNow(Carbon::parse('2026-10-09 10:00:00', 'America/Santiago'));
     $path = tempnam(sys_get_temp_dir(), 'appointment-status-');
     try {
         prepareAppointmentWorkflowDatabase('center', $path);
@@ -217,6 +228,7 @@ it('persiste cambios de estado hechos por recepción con su registro de auditor�
             ->and(DB::connection('center')->table('appointment_history')->orderBy('id')->value('event_type'))->toBe('CAMBIO_ESTADO')
             ->and(DB::connection('center')->table('appointment_history')->orderByDesc('id')->value('event_type'))->toBe('CANCELACION');
     } finally {
+        Carbon::setTestNow();
         DB::purge('center');
         DB::purge('center');
         @unlink($path);
