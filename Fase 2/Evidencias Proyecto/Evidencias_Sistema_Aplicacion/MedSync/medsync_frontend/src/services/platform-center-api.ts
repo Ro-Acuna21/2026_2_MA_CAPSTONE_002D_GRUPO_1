@@ -1,0 +1,30 @@
+import { apiRequest } from './http'
+
+export interface PlatformCenter {
+  id: number
+  name: string
+  slug: string
+  rut: string
+  phone: string | null
+  email: string | null
+  plan: 'STARTER' | 'PRO' | null
+  subscription_status: 'TRIAL' | 'ACTIVE' | 'EXPIRED' | 'SUSPENDED' | null
+  is_active: boolean
+  provisioning_status: 'PENDING' | 'READY' | 'FAILED'
+  provisioned_at: string | null
+}
+
+export type CenterInput = Pick<PlatformCenter, 'name' | 'slug' | 'rut' | 'phone' | 'email' | 'plan' | 'subscription_status' | 'is_active'>
+
+export const platformCenterApi = {
+  list: () => apiRequest<{ data: PlatformCenter[] }>('/api/v1/platform/centers'),
+  create: (input: CenterInput) => apiRequest<{ data: PlatformCenter }>('/api/v1/platform/centers', {
+    method: 'POST', body: JSON.stringify(input),
+  }),
+  update: (id: number, input: Partial<CenterInput>) => apiRequest<{ data: PlatformCenter }>(`/api/v1/platform/centers/${id}`, {
+    method: 'PATCH', body: JSON.stringify(input),
+  }),
+  retry: (id: number) => apiRequest<{ data: PlatformCenter }>(`/api/v1/platform/centers/${id}/provision`, {
+    method: 'POST', body: JSON.stringify({ is_active: true }),
+  }),
+}

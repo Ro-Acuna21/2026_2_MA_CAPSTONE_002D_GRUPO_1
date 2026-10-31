@@ -89,7 +89,7 @@ class AuthController extends Controller
 if ($existingUser) {
     throw ValidationException::withMessages([
         'email' => [
-            'Ya existe una cuenta registrada con este correo electrónico.',
+            'Ya tienes una cuenta MedSync. Inicia sesión en este centro para crear tu ficha local.',
         ],
     ]);
 }
@@ -263,15 +263,24 @@ if ($existingUser) {
 
         $centerUser = $user->centerUsers()
             ->where('medical_center_id', $medicalCenter->id)
-            ->where('is_active', true)
             ->with('medicalCenter')
             ->first();
 
         if (! $centerUser) {
+            if ($request->hasSession()) {
+                $request->session()->regenerate();
+                $request->session()->forget('active_medical_center_id');
+                $request->session()->put('pending_patient_center_id', $medicalCenter->id);
+            }
+            return response()->json([
+                'code' => 'CENTER_ENROLLMENT_REQUIRED',
+                'message' => 'Tu cuenta es válida. Confirma tus datos para crear una ficha de paciente en este centro.',
+            ], 409);
+        }
+        if (! $centerUser->is_active) {
             Auth::guard('web')->logout();
-
             throw ValidationException::withMessages([
-                'center_slug' => ['Tu cuenta no tiene acceso activo a este centro médico.'],
+                'center_slug' => ['Tu acceso a este centro está inactivo. Contacta a su administración.'],
             ]);
         }
 
@@ -280,6 +289,7 @@ if ($existingUser) {
 
         if ($request->hasSession()) {
             $request->session()->regenerate();
+            $request->session()->forget('pending_patient_center_id');
             $request->session()->put('active_medical_center_id', $medicalCenter->id);
         }
 

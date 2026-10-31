@@ -2,6 +2,8 @@ import { vi } from 'vitest'
 import type { AuthUser, BackendAvailability, BackendProfessional } from '@/services/http'
 import type { Role } from '@/domain/types'
 import type { GlobalSpecialty } from '@/services/specialty-catalog-api'
+import type { PlatformCenter } from '@/services/platform-center-api'
+import type { CenterAccess } from '@/services/center-access-api'
 
 export const centers = [
   { id: 1, name: 'Clínica Horizonte', slug: 'clinica-horizonte' },
@@ -30,13 +32,20 @@ export function stubLaravelApi(options: {
   availabilities?: BackendAvailability[]
   unauthorizedServices?: boolean
   globalSpecialties?: GlobalSpecialty[]
+  platformCenters?: PlatformCenter[]
+  administrators?: CenterAccess[]
+  receptionists?: CenterAccess[]
+  pendingEnrollment?: { center: { id: number; name: string; slug: string }; email: string }
 } = {}) {
   const requests: RequestRecord[] = []
   let session = options.session ?? null
-  const publishedCenters = options.centers ?? centers
+  const publishedCenters = [...(options.centers ?? centers)]
   const patientRecords = [...(options.patients ?? [])]
   const availabilityRecords = [...(options.availabilities ?? [])]
   const globalSpecialties = [...(options.globalSpecialties ?? [])]
+  const platformCenters = [...(options.platformCenters ?? [])]
+  const administrators = [...(options.administrators ?? [])]
+  const receptionists = [...(options.receptionists ?? [])]
   const ok = (data: unknown, status = 200) => ({ ok: true, status, json: async () => structuredClone(data) })
   const fail = (status: number) => ({ ok: false, status, json: async () => ({ message: 'Sin acceso' }) })
 
@@ -57,7 +66,47 @@ export function stubLaravelApi(options: {
       return ok({ data: account })
     }
     if (path === '/api/logout') { session = null; return { ok: true, status: 204 } }
+    if (path === '/api/v1/patient-enrollment' && options.pendingEnrollment) {
+      if (method === 'GET') return ok({ data: options.pendingEnrollment })
+      if (method === 'POST') return ok({ data: { center: options.pendingEnrollment.center, patient_id: 99 } }, 201)
+    }
     if (!session) return fail(401)
+    if (path === '/api/v1/platform/centers' && session.role === 'SUPER_ADMIN') {
+      if (method === 'GET') return ok({ data: platformCenters })
+      if (method === 'POST') {
+        const id = Math.max(0, ...platformCenters.map((item) => item.id)) + 1
+        const center = {
+          id, name: String(body?.name), slug: String(body?.slug), rut: String(body?.rut),
+          phone: body?.phone ? String(body.phone) : null, email: body?.email ? String(body.email) : null,
+          plan: body?.plan ?? 'STARTER', subscription_status: body?.subscription_status ?? 'TRIAL',
+          is_active: body?.is_active === true, provisioning_status: 'READY', provisioned_at: new Date().toISOString(),
+        }
+        platformCenters.push(center as PlatformCenter)
+        if (center.is_active) publishedCenters.push({ id, name: center.name, slug: center.slug })
+        return ok({ data: center }, 201)
+      }
+    }
+    const administratorsMatch = path.match(/^\/api\/v1\/platform\/centers\/(\d+)\/administrators$/)
+    if (administratorsMatch && session.role === 'SUPER_ADMIN') {
+      if (method === 'GET') return ok({ data: administrators })
+      if (method === 'POST') {
+        const access = { id: administrators.length + 1, user_id: administrators.length + 10,
+          name: String(body?.name), email: String(body?.email), role: 'ADMIN', is_active: true,
+          invitation_pending: true, invitation_sent_at: new Date().toISOString() }
+        administrators.push(access as CenterAccess)
+        return ok({ data: access, account_created: true, invitation_sent: true, message: 'Invitación enviada.' }, 201)
+      }
+    }
+    if (path === '/api/v1/center/receptionists' && session.role === 'ADMIN') {
+      if (method === 'GET') return ok({ data: receptionists })
+      if (method === 'POST') {
+        const access = { id: receptionists.length + 1, user_id: receptionists.length + 10,
+          name: String(body?.name), email: String(body?.email), role: 'RECEPCIONISTA', is_active: true,
+          invitation_pending: true, invitation_sent_at: new Date().toISOString() }
+        receptionists.push(access as CenterAccess)
+        return ok({ data: access, account_created: true, invitation_sent: true, message: 'Invitación enviada.' }, 201)
+      }
+    }
     if (path === '/api/v1/platform/specialties' && session.role === 'SUPER_ADMIN') {
       if (method === 'GET') return ok({ data: globalSpecialties })
       if (method === 'POST') {

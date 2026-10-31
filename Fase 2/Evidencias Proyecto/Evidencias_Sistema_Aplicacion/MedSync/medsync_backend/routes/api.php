@@ -8,6 +8,9 @@ use App\Http\Controllers\Api\AccountActivationController;
 use App\Http\Controllers\Api\ServiceController;
 use App\Http\Controllers\Api\SpecialtyController;
 use App\Http\Controllers\Api\PlatformSpecialtyController;
+use App\Http\Controllers\Api\PlatformCenterController;
+use App\Http\Controllers\Api\PatientEnrollmentController;
+use App\Http\Controllers\Api\CenterAccessController;
 use App\Http\Controllers\Api\CenterSpecialtyController;
 use App\Http\Controllers\Api\AppointmentController;
 use App\Http\Controllers\Api\PatientController;
@@ -23,17 +26,31 @@ Route::post(
 );
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
+    Route::get('/v1/patient-enrollment', [PatientEnrollmentController::class, 'show']);
+    Route::post('/v1/patient-enrollment', [PatientEnrollmentController::class, 'store']);
 });
 
 // Catálogo global de especialidades (plataforma): exclusivo de SUPER_ADMIN,
 // nunca abre una conexión clínica (ver api-contract.md, 24-10-2026).
 Route::middleware('auth:sanctum')->prefix('v1/platform')->group(function () {
+    Route::get('/centers', [PlatformCenterController::class, 'index']);
+    Route::post('/centers', [PlatformCenterController::class, 'store']);
+    Route::patch('/centers/{center}', [PlatformCenterController::class, 'update'])->whereNumber('center');
+    Route::post('/centers/{center}/provision', [PlatformCenterController::class, 'retry'])->whereNumber('center');
+    Route::get('/centers/{center}/administrators', [CenterAccessController::class, 'platformIndex'])->whereNumber('center');
+    Route::post('/centers/{center}/administrators', [CenterAccessController::class, 'platformStore'])->whereNumber('center');
+    Route::patch('/centers/{center}/administrators/{membership}', [CenterAccessController::class, 'platformUpdate'])->whereNumber('center')->whereNumber('membership');
+    Route::post('/centers/{center}/administrators/{membership}/resend-invitation', [CenterAccessController::class, 'platformResend'])->whereNumber('center')->whereNumber('membership');
     Route::get('/specialties', [PlatformSpecialtyController::class, 'index']);
     Route::post('/specialties', [PlatformSpecialtyController::class, 'store']);
     Route::patch('/specialties/{specialty}', [PlatformSpecialtyController::class, 'update'])->whereNumber('specialty');
 });
 
 Route::middleware(['auth:sanctum', 'tenant.center'])->group(function () {
+    Route::get('/v1/center/receptionists', [CenterAccessController::class, 'centerIndex']);
+    Route::post('/v1/center/receptionists', [CenterAccessController::class, 'centerStore']);
+    Route::patch('/v1/center/receptionists/{membership}', [CenterAccessController::class, 'centerUpdate'])->whereNumber('membership');
+    Route::post('/v1/center/receptionists/{membership}/resend-invitation', [CenterAccessController::class, 'centerResend'])->whereNumber('membership');
     Route::get('/v1/me', [AuthController::class, 'me']);
     Route::get('/v1/professionals',[ProfessionalController::class,'index']);
     Route::get('/v1/patients', [PatientController::class, 'index']);

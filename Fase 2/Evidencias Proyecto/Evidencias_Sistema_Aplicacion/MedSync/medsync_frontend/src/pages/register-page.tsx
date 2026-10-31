@@ -184,7 +184,7 @@ export function RegisterPage() {
 
                 // 3. Si por alguna razón el login automático falla,
                 // la cuenta igual quedó creada.
-                if (!loggedIn) {
+                if (loggedIn !== true) {
                   toast.success(
                     "Cuenta creada correctamente. Inicia sesión para continuar.",
                   );

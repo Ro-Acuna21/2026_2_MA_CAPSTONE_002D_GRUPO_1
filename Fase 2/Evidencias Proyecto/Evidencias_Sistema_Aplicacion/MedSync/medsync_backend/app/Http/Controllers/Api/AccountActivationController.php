@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\ActivateAccountRequest;
 use App\Models\User;
+use App\Models\Core\CenterUser;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Validation\ValidationException;
@@ -44,6 +45,9 @@ class AccountActivationController extends Controller
                  */
 
                 $user->save();
+                CenterUser::query()->where('user_id', $user->id)
+                    ->where('invitation_pending', true)
+                    ->update(['invitation_pending' => false]);
 
                 event(new PasswordReset($user));
             }

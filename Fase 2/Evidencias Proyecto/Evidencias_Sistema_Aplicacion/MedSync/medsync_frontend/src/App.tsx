@@ -16,6 +16,7 @@ import { PatientsPage } from "@/pages/patients-page";
 import { ProfilePage } from "@/pages/profile-page";
 import { ReportsPage } from "@/pages/reports-page";
 import { RegisterPage } from "@/pages/register-page";
+import { PatientEnrollmentPage } from "@/pages/patient-enrollment-page";
 import { PlatformPage } from "@/pages/platform-page";
 import { PlansPage } from "@/pages/plans-page";
 import { ClinicFinancePage } from "@/pages/clinic-finance-page";
@@ -102,6 +103,7 @@ export default function App() {
       <Route path="/activar-cuenta" element={<ActivateAccountPage />} />
       <Route path="/plataforma/acceso" element={<LoginPage platform />} />
       <Route path="/centro/:centerSlug/ingresar" element={<LoginPage />} />
+      <Route path="/centro/:centerSlug/crear-ficha" element={<PatientEnrollmentPage />} />
       <Route
         path="/centro/:centerSlug/crear-cuenta"
         element={<RegisterPage />}

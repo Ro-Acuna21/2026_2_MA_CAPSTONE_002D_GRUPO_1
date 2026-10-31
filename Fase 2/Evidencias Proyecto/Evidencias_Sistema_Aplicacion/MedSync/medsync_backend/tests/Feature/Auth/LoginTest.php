@@ -77,7 +77,7 @@ it('cierra la sesion correctamente', function () {
     $this->assertGuest('web');
 });
 
-it('rechaza credenciales correctas cuando el usuario no pertenece al centro solicitado', function () {
+it('ofrece crear una ficha local cuando la cuenta válida no pertenece al centro solicitado', function () {
     MedicalCenter::create([
         'name' => 'Centro Médico Alameda',
         'slug' => 'centro-medico-alameda',
@@ -86,14 +86,16 @@ it('rechaza credenciales correctas cuando el usuario no pertenece al centro soli
         'is_active' => true,
     ]);
 
-    $this->postJson('/api/login', [
+    $this->withHeader('Origin', 'http://localhost:3000')->postJson('/api/login', [
         'email' => 'ana.soto@example.com',
         'password' => 'password123',
         'center_slug' => 'centro-medico-alameda',
-    ])->assertUnprocessable()
-        ->assertJsonValidationErrors('center_slug');
+    ])->assertStatus(409)
+        ->assertJsonPath('code', 'CENTER_ENROLLMENT_REQUIRED');
 
-    $this->assertGuest();
+    $this->assertAuthenticatedAs($this->user);
+    $this->getJson('/api/v1/patient-enrollment')->assertOk()
+        ->assertJsonPath('data.center.slug', 'centro-medico-alameda');
 });
 
 it('rechaza un centro inexistente o inactivo antes de autenticar el acceso clínico', function (string $slug) {

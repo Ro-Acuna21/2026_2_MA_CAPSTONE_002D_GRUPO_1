@@ -34,12 +34,16 @@ class CenterUser extends Model
         'patient_id',
         'professional_id',
         'is_active',
+        'invitation_pending',
+        'invitation_sent_at',
     ];
 
     protected function casts(): array
     {
         return [
             'is_active' => 'boolean',
+            'invitation_pending' => 'boolean',
+            'invitation_sent_at' => 'datetime',
         ];
     }
 

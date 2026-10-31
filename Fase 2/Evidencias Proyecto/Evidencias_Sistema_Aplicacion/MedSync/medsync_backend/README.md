@@ -32,7 +32,7 @@ Lo que ya funciona:
 
 ⚠️ **Riesgo conocido, pendiente de decidir en equipo** (ver detalle en sección 11): al usar dos bases físicas separadas, una sola transacción de Laravel ya no puede cubrir una operación que escribe en ambas a la vez. Esto afecta el registro de pacientes.
 
-Lo que **todavía no existe** (ver sección 10, próximas iteraciones): roles con Spatie Permission, resultados médicos y plataforma/suscripciones persistentes. Para usar un segundo centro en producción hay que aprovisionar su base clínica y darlo de alta en Core.
+Lo que **todavía no existe** (ver sección 10, próximas iteraciones): resultados médicos y cobro/suscripciones automatizados. Los centros y su estado de plan/suscripción ya se guardan en Core; la creación de una base clínica aislada se automatizó.
 
 > Actualización: especialidades, prestaciones, disponibilidad y reservas **ya tienen backend real** (el flujo de reserva del propio paciente, de punta a punta). Ver sección 13 para el detalle — la administración del catálogo y la agenda de recepción/profesional siguen pendientes.
 
@@ -350,7 +350,7 @@ Orden recomendado según `INDICACIONES_BACKEND.md` y `REQUERIMIENTOS_BD.md`, aju
 ### Iteración 6 — Multi-centro real y plataforma
 - ✅ Resolver el centro por slug de login, sesión y middleware; la conexión clínica se selecciona dinámicamente desde `medical_centers.database_name`.
 - ✅ `SUPER_ADMIN` separado del portal clínico y aislamiento probado entre dos bases SQLite temporales.
-- Pendiente: provisionamiento automatizado de una nueva base clínica y sus migraciones al crear un centro; por ahora `database_name` debe apuntar a una base ya provisionada.
+- Implementado: al crear un centro, la plataforma genera `database_name` en el servidor, crea la base PostgreSQL, aplica migraciones clínicas y el catálogo de previsiones, verifica tablas y solo entonces habilita el centro.
 - Pendiente: exponer una API pública de centros para sustituir los mocks del directorio/selector frontend.
 
 ### Pendientes transversales (aplican en cualquier iteración)
@@ -492,3 +492,15 @@ Las respuestas conservan `401` sin sesión, `403` con rol/centro incorrecto, `40
 La migración `database/migrations/core/2026_10_28_000001_migrate_center_specialties_to_global_catalog.php` conserva las correspondencias antiguas en `core.medical_center_specialty_mappings`, actualiza los IDs de prestaciones y profesionales y elimina la tabla local al terminar cada centro. Debe revisarse y respaldarse el entorno antes de ejecutarla; las bases Center mantienen referencias lógicas a IDs Core porque PostgreSQL no admite esas claves foráneas entre bases. Esta rama deja preparada la migración pero no la ejecuta.
 
 El frontend ya elimina su usuario visible cuando una API responde `401` y envía al login contextual. Esta rama modificó backend, frontend, migraciones y documentación; no ejecutó migraciones ni cambió datos clínicos.
+
+## Actualización 2026-10-31: centros y pacientes en otro centro
+
+`SUPER_ADMIN` usa `GET/POST /api/v1/platform/centers`, `PATCH /api/v1/platform/centers/{center}` y `POST /api/v1/platform/centers/{center}/provision`. Core almacena plan, estado de suscripción, `provisioning_status` (`PENDING`, `READY`, `FAILED`) y `provisioned_at`. El navegador nunca define ni recibe `database_name`. La creación genera un nombre único, crea la base PostgreSQL y ejecuta solo las migraciones de `database/migrations/center` y `CenterHealthInsuranceSeeder`. Un fallo deja el centro inactivo y permite reintentar sobre el mismo registro. El usuario PostgreSQL de Core debe tener privilegio `CREATEDB`. No se copian pacientes, profesionales ni citas.
+
+Si una cuenta global válida inicia sesión en un centro activo donde no tiene membresía, `POST /api/login` devuelve `409` con código `CENTER_ENROLLMENT_REQUIRED` y conserva una sesión limitada con el centro pendiente. `GET /api/v1/patient-enrollment` confirma ese contexto y `POST` crea la ficha clínica local y la membresía `PACIENTE` en Core tras consentimiento explícito. El correo se toma de la cuenta autenticada; RUT o correo previamente usados en el centro exigen verificación por recepción. La operación usa transacción clínica y compensación de la membresía si falla la confirmación entre bases. Repetir el POST no crea una segunda ficha. Una membresía inactiva o de otro rol no se convierte automáticamente.
+
+Para actualizar un entorno existente: respaldar Core y bases clínicas, ejecutar `php artisan migrate --force` y verificar `php artisan test`. En un despliegue con varios centros deben migrarse también sus bases Center individualmente según el procedimiento operativo del equipo.
+
+### Accesos de ADMIN y recepción (paso 3 incorporado)
+
+`SUPER_ADMIN` gestiona ADMIN mediante `GET/POST /api/v1/platform/centers/{center}/administrators`, `PATCH .../{membership}` y `POST .../{membership}/resend-invitation`. Un ADMIN de centro gestiona RECEPCIONISTA con `GET/POST /api/v1/center/receptionists` y las mismas operaciones por membresía, resueltas bajo `tenant.center`. Una cuenta existente conserva contraseña; una nueva recibe por SMTP un token de activación válido 60 minutos. `invitation_pending` y `invitation_sent_at` quedan en Core. El envío fallido se informa y permite reintentar. Configurar `MAIL_*` y `FRONTEND_URL`; la plataforma no entra a datos clínicos.

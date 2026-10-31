@@ -260,3 +260,9 @@ Pruebas necesarias antes de aplicar a datos reales: integridad de todos los IDs 
 3. Después de migrar, comprobar que cada ID de servicio y vínculo profesional exista en `core.specialties`, y revisar reservas históricas y asociaciones activas por centro.
 
 La corrección frontend de sesión caducada y carga de reservas no requiere cambios de esquema ni datos. En esta rama no se aplicaron migraciones, seeders ni escrituras SQL.
+
+## Migración posterior al respaldo SQL (2026-10-31)
+
+El esquema vivo de Core incluye `medical_centers.provisioning_status` y `medical_centers.provisioned_at`, agregados por la migración Laravel `2026_10_31_000001`. Los SQL de esta carpeta son respaldo documental y pueden no incluir estas columnas. La creación desde plataforma genera una base PostgreSQL separada por centro, ejecuta las migraciones `database/migrations/center` y carga previsiones iniciales. La incorporación de un usuario global a otro centro crea una ficha en esa base y una membresía en Core, sin copiar datos clínicos. Para restaurar, aplicar migraciones y verificar cada base Center antes de habilitarla.
+
+La migración Core `2026_10_31_000002` agrega `center_users.invitation_pending` y `invitation_sent_at` para las invitaciones de ADMIN y recepción. El SQL de respaldo puede no reflejar esas columnas; aplicar migraciones Laravel antes de operar.

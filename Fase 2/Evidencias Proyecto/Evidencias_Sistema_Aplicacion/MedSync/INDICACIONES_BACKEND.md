@@ -132,3 +132,13 @@ Las vistas de plataforma incorporan gestión comercial de centros, planes y susc
 ## Observación de especialidades globales (24-10-2026)
 
 El frontend presenta el catálogo global a `SUPER_ADMIN` y la selección del centro a `ADMIN`, pero las rutas correspondientes aún son **propuestas**. Implementar los contratos de `medsync_frontend/docs/api-contract.md` y la guía del `medsync_backend/README.md`. Mantener `GET/POST/PATCH /api/v1/availabilities` tal como está; React agrupa sus filas por profesional. No convertir `POST /api/v1/specialties` local en operación global sin migración coordinada. El servidor debe derivar el centro de la sesión, validar `core.medical_center_specialties`, impedir que `SUPER_ADMIN` consulte datos clínicos y cubrir los permisos con pruebas de dos centros.
+
+## Pasos 1 y 2 implementados: centros y paciente global en otro centro
+
+La creación de centros se ejecuta solo para `SUPER_ADMIN`: Core genera `database_name`, crea una base PostgreSQL nueva, aplica migraciones Center y previsiones, verifica tablas y marca `READY`. En error conserva el centro `FAILED` e inactivo para reintentar. El usuario PostgreSQL necesita `CREATEDB`. El estado de suscripción se registra en Core, pero cobro y renovaciones no están automatizados.
+
+Una cuenta global autenticada sin membresía en el centro elegido recibe un estado explícito y puede cancelar o confirmar su ficha local. La sesión conserva un ID de centro validado, nunca un nombre de base enviado por React. El correo sale del usuario autenticado; RUT y correo duplicados requieren verificación por recepción. Crear paciente clínico y membresía Core exige compensación entre bases e idempotencia. No copiar fichas, citas ni resultados de otro centro. El paso 3 de ADMIN y recepción se incorporó a esta entrega.
+
+### Paso 3 incorporado: ADMIN y recepción
+
+Se eligió invitación por correo, siguiendo el flujo ya existente para profesionales. `SUPER_ADMIN` crea/asigna únicamente ADMIN, y un ADMIN del centro crea/asigna únicamente RECEPCIONISTA de su tenant. Reutilizar la identidad Core sin cambiar su contraseña, mantener una sola membresía por cuenta y centro y revocar acceso mediante `is_active`. Una cuenta nueva recibe un token temporal; registrar envío fallido y permitir reenvío. No exponer tokens ni datos clínicos en rutas de plataforma.

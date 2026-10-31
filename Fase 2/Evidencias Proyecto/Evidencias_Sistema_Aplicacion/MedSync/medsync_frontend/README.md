@@ -17,7 +17,7 @@ Abre [http://localhost:3000](http://localhost:3000). La raíz es una landing pú
 
 ## Navegación pública y acceso contextual
 
-El selector público de login y registro usa `GET /api/public/centers` como fuente de centros activos. `src/data/public-centers.ts` conserva textos e información comercial estática para las vistas públicas; no determina qué centro puede recibir un registro.
+El selector, directorio y portada públicos usan `GET /api/public/centers` como fuente de centros activos. `src/data/public-centers.ts` solo enriquece con textos editoriales a centros conocidos; no determina qué centro puede recibir un registro.
 
 | Ruta | Propósito |
 | --- | --- |
@@ -31,7 +31,7 @@ El selector público de login y registro usa `GET /api/public/centers` como fuen
 
 Los accesos genéricos nunca asumen Clínica Horizonte ni otro centro. Los botones dentro de un micrositio sí llevan directamente a su propio `/centro/{slug}/ingresar`.
 
-El formulario de `/centro/{slug}/crear-cuenta` envía ese `slug` como `center_slug` a Laravel y lo reutiliza para el login posterior. Si Core no publica el centro, no se ofrece en el selector. Los centros estáticos del directorio comercial pueden diferir de los centros aprovisionados en Core; mantenerlos sincronizados queda pendiente.
+El formulario de `/centro/{slug}/crear-cuenta` envía ese `slug` como `center_slug` a Laravel y lo reutiliza para el login posterior. Si Core no publica el centro, no se ofrece en el selector. Los centros nuevos aprovisionados y activos aparecen en el directorio y pueden recibir registro sin editar un arreglo estático.
 
 ## Usuarios del dataset local de demostración
 
@@ -137,3 +137,13 @@ Los JSON, permisos y códigos de error están en `docs/api-contract.md`. La UI o
 `/centro/{centerSlug}/reservar` carga prestaciones desde `GET /api/v1/services`, profesionales desde `GET /api/v1/services/{id}/professionals` y horas desde `GET /api/v1/appointments/available-slots`. La pantalla ahora distingue la carga, el catálogo vacío y el error de catálogo con opción de reintentar. Si cualquier solicitud Laravel responde `401`, el estado de usuario y centro se limpia y la ruta clínica vuelve al acceso contextual; así no queda visible una sesión local antigua con selectores vacíos. Reingresar recupera el catálogo. La disponibilidad puede ser legítimamente vacía en días sin bloques activos; en el centro de prueba los bloques configurados están de lunes a viernes.
 
 Verificación de esta rama: `npm run test -- --run` (44 pruebas), `npm run lint` (sin errores; una advertencia heredada en `button.tsx`) y `npm run build` (correcto; advertencia de tamaño del bundle). La API global de especialidades continúa pendiente y su ausencia se muestra como error controlado, sin datos ficticios.
+
+## Centros reales y cuenta existente en otro centro
+
+La pantalla `/plataforma` consulta Core para listar, crear, editar, habilitar y deshabilitar centros; muestra si la base clínica está lista y permite reintentar un fallo. Los datos de plan y suscripción son estados guardados en Core; no hay cobro automático. Los centros activos aparecen en portada y directorio a través de la API pública.
+
+Si el login en un centro reconoce una cuenta global sin membresía allí, la ruta `/centro/{slug}/crear-ficha` muestra el correo autenticado y solicita los datos de una ficha local con consentimiento. Cancelar cierra la sesión sin crear registros. La ficha usa la misma cuenta global; los datos clínicos de otros centros no se muestran ni copian. Si un RUT o correo ya existe en ese centro, se requiere verificación por recepción.
+
+### Administración de accesos
+
+`/plataforma` asigna ADMIN al centro seleccionado; la administración del centro asigna recepción. La interfaz consulta y escribe membresías en Laravel, muestra invitaciones pendientes y permite desactivar, reactivar y reenviar. No solicita contraseña inicial: el usuario nuevo la crea desde el correo. Una cuenta existente mantiene su contraseña.

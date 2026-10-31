@@ -49,6 +49,7 @@ import { dateFromToday, toMinutes, toTime, uid } from "@/lib/utils";
 import { canSetAppointmentStatus } from "@/domain/appointment-rules";
 
 import {
+  ApiError,
   AUTH_EXPIRED_EVENT,
   availabilityApi,
   appointmentApi,
@@ -255,7 +256,7 @@ interface ClinicContextValue {
     password: string,
     portal?: "CENTER" | "PLATFORM",
     centerSlug?: string,
-  ): Promise<boolean>;
+  ): Promise<boolean | 'ENROLLMENT_REQUIRED'>;
 
   logout(): Promise<void>;
 
@@ -398,6 +399,13 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
   const [publicCentersLoading, setPublicCentersLoading] = useState(true);
   const [publicOrganizations, setPublicOrganizations] = useState<Organization[]>([]);
   const [initialOrganizations] = useState(() => allData.organizations);
+  const [publicCenterReloadToken, setPublicCenterReloadToken] = useState(0);
+
+  useEffect(() => {
+    const reload = () => setPublicCenterReloadToken((value) => value + 1);
+    window.addEventListener('medsync:centers-updated', reload);
+    return () => window.removeEventListener('medsync:centers-updated', reload);
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -423,7 +431,7 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
       if (mounted) setPublicCentersLoading(false);
     });
     return () => { mounted = false; };
-  }, [initialOrganizations]);
+  }, [initialOrganizations, publicCenterReloadToken]);
 
   const availableOrganizations = publicOrganizations.filter(
     (item) =>
@@ -1104,6 +1112,10 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
       return true;
     } catch (error) {
       console.error("Error en login de Laravel:", error);
+
+      if (error instanceof ApiError && error.status === 409 && error.code === 'CENTER_ENROLLMENT_REQUIRED') {
+        return 'ENROLLMENT_REQUIRED' as const;
+      }
 
       return false;
     }

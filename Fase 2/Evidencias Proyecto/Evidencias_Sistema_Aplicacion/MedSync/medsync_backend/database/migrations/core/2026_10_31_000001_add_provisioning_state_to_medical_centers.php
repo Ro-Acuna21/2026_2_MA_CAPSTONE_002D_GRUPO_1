@@ -1,0 +1,23 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::connection('core')->table('medical_centers', function (Blueprint $table) {
+            $table->string('provisioning_status', 20)->default('READY');
+            $table->timestamp('provisioned_at')->nullable();
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::connection('core')->table('medical_centers', function (Blueprint $table) {
+            $table->dropColumn(['provisioning_status', 'provisioned_at']);
+        });
+    }
+};

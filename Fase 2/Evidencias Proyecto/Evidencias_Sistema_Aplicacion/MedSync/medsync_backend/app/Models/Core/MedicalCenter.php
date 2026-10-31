@@ -18,12 +18,19 @@ class MedicalCenter extends Model
         'phone',
         'email',
         'is_active',
+        'plan',
+        'subscription_status',
+        'subscription_ends_at',
+        'provisioning_status',
+        'provisioned_at',
     ];
 
     protected function casts(): array
     {
         return [
             'is_active' => 'boolean',
+            'subscription_ends_at' => 'datetime',
+            'provisioned_at' => 'datetime',
         ];
     }
     public function addresses()

@@ -1,11 +1,78 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { toast } from 'sonner'
 import { ActionForm } from './action-form'
-import { Field, Input, Select } from './ui/form-controls'
-import { useClinic } from '@/state/clinic-store'
-import { roleNames, type Membership } from '@/domain/types'
-import { membershipsFor } from '@/domain/access'
+import { Button } from './ui/button'
+import { Field, Input } from './ui/form-controls'
+import { centerAccessApi, type CenterAccess } from '@/services/center-access-api'
+import { firstApiErrorMessage } from '@/services/http'
 
 export function AccessForm({ centerId, platform = false }: { centerId: string; platform?: boolean }) {
-  const { assignAccess, data, user } = useClinic(); const [role, setRole] = useState<Membership['role']>('ADMIN')
-  return <div className="grid gap-5"><p className="text-sm text-muted-foreground">Para actualizar una cuenta existente, usa su correo. La contraseña solo se requiere para cuentas nuevas. Las cuentas de pacientes se originan en su registro y se muestran aquí sin exponer su ficha clínica.</p><ActionForm reset={false} className="sm:grid-cols-2" label="Guardar acceso" onSave={(v) => assignAccess(v.email, v.name, { organizationId: centerId, role: platform ? 'ADMIN' : role, professionalId: v.professionalId, extraPermissions: v.upload === 'on' ? ['results.upload'] : [] }, v.password)}><Field label="Nombre del usuario"><Input name="name" required /></Field><Field label="Correo de la cuenta"><Input name="email" type="email" required /></Field>{!platform && <Field label="Rol en este centro"><Select value={role} onChange={(e) => setRole(e.target.value as Membership['role'])}>{(['ADMIN', 'RECEPCIONISTA', 'PROFESIONAL'] as const).map((r) => <option key={r} value={r}>{roleNames[r]}</option>)}</Select></Field>}<Field label="Contraseña inicial (solo cuenta nueva)"><Input type="password" name="password" autoComplete="new-password" placeholder="8 caracteres, mayúscula, minúscula y número" /></Field>{role === 'PROFESIONAL' && <Field label="Ficha del profesional"><Select name="professionalId" required><option value="">Seleccionar</option>{data.professionals.map((p) => <option key={p.id} value={p.id}>{p.name} · {p.email}</option>)}</Select></Field>}{role === 'RECEPCIONISTA' && <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="upload" /> Permitir carga de borradores de informes</label>}</ActionForm><ul className="divide-y text-sm">{data.users.flatMap((u) => membershipsFor(u).filter((m) => m.organizationId === centerId && (!platform || m.role === 'ADMIN')).map((m) => <li className="py-3" key={`${u.id}-${m.organizationId}`}>{u.name} · {u.email}<span className="block text-xs text-muted-foreground">{roleNames[m.role]}{u.id === user?.id ? ' · Tu cuenta' : ''}{m.extraPermissions?.includes('results.upload') ? ' · Puede cargar borradores' : ''}</span></li>))}</ul></div>
+  const [memberships, setMemberships] = useState<CenterAccess[]>([])
+  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [error, setError] = useState('')
+  const [reload, setReload] = useState(0)
+  const [busyId, setBusyId] = useState<number | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    centerAccessApi.list(platform, centerId).then((response) => {
+      if (cancelled) return
+      setMemberships(response.data)
+      setStatus('ready')
+      setError('')
+    }).catch((failure: unknown) => {
+      if (cancelled) return
+      setError(firstApiErrorMessage(failure, 'No fue posible cargar los accesos del centro.'))
+      setStatus('error')
+    })
+    return () => { cancelled = true }
+  }, [centerId, platform, reload])
+
+  async function assign(values: Record<string, string>) {
+    const response = await centerAccessApi.assign(platform, centerId, {
+      name: values.name.trim(), email: values.email.trim().toLowerCase(),
+    }).catch((failure: unknown) => { throw new Error(firstApiErrorMessage(failure, 'No fue posible guardar el acceso.')) })
+    setMemberships((current) => [...current.filter((item) => item.id !== response.data.id), response.data])
+    if (response.account_created && !response.invitation_sent) toast.warning(response.message)
+    else toast.success(response.message)
+  }
+
+  async function changeAccess(item: CenterAccess, operation: 'toggle' | 'resend') {
+    setBusyId(item.id)
+    setError('')
+    try {
+      const response = operation === 'toggle'
+        ? await centerAccessApi.setActive(platform, centerId, item.id, !item.is_active)
+        : await centerAccessApi.resend(platform, centerId, item.id)
+      setMemberships((current) => current.map((entry) => entry.id === item.id ? response.data : entry))
+      toast.success(operation === 'resend' && 'message' in response && typeof response.message === 'string' ? response.message : 'Acceso actualizado en el centro.')
+    } catch (failure) {
+      setError(firstApiErrorMessage(failure, 'No fue posible actualizar el acceso.'))
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  return <div className="grid gap-5">
+    <p className="text-sm text-muted-foreground">{platform ? 'Asigna administradores a este centro.' : 'Asigna cuentas de recepción a tu centro.'} Si el correo ya tiene una cuenta MedSync, conserva su contraseña. Las cuentas nuevas reciben una invitación para crearla.</p>
+    {status === 'loading' && <p role="status">Cargando accesos…</p>}
+    {status === 'error' && <div><p role="alert" className="text-sm text-rose-700">{error}</p><Button type="button" variant="outline" onClick={() => { setStatus('loading'); setReload((value) => value + 1) }}>Reintentar</Button></div>}
+    {status === 'ready' && <>
+      <ActionForm className="sm:grid-cols-2" label={platform ? 'Asignar administrador' : 'Asignar recepción'} onSave={assign}>
+        <Field label="Nombre de la persona"><Input name="name" required minLength={3} maxLength={150} /></Field>
+        <Field label="Correo de la cuenta"><Input name="email" type="email" required maxLength={150} /></Field>
+      </ActionForm>
+      {error && <p role="alert" className="text-sm text-rose-700">{error}</p>}
+      <ul className="divide-y text-sm">
+        {memberships.length === 0 && <li className="py-3 text-muted-foreground">Todavía no hay accesos asignados.</li>}
+        {memberships.map((item) => <li className="flex flex-wrap items-center justify-between gap-3 py-3" key={item.id}>
+          <div><strong>{item.name}</strong> · {item.email}<span className="block text-xs text-muted-foreground">{item.is_active ? 'Activo' : 'Inactivo'}{item.invitation_pending ? ' · Invitación pendiente' : ''}</span></div>
+          <div className="flex gap-2">
+            {item.invitation_pending && item.is_active && <Button type="button" size="sm" variant="outline" disabled={busyId === item.id} onClick={() => void changeAccess(item, 'resend')}>Reenviar invitación</Button>}
+            <Button type="button" size="sm" variant="outline" disabled={busyId === item.id} onClick={() => void changeAccess(item, 'toggle')}>{item.is_active ? 'Desactivar' : 'Reactivar'}</Button>
+          </div>
+        </li>)}
+      </ul>
+    </>}
+  </div>
 }

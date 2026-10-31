@@ -123,6 +123,11 @@ export function LoginPage({ platform = false }: { platform?: boolean }) {
         center?.slug,
       );
 
+      if (ok === 'ENROLLMENT_REQUIRED') {
+        navigate(`${base}/crear-ficha`);
+        return;
+      }
+
       if (!ok) {
         setError(
           platform

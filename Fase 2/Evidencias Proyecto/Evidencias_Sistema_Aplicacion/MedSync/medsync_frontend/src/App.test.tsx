@@ -19,6 +19,18 @@ describe('navegación por roles con sesión Laravel', () => {
     expect(screen.queryByRole('link', { name: 'Agenda' })).toBeNull()
   })
 
+  it('crea un centro desde plataforma mediante la API y actualiza el directorio público', async () => {
+    const api = stubLaravelApi({ session: backendUser('SUPER_ADMIN'), centers: [] })
+    open('/plataforma')
+    fireEvent.click(await screen.findByRole('button', { name: 'Crear centro' }))
+    fireEvent.change(screen.getByLabelText('Nombre del centro'), { target: { value: 'Centro Nuevo' } })
+    fireEvent.change(screen.getByLabelText('Dirección del centro en la plataforma'), { target: { value: 'centro-nuevo' } })
+    fireEvent.change(screen.getByLabelText('RUT del centro'), { target: { value: '12.345.678-5' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Crear centro' }))
+    expect(await screen.findByText('Centro Nuevo')).toBeDefined()
+    expect(api.requests.some((request) => request.path === '/api/v1/platform/centers' && request.method === 'POST' && request.body?.slug === 'centro-nuevo')).toBe(true)
+  })
+
   it('redirige al SUPER_ADMIN fuera de una ruta clínica', async () => {
     stubLaravelApi({ session: backendUser('SUPER_ADMIN') })
     open('/centro/clinica-horizonte/pacientes')
@@ -32,6 +44,16 @@ describe('navegación por roles con sesión Laravel', () => {
     expect(await screen.findByLabelText('Previsión de salud')).toBeDefined()
     expect(screen.getByLabelText('Confirmar contraseña')).toBeDefined()
     expect(screen.getByRole('button', { name: 'Crear mi cuenta' })).toBeDefined()
+  })
+
+  it('solicita una ficha local a la cuenta global autenticada sin pedir otra contraseña', async () => {
+    stubLaravelApi({ pendingEnrollment: { center: centers[1], email: 'existing@example.test' } })
+    open('/centro/centro-alameda/crear-ficha')
+    expect(await screen.findByText('existing@example.test')).toBeDefined()
+    expect(screen.getByLabelText('RUT')).toBeDefined()
+    expect(screen.getByRole('button', { name: 'Crear mi ficha en este centro' })).toBeDefined()
+    expect(screen.queryByLabelText('Contraseña')).toBeNull()
+    expect(screen.queryByLabelText('Correo electrónico')).toBeNull()
   })
 
   it('mantiene el acceso de plataforma solo en su dirección específica', async () => {

@@ -28,7 +28,7 @@ El middleware clínico configura `database.connections.center.database`, ejecuta
 
 El registro público es la excepción pública que necesita escribir una ficha clínica: recibe solo `center_slug`, consulta en Core un centro activo y reutiliza `TenantConnectionResolver` antes de acceder a `health_insurances` o `patients`. No requiere una migración nueva. Sigue pendiente la decisión de producto sobre correos compartidos entre centros: el esquema actual de `core.users` exige correo globalmente único, aunque el modelo objetivo descrito arriba propone otra política.
 
-`DB_CENTER_DATABASE` no es el mecanismo de selección por petición: puede existir como valor local de arranque, pero no autoriza ni determina el tenant autenticado. Crear una nueva base y aplicar sus migraciones sigue siendo una tarea de provisionamiento explícita, fuera de esta resolución.
+`DB_CENTER_DATABASE` no es el mecanismo de selección por petición: puede existir como valor local de arranque, pero no autoriza ni determina el tenant autenticado. El alta desde plataforma ya crea una base clínica nueva y aplica sus migraciones automáticamente.
 
 ## Catálogos y personas del centro
 
@@ -118,3 +118,13 @@ Guardar `consent_at` y `consent_version`, no solo un booleano. Los cambios de ci
 ### Transición del catálogo de especialidades (24-10-2026)
 
 La tabla `specialties` descrita arriba representa el diseño clínico local previo. El PR #19 agregó en Core `specialties` y `medical_center_specialties`, pero las FK de `services.specialty_id` y `professional_specialty.specialty_id` aún apuntan a `center.specialties`. El diseño objetivo usa la relación Core para la selección de cada centro y referencias lógicas desde la base clínica a IDs globales. Antes de retirar tablas o FK locales se requiere un mapeo por centro, validación de todas las referencias, adaptación del backend y pruebas de reserva e historial. El procedimiento propuesto y sus verificaciones están en `medsync_BD/README_BD.md`; no se ejecutó ninguna migración en esta entrega.
+
+## Estado implementado en Core: aprovisionamiento e incorporación
+
+La migración `2026_10_31_000001` agrega `medical_centers.provisioning_status` (`PENDING|READY|FAILED`) y `provisioned_at`. Los centros preexistentes se consideran `READY`; uno nuevo solo se activa al verificar su base clínica. `database_name` se genera en Laravel y jamás proviene del cliente. La base nueva recibe migraciones Center y previsiones iniciales, sin pacientes ni citas.
+
+La identidad permanece en `core.users` y el paciente del segundo centro se crea en su propia base; `core.center_users` agrega una membresía `PACIENTE` al mismo usuario global. La unicidad `(medical_center_id,user_id)` impide duplicar su rol en el centro. La política objetivo de correos duplicables por centro continúa pendiente: el esquema actual exige correo global único. No crear claves foráneas entre bases físicas.
+
+### Invitaciones de acceso (paso 3)
+
+La migración Core `2026_10_31_000002` agrega `center_users.invitation_pending` y `invitation_sent_at`. La cuenta permanece en `core.users`; asignar ADMIN o RECEPCIONISTA crea/reutiliza una sola fila de `center_users` por centro sin modificar contraseñas existentes. La activación por token limpia el estado pendiente.

@@ -11,6 +11,7 @@ export class ApiError extends Error {
     public status: number,
     message: string,
     public errors?: Record<string, string[]>,
+    public code?: string,
   ) {
     super(message);
   }
@@ -54,7 +55,7 @@ export async function apiRequest<T>(
       window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
     }
 
-    throw new ApiError(response.status, body.message, body.errors);
+    throw new ApiError(response.status, body.message, body.errors, body.code);
   }
 
   return response.status === 204 ? (undefined as T) : response.json();
@@ -221,6 +222,14 @@ export const sanctum = {
     }),
 
   me: () => apiRequest<AuthResponse>("/api/v1/me"),
+
+  pendingEnrollment: () => apiRequest<{ data: { center: { id: number; name: string; slug: string }; email: string } }>("/api/v1/patient-enrollment"),
+
+  enrollPatient: (payload: Omit<PatientRegisterPayload, 'center_slug' | 'email' | 'password' | 'password_confirmation'>) =>
+    apiRequest<{ data: { center: { id: number; name: string; slug: string }; patient_id: number } }>("/api/v1/patient-enrollment", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
 
   register: async (payload: PatientRegisterPayload) => {
     await sanctum.csrf();
