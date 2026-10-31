@@ -36,8 +36,6 @@ class PlatformCenterController extends Controller
             'rut' => ['required', 'string', new ValidRut(), Rule::unique('core.medical_centers', 'rut')],
             'email' => ['nullable', 'email', 'max:150'],
             'phone' => ['nullable', 'string', 'max:20'],
-            'plan' => ['required', Rule::in(['STARTER', 'PRO'])],
-            'subscription_status' => ['required', Rule::in(['TRIAL', 'ACTIVE', 'EXPIRED', 'SUSPENDED'])],
             'is_active' => ['required', 'boolean'],
         ]);
 
@@ -64,8 +62,6 @@ class PlatformCenterController extends Controller
             'rut' => ['sometimes', 'required', 'string', new ValidRut(), Rule::unique('core.medical_centers', 'rut')->ignore($center->id)],
             'email' => ['sometimes', 'nullable', 'email', 'max:150'],
             'phone' => ['sometimes', 'nullable', 'string', 'max:20'],
-            'plan' => ['sometimes', Rule::in(['STARTER', 'PRO'])],
-            'subscription_status' => ['sometimes', Rule::in(['TRIAL', 'ACTIVE', 'EXPIRED', 'SUSPENDED'])],
             'is_active' => ['sometimes', 'boolean'],
         ]);
         if (($data['is_active'] ?? false) && $center->provisioning_status !== 'READY') {
@@ -109,9 +105,12 @@ class PlatformCenterController extends Controller
 
     private function present(MedicalCenter $center): array
     {
-        return $center->only([
-            'id', 'name', 'slug', 'rut', 'phone', 'email', 'plan', 'subscription_status',
-            'is_active', 'provisioning_status', 'provisioned_at',
-        ]);
+        $center->loadMissing('currentSubscription.plan');
+        return [
+            ...$center->only(['id', 'name', 'slug', 'rut', 'phone', 'email', 'is_active', 'provisioning_status', 'provisioned_at']),
+            'plan' => $center->currentSubscription?->plan?->code,
+            'subscription_status' => $center->currentSubscription?->status,
+            'subscription_renews_at' => $center->currentSubscription?->renews_at?->toDateString(),
+        ];
     }
 }

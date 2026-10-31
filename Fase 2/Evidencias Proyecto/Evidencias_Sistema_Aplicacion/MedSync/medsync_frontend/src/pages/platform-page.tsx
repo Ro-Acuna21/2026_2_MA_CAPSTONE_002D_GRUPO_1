@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Field, Input, Select } from '@/components/ui/form-controls'
 import { firstApiErrorMessage } from '@/services/http'
 import { platformCenterApi, type CenterInput, type PlatformCenter } from '@/services/platform-center-api'
+import { PlatformSubscription } from '@/components/platform-subscription'
 import { useClinic } from '@/state/clinic-store'
 
 const subscriptionLabels = { TRIAL: 'Prueba', ACTIVE: 'Activa', EXPIRED: 'Vencida', SUSPENDED: 'Suspendida' }
@@ -21,8 +22,6 @@ function CenterForm({ center, onSaved }: { center?: PlatformCenter; onSaved: (in
     await onSaved({
       name: values.name.trim(), slug: values.slug.trim(), rut: values.rut.trim(),
       email: values.email.trim() || null, phone: values.phone.trim() || null,
-      plan: values.plan as CenterInput['plan'],
-      subscription_status: values.subscription_status as CenterInput['subscription_status'],
       is_active: values.is_active === 'true',
     })
   }}>
@@ -31,8 +30,6 @@ function CenterForm({ center, onSaved }: { center?: PlatformCenter; onSaved: (in
     <Field label="RUT del centro"><Input name="rut" defaultValue={center?.rut} required placeholder="12.345.678-5" /></Field>
     <Field label="Correo de contacto"><Input name="email" type="email" defaultValue={center?.email ?? ''} /></Field>
     <Field label="Teléfono"><Input name="phone" defaultValue={center?.phone ?? ''} /></Field>
-    <Field label="Plan"><Select name="plan" defaultValue={center?.plan ?? 'STARTER'}><option value="STARTER">Básico</option><option value="PRO">Profesional</option></Select></Field>
-    <Field label="Estado de suscripción"><Select name="subscription_status" defaultValue={center?.subscription_status ?? 'TRIAL'}>{Object.entries(subscriptionLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</Select></Field>
     <Field label="Acceso del centro"><Select name="is_active" defaultValue={String(center?.is_active ?? true)}><option value="true">Habilitado</option><option value="false">Deshabilitado</option></Select></Field>
   </ActionForm>
 }
@@ -112,7 +109,7 @@ export function PlatformPage() {
       <section className="mb-6 grid gap-4 sm:grid-cols-3">{stats.map(({ label, value, Icon }) => <Card key={label}><CardContent className="flex items-start justify-between p-5"><div><p className="text-xs text-muted-foreground">{label}</p><strong className="mt-2 block text-2xl">{value}</strong></div><Icon className="size-5 text-primary" /></CardContent></Card>)}</section>
       {showCreate && <Card className="mb-6"><CardHeader><CardTitle>Nuevo centro médico</CardTitle></CardHeader><CardContent><CenterForm onSaved={(input) => save(input)} /></CardContent></Card>}
       <Card className="mb-6"><CardHeader><CardTitle>Centros</CardTitle></CardHeader><CardContent className="overflow-x-auto p-0"><table className="w-full min-w-[800px] text-left text-sm"><thead className="bg-muted/60 text-xs uppercase text-muted-foreground"><tr><th className="px-5 py-3">Centro</th><th className="px-4 py-3">Plan</th><th className="px-4 py-3">Suscripción</th><th className="px-4 py-3">Base clínica</th><th className="px-4 py-3">Acceso</th><th className="px-4 py-3">Acciones</th></tr></thead><tbody>{centers.map((center) => <tr className="border-t" key={center.id}><td className="px-5 py-4"><strong>{center.name}</strong><span className="block text-xs text-muted-foreground">/{center.slug}</span></td><td className="px-4 py-4">{center.plan ?? 'Sin plan'}</td><td className="px-4 py-4">{center.subscription_status ? subscriptionLabels[center.subscription_status] : 'Sin definir'}</td><td className="px-4 py-4">{provisioningLabels[center.provisioning_status]}</td><td className="px-4 py-4">{center.is_active ? 'Habilitado' : 'Deshabilitado'}</td><td className="flex flex-wrap gap-2 px-4 py-4"><Button size="sm" variant="outline" onClick={() => setSelectedId(center.id)}><Eye className="size-4" /> Detalle</Button>{center.provisioning_status === 'FAILED' && <Button size="sm" disabled={busyId === center.id} onClick={() => void change(center, 'retry')}>Reintentar base</Button>}{center.provisioning_status === 'READY' && <Button size="sm" variant="outline" disabled={busyId === center.id} onClick={() => void change(center, 'toggle')}>{center.is_active ? 'Deshabilitar' : 'Habilitar'}</Button>}</td></tr>)}</tbody></table>{centers.length === 0 && <p className="p-5 text-sm text-muted-foreground">Todavía no hay centros registrados.</p>}</CardContent></Card>
-      {selected && <Card><CardHeader><CardTitle>Detalle · {selected.name}</CardTitle></CardHeader><CardContent className="grid gap-8 xl:grid-cols-2"><div><h3 className="mb-4 font-semibold">Centro y acceso</h3><CenterForm key={selected.id} center={selected} onSaved={(input) => save(input, selected)} /></div>{selected.provisioning_status === 'READY' && <div><h3 className="mb-4 font-semibold">Administradores del centro</h3><AccessForm centerId={String(selected.id)} platform /><PlatformStaffRoles centerId={String(selected.id)} /></div>}</CardContent></Card>}
+      {selected && <><Card><CardHeader><CardTitle>Detalle · {selected.name}</CardTitle></CardHeader><CardContent className="grid gap-8 xl:grid-cols-2"><div><h3 className="mb-4 font-semibold">Centro y acceso</h3><CenterForm key={selected.id} center={selected} onSaved={(input) => save(input, selected)} /></div>{selected.provisioning_status === 'READY' && <div><h3 className="mb-4 font-semibold">Administradores del centro</h3><AccessForm centerId={String(selected.id)} platform /><PlatformStaffRoles centerId={String(selected.id)} /></div>}</CardContent></Card><PlatformSubscription centerId={selected.id} onChanged={() => setReload((value) => value + 1)} /></>}
     </>}
   </>
 }

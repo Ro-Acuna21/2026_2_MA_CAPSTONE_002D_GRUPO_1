@@ -21,8 +21,11 @@ use App\Http\Controllers\Api\MedicalResultController;
 use App\Http\Controllers\Api\ResultTypeController;
 use App\Http\Controllers\Api\ServicePriceController;
 use App\Http\Controllers\Api\ReportController;
+use App\Http\Controllers\Api\PlanController;
+use App\Http\Controllers\Api\SubscriptionController;
 Route::get('/public/centers', [AuthController::class, 'publicCenters']);
 Route::get('/public/territorial-catalog', [TerritorialCatalogController::class, 'index']);
+Route::get('/public/plans', [PlanController::class, 'publicIndex']);
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 Route::post(
@@ -38,7 +41,14 @@ Route::middleware('auth:sanctum')->group(function () {
 // Catálogo global de especialidades (plataforma): exclusivo de SUPER_ADMIN,
 // nunca abre una conexión clínica (ver api-contract.md, 24-10-2026).
 Route::middleware('auth:sanctum')->prefix('v1/platform')->group(function () {
+    Route::get('/plans', [PlanController::class, 'index']);
+    Route::post('/plans', [PlanController::class, 'store']);
+    Route::patch('/plans/{plan}', [PlanController::class, 'update'])->whereNumber('plan');
     Route::get('/centers', [PlatformCenterController::class, 'index']);
+    Route::get('/centers/{center}/subscription', [SubscriptionController::class, 'platformShow'])->whereNumber('center');
+    Route::post('/centers/{center}/subscriptions', [SubscriptionController::class, 'store'])->whereNumber('center');
+    Route::patch('/centers/{center}/subscriptions/{subscription}', [SubscriptionController::class, 'update'])->whereNumber('center')->whereNumber('subscription');
+    Route::post('/centers/{center}/subscriptions/{subscription}/payments', [SubscriptionController::class, 'payment'])->whereNumber('center')->whereNumber('subscription');
     Route::post('/centers', [PlatformCenterController::class, 'store']);
     Route::patch('/centers/{center}', [PlatformCenterController::class, 'update'])->whereNumber('center');
     Route::post('/centers/{center}/provision', [PlatformCenterController::class, 'retry'])->whereNumber('center');
@@ -54,6 +64,7 @@ Route::middleware('auth:sanctum')->prefix('v1/platform')->group(function () {
 });
 
 Route::middleware(['auth:sanctum', 'tenant.center'])->group(function () {
+    Route::get('/v1/center/subscription', [SubscriptionController::class, 'centerShow']);
     Route::get('/v1/center/permissions', CenterPermissionCatalogController::class);
     Route::get('/v1/center/receptionists', [CenterAccessController::class, 'centerIndex']);
     Route::post('/v1/center/receptionists', [CenterAccessController::class, 'centerStore']);

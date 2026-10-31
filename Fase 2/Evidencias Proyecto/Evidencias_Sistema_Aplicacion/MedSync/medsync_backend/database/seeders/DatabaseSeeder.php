@@ -11,6 +11,7 @@ class DatabaseSeeder extends Seeder
         $this->call([
             SuperAdminSeeder::class,
             CoreMedicalCenterSeeder::class,
+            PlanCatalogSeeder::class,
             CenterHealthInsuranceSeeder::class,
             MedSyncDemoSeeder::class,
             ReceptionistDemoSeeder::class,

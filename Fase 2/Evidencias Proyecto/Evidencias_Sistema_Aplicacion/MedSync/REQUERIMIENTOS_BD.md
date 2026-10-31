@@ -135,3 +135,6 @@ Spatie persiste roles y asignaciones en Core con Teams por `medical_center_id`; 
 
 ## Pasos 5 y 6 · 31-10-2026
 Resultados, precios y reportes (pasos 5 y 6): ver `README_RESULTADOS_PRECIOS_REPORTES.md` en la raíz MedSync. API de archivos privados, permisos por centro, vigencia de tarifas e indicadores estimados; aplicar la migración Core de permisos y respaldar almacenamiento local privado.
+
+## Paso 7: estado comercial persistido (31-10-2026)
+Core `plans`, `subscriptions` y `subscription_payments` son la fuente comercial. La suscripción abierta es única por centro. La migración `2026_10_31_000004` agrega precio de contratación y actor del pago manual; `2026_10_31_000005` impide referencias duplicadas por suscripción. Los campos comerciales de `medical_centers` son de compatibilidad; la interfaz lee la suscripción abierta. Ver `README_SUSCRIPCIONES_Y_REVISION_FINAL.md` en la raíz MedSync.

@@ -32,3 +32,6 @@ Laravel aplica el catálogo fijo de Spatie en Core con Teams por `medical_center
 
 ## Pasos 5 y 6 · 31-10-2026
 MedSync pasos 5 y 6: resultados médicos privados, precios históricos y reportes por centro. Detalle en `Fase 2/Evidencias Proyecto/Evidencias_Sistema_Aplicacion/MedSync/README_RESULTADOS_PRECIOS_REPORTES.md`.
+
+## Paso 7 y revisión final · 31-10-2026
+Planes, suscripciones y pagos manuales se guardan en Core; plataforma y centro leen el mismo estado. No hay cobro integrado ni afirmación automática de «pago al día». La revisión integral y sus pendientes están en `README_SUSCRIPCIONES_Y_REVISION_FINAL.md` de la raíz MedSync.

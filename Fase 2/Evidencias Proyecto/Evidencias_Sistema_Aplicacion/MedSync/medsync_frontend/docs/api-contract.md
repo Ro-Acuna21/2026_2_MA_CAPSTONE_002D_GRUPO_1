@@ -53,7 +53,7 @@ El acceso visual separado (`/plataforma/acceso`) mejora la navegación, pero la 
 | Método | Ruta propuesta | Uso |
 | --- | --- | --- |
 | POST | `/api/register` | Registro del paciente y membresía inicial; validar RUT, duplicados y contraseña en servidor |
-| GET/POST/PATCH | `/api/v1/platform/centers` | Centros, planes, suscripciones y habilitación, exclusivo de plataforma |
+| GET/POST/PATCH | `/api/v1/platform/centers` | Centros y habilitación, exclusivo de plataforma; muestra plan y estado de la suscripción abierta |
 | GET/POST | `/api/v1/platform/centers/{id}/administrators` | Asignación persistente de ADMIN; implementado |
 | GET/PATCH | `/api/v1/platform/centers/{id}/staff` | Listado y cambio de rol ADMIN/RECEPCIONISTA en la misma membresía; implementado |
 | GET/POST | `/api/v1/center/receptionists` | Asignación persistente de recepción por ADMIN; implementado |
@@ -93,7 +93,7 @@ En el flujo de reserva existente, `GET /api/v1/services`, `GET /api/v1/services/
 
 ## Endpoints implementados: centros e incorporación de pacientes (2026-10-31)
 
-Todos usan sesión Sanctum. `GET/POST /api/v1/platform/centers`, `PATCH /api/v1/platform/centers/{center}` y `POST /api/v1/platform/centers/{center}/provision` exigen `SUPER_ADMIN`. Crear recibe `name`, `slug`, `rut`, `email?`, `phone?`, `plan` (`STARTER|PRO`), `subscription_status` (`TRIAL|ACTIVE|EXPIRED|SUSPENDED`) e `is_active`. La respuesta incluye `provisioning_status` (`PENDING|READY|FAILED`) y `provisioned_at`, pero no `database_name`. Un fallo devuelve `503` y deja el centro inactivo; el reintento usa el mismo ID.
+Todos usan sesión Sanctum. `GET/POST /api/v1/platform/centers`, `PATCH /api/v1/platform/centers/{center}` y `POST /api/v1/platform/centers/{center}/provision` exigen `SUPER_ADMIN`. Crear recibe `name`, `slug`, `rut`, `email?`, `phone?` e `is_active`. Plan y estado no se editan en el formulario del centro: provienen de la suscripción abierta en Core. La respuesta incluye `provisioning_status` (`PENDING|READY|FAILED`) y `provisioned_at`, pero no `database_name`. Un fallo devuelve `503` y deja el centro inactivo; el reintento usa el mismo ID.
 
 `POST /api/login` con credenciales correctas y centro activo sin membresía responde `409` con `{code: "CENTER_ENROLLMENT_REQUIRED", message}` y una sesión limitada al centro pendiente. No da acceso clínico. `GET /api/v1/patient-enrollment` devuelve el centro pendiente y correo de la cuenta autenticada. `POST /api/v1/patient-enrollment` recibe `first_name`, `last_name`, `rut`, `birth_date`, `phone`, `health_insurance`, `medical_insurance?`, `address?`, `region_code?`, `commune_code?`, `consent`; el correo proviene de la cuenta global. Devuelve `201` y `patient_id`; repetición válida devuelve `200` sin duplicar. RUT/correo ya usados en ese centro devuelven `422` hasta verificar identidad. Una membresía inactiva o de otro rol no habilita inscripción.
 
@@ -105,3 +105,6 @@ Todos usan sesión Sanctum. `GET/POST /api/v1/platform/centers`, `PATCH /api/v1/
 
 ## Pasos 5 y 6 · 31-10-2026
 Resultados, precios y reportes (pasos 5 y 6): ver `README_RESULTADOS_PRECIOS_REPORTES.md` en la raíz MedSync. API de archivos privados, permisos por centro, vigencia de tarifas e indicadores estimados; aplicar la migración Core de permisos y respaldar almacenamiento local privado.
+
+## Paso 7: suscripciones persistidas (31-10-2026)
+`GET /api/public/plans` publica planes activos. `GET/POST /api/v1/platform/plans` y `PATCH /api/v1/platform/plans/{plan}` son solo de SUPER_ADMIN. `GET /api/v1/platform/centers/{center}/subscription`, `POST /api/v1/platform/centers/{center}/subscriptions`, `PATCH /api/v1/platform/centers/{center}/subscriptions/{subscription}` y `POST .../payments` operan Core, no bases clínicas. `GET /api/v1/center/subscription` da al ADMIN del centro la misma suscripción abierta e historial visible para plataforma. `PAID` es un registro manual con fecha y referencia, nunca una confirmación bancaria.

@@ -7,6 +7,7 @@ import { ActionForm } from "@/components/action-form";
 import { AccessForm } from "@/components/access-form";
 import { CenterPermissionCatalogView } from "@/components/center-permission-catalog";
 import { CenterSpecialtyCatalog } from "@/components/center-specialty-catalog";
+import { CenterSubscriptionView } from "@/components/center-subscription";
 import { useClinic } from "@/state/clinic-store";
 import {
   ApiError,
@@ -535,18 +536,7 @@ export function AdminPage() {
             <div className="mt-8 border-t pt-6"><h3 className="mb-3 font-semibold">Permisos por rol</h3><CenterPermissionCatalogView /></div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-5">
-            <p>
-              Plan {organization?.plan} · Suscripción:{" "}
-              {organization?.subscription ?? "ACTIVE"}
-            </p>
-            <p className="mt-2 text-sm text-muted-foreground">
-              La administración de plataforma gestiona los cambios de
-              suscripción.
-            </p>
-          </CardContent>
-        </Card>
+        <CenterSubscriptionView />
       </div>
     </>
   );

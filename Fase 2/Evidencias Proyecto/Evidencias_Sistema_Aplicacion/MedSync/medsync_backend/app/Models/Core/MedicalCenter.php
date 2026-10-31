@@ -47,4 +47,14 @@ public function primaryAddress()
     {
         return $this->hasMany(CenterUser::class, 'medical_center_id');
     }
+
+    public function subscriptions()
+    {
+        return $this->hasMany(Subscription::class, 'medical_center_id')->orderByDesc('started_at');
+    }
+
+    public function currentSubscription()
+    {
+        return $this->hasOne(Subscription::class, 'medical_center_id')->whereNull('ended_at');
+    }
 }
