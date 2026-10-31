@@ -27,7 +27,7 @@ El rol global `SUPER_ADMIN` continúa en `users.system_role`: administra la plat
 
 Los controladores de pacientes, agenda, profesionales, acceso de profesionales, prestaciones, disponibilidad y especialidades del centro comprueban permisos Spatie. Las reglas de negocio que dependen de la identidad (por ejemplo, que el paciente opere sobre su propia ficha o que el profesional actualice una cita que le corresponde) siguen comprobándose además de los permisos.
 
-La plataforma asigna ADMIN y puede cambiar el rol de personal entre ADMIN y RECEPCIONISTA en una sola membresía del centro. El ADMIN asigna recepción. La pantalla de administración consulta `GET /api/v1/center/permissions` y presenta el catálogo fijo del backend en modo lectura; no hay permisos individuales editables. Informes y resultados siguen sin autorización backend funcional hasta sus respectivos pasos.
+La plataforma asigna ADMIN y puede cambiar el rol de personal entre ADMIN y RECEPCIONISTA en una sola membresía del centro. El ADMIN asigna recepción. La pantalla de administración consulta `GET /api/v1/center/permissions` y presenta el catálogo fijo del backend en modo lectura; no hay permisos individuales editables. Resultados, informes y reportes ya comprueban permisos en Laravel; ver `docs/MATRIZ_ACCESO_ROLES.md` y las pruebas correspondientes.
 
 ## Archivos principales
 

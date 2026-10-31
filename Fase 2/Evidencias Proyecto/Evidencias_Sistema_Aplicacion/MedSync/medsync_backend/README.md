@@ -1,5 +1,7 @@
 # MedSync — Backend (Laravel)
 
+**Integrantes del equipo:** antes de actualizar una instalación existente, seguir [`../README_EQUIPO.md`](../README_EQUIPO.md). Las secciones de iteraciones antiguas de este archivo conservan contexto histórico y no reemplazan esa guía vigente.
+
 Para configurar HTTPS, sesiones y CORS en un servidor, y respaldar o restaurar Core, bases Center y documentos privados, consultar [`docs/OPERACION_PRODUCCION.md`](docs/OPERACION_PRODUCCION.md).
 
 Backend del proyecto **MedSync** (Duoc UC, Capstone). API REST hecha con **Laravel 13**, **PostgreSQL** y **Laravel Sanctum** (autenticación por sesión/cookies, no tokens), pensada para conectarse al frontend en `medsync_frontend` (React + Vite).
@@ -10,7 +12,7 @@ Backend del proyecto **MedSync** (Duoc UC, Capstone). API REST hecha con **Larav
 
 ---
 
-## 1. Estado actual (Iteración 1)
+## 1. Antecedentes de la Iteración 1
 
 Iteración 1 = **registro de cuenta + login**, funcionando de punta a punta (frontend → backend → Postgres), para un **solo centro médico fijo**: "Clínica Horizonte" (`slug: clinica-horizonte`).
 
@@ -34,9 +36,9 @@ Lo que ya funciona:
 
 ⚠️ **Riesgo conocido, pendiente de decidir en equipo** (ver detalle en sección 11): al usar dos bases físicas separadas, una sola transacción de Laravel ya no puede cubrir una operación que escribe en ambas a la vez. Esto afecta el registro de pacientes.
 
-Lo que **todavía no existe** (ver sección 10, próximas iteraciones): resultados médicos y cobro/suscripciones automatizados. Los centros y su estado de plan/suscripción ya se guardan en Core; la creación de una base clínica aislada se automatizó.
+Estado vigente: resultados médicos privados, precios, reportes, planes y suscripciones manuales ya están integrados. MedSync no procesa cobros bancarios; el estado de pago se informa manualmente. Ver `README_RESULTADOS_PRECIOS_REPORTES.md` y `README_SUSCRIPCIONES_Y_REVISION_FINAL.md` en la carpeta MedSync.
 
-> Actualización: especialidades, prestaciones, disponibilidad y reservas **ya tienen backend real** (el flujo de reserva del propio paciente, de punta a punta). Ver sección 13 para el detalle — la administración del catálogo y la agenda de recepción/profesional siguen pendientes.
+Especialidades globales, prestaciones, disponibilidad, reservas y agendas de recepción/profesional tienen API real. Las referencias a pendientes de esas áreas en secciones históricas describen el estado anterior del proyecto.
 
 ### Estado multi-centro implementado
 
@@ -59,7 +61,7 @@ Las pruebas de aislamiento usan dos archivos SQLite temporales distintos para de
 
 Cada integrante necesita instalado:
 
-- PHP 8.3+ (el proyecto se desarrolló con PHP 8.5)
+- PHP 8.3+ con extensiones `pdo_pgsql` y `pgsql` (la instalación local verificada usa PHP 8.4)
 - Composer
 - PostgreSQL (con un usuario y una base de datos creados)
 - Node.js 20.19+ y npm (para `medsync_frontend`)
@@ -128,12 +130,12 @@ php artisan db:seed
 
 Un solo `php artisan migrate` llena las dos bases: cada migración especifica su propia conexión (`Schema::connection('core')` o `Schema::connection('center')`) y `app/Providers/AppServiceProvider.php` registra ambas carpetas (`database/migrations/core` y `database/migrations/center`) con `loadMigrationsFrom()`.
 
-`db:seed` corre, en este orden, `SuperAdminSeeder` → `CoreMedicalCenterSeeder` → `CenterHealthInsuranceSeeder` → `MedSyncDemoSeeder` → `ReceptionistDemoSeeder` → `AppointmentsCatalogSeeder`, y crea automáticamente:
+`db:seed` corre, en este orden, `SuperAdminSeeder` → `CoreMedicalCenterSeeder` → `PlanCatalogSeeder` → `CenterHealthInsuranceSeeder` → `MedSyncDemoSeeder` → `ReceptionistDemoSeeder` → `AppointmentsCatalogSeeder`, y crea automáticamente:
 
 - Un usuario super administrador.
 - El centro médico fijo "Clínica Horizonte".
 - El catálogo de previsiones Fonasa / Isapre / Particular / Otra.
-- Un paciente y un profesional de prueba (`paciente.prueba@test.cl` / `profesional.prueba@test.cl`, contraseña `Password123`).
+- Pacientes, profesionales, prestaciones y citas de demostración. El profesional de catálogo no obtiene acceso de usuario hasta que un ADMIN del centro lo habilite.
 - Una cuenta de recepción de Clínica Horizonte: `recepcion@clinicahorizonte.cl` / `Password123`.
 
 Para incorporar solamente la cuenta de recepción en una base existente, sin migrar ni eliminar datos, ejecutar:
@@ -158,7 +160,8 @@ Por defecto queda en `http://localhost:8000`.
 | --- | --- | --- |
 | `DB_*` | Conexión a tu Postgres local | Ver arriba |
 | `APP_URL` | URL pública del backend | `http://localhost:8000` |
-| `SANCTUM_STATEFUL_DOMAINS` | Qué orígenes pueden autenticarse por cookie | No hace falta definirla: el valor por defecto en `config/sanctum.php` ya incluye `localhost:3000` (el puerto del frontend). Solo agrégala si el frontend corre en otro puerto/dominio. |
+| `SANCTUM_STATEFUL_DOMAINS` | Qué orígenes pueden autenticarse por cookie | Incluye el host y puerto del frontend; comparar con `.env.example` si cambia el origen. |
+| `CORS_ALLOWED_ORIGINS` | Orígenes HTTP permitidos | Opcional en local; para otro dominio o puerto, indicar la URL exacta. En producción se usa `FRONTEND_URL` si se omite. |
 | `SESSION_DOMAIN` | Dominio de la cookie de sesión | Déjala en blanco/null para desarrollo local (funciona entre `localhost:3000` y `localhost:8000`). |
 
 ---
@@ -184,7 +187,9 @@ Queda disponible en `http://localhost:3000`. La variable `VITE_API_URL` (opciona
 
 ---
 
-## 5. Probar que el registro llega a la base de datos
+## 5. Prueba histórica del registro de Iteración 1
+
+Esta sección documenta el recorrido de la primera integración; para probar la versión vigente usar el acceso contextual y la guía `../README_EQUIPO.md`. No esperar notificaciones mock ni guardar registros paralelos en el navegador.
 
 1. Con el backend (`php artisan serve`) y el frontend (`npm run dev`) corriendo, abre `http://localhost:3000/centro/clinica-horizonte/crear-cuenta`.
 2. Llena el formulario y presiona "Crear mi cuenta".
@@ -241,7 +246,7 @@ npm run lint    # análisis estático
 
 ## 7. Contrato real de la API (para Denise / frontend)
 
-⚠️ `medsync_frontend/docs/api-contract.md` todavía no refleja esto exactamente — hay que actualizarlo. Mientras tanto, este es el contrato que **realmente** implementa el backend.
+Esta sección conserva el contrato de la primera iteración. Para las rutas vigentes y sus respuestas, consultar `medsync_frontend/docs/api-contract.md` y `docs/MATRIZ_ACCESO_ROLES.md`.
 
 Todas las peticiones deben ir con `credentials: 'include'`. Antes de `POST /api/login` o `POST /api/register`, el frontend debe pedir `GET /sanctum/csrf-cookie` y reenviar el valor de la cookie `XSRF-TOKEN` en el header `X-XSRF-TOKEN` (ya implementado en `src/services/http.ts`).
 
@@ -297,14 +302,14 @@ Requiere estar autenticado. Devuelve `{ "data": { ...mismo formato... } }` con e
 | --- | --- | --- |
 | Toast "Backend real: No se pudo conectar..." | `php artisan serve` no está corriendo | Levantarlo en el puerto 8000 |
 | Error 419 / CSRF token mismatch | Falta pedir `/sanctum/csrf-cookie` antes del POST | Ya está resuelto en `http.ts`; si vuelve a pasar, revisar que `credentials: 'include'` siga presente |
-| Error CORS en la consola del navegador | El frontend corre en un puerto distinto a 3000 | Agregar ese origen a `allowed_origins` en `config/cors.php` |
-| "El centro médico no está configurado" | No se corrió `php artisan db:seed` | Correr `php artisan db:seed` |
-| "Previsión no reconocida" | Igual que el anterior (falta `HealthInsuranceSeeder`) | `php artisan db:seed` |
+| Error CORS en la consola del navegador | El origen del frontend no está permitido | Configurar `CORS_ALLOWED_ORIGINS` en `.env` y ejecutar `php artisan optimize:clear` |
+| "El centro médico no está configurado" | Falta el centro en Core o está inactivo | Revisar la base Core y sus seeders; ejecutar `db:seed` solo si se desea el dataset demo |
+| "Previsión no reconocida" | Falta el catálogo de previsiones del centro | Revisar `CenterHealthInsuranceSeeder`; no sobrescribir una base existente sin respaldo |
 | Error 500 crudo en vez de mensaje de validación | Dos registros llegaron casi simultáneamente con el mismo RUT/correo (choque con el índice único de Postgres) | Conocido, pendiente de pulir (ver sección 9) |
 | `php artisan migrate` dice "Nothing to migrate" | Laravel solo revisa `database/migrations` en la raíz por defecto; con la base dividida, las migraciones están en `database/migrations/core` y `database/migrations/center` | Ya está resuelto en `app/Providers/AppServiceProvider.php` con `loadMigrationsFrom([...])`. Si vuelve a pasar, revisa que ese archivo no se haya pisado. |
 | `SQLSTATE[42P01]: ... no existe la relación «medical_centers»` (o similar) al migrar | El `.env` sigue apuntando a la conexión/base vieja (`DB_CONNECTION=pgsql`, `DB_DATABASE=medsync_bd`) en vez de `core` + `medsync_core`/`medsync_clinica_horizonte`, o la caché de config quedó desactualizada | Revisar el bloque `DB_*` del `.env` (sección 3) y correr `php artisan config:clear` |
-| `php artisan migrate:status` dice "Ran" en migraciones cuyas tablas no existen | Quedó un estado inconsistente de un intento anterior (bases a medio borrar, o corridas contra una conexión equivocada) | Borrar ambas bases con `DROP DATABASE nombre WITH (FORCE);` (Postgres 13+; cierra primero cualquier pestaña de Query Tool abierta sobre esa base), recrearlas vacías y volver a `migrate` + `db:seed` |
-| Error de registro: "El RUT o el correo ya están asociados a otra ficha..." aunque la tabla `patients` no tiene esa fila | El registro "mock" del frontend (guardado en `localStorage` del navegador) tiene un intento anterior guardado y falla antes de llegar al backend real | Botón "Restablecer datos demo" en el login, o borrar `localStorage` del sitio en las herramientas de desarrollador (F12 → Application → Local Storage) |
+| `php artisan migrate:status` dice "Ran" en migraciones cuyas tablas no existen | Puede haber conexión equivocada o estado de migración inconsistente | Detener escrituras, respaldar las bases y revisar conexiones/tablas; no borrar bases con datos para corregirlo |
+| Error de registro: "El RUT o el correo ya están asociados a otra ficha..." | Existe una ficha o cuenta vinculada en ese centro | Verificar RUT y correo en la base del centro y resolver la discrepancia con recepción; no borrar `localStorage` para intentar omitir la validación del servidor |
 
 ---
 
@@ -318,7 +323,9 @@ Recomendación: no correr `medsync_schema.sql` contra una base que ya tiene las 
 
 ---
 
-## 10. Próximas iteraciones necesarias
+## 10. Plan histórico de iteraciones
+
+Las tareas de esta sección fueron propuestas antes de las integraciones actuales. Para ejecutar o actualizar el sistema, seguir `../README_EQUIPO.md` y consultar rutas, migraciones y pruebas vigentes.
 
 Orden recomendado según `INDICACIONES_BACKEND.md` y `REQUERIMIENTOS_BD.md`, ajustado a lo que ya se avanzó:
 
@@ -363,7 +370,9 @@ Orden recomendado según `INDICACIONES_BACKEND.md` y `REQUERIMIENTOS_BD.md`, aju
 
 ---
 
-## 11. Detalle de cambios de esta iteración (para revisión de Roberto y Denise)
+## 11. Archivo histórico de la primera integración
+
+Las secciones siguientes explican decisiones y código de la primera iteración, incluidos métodos mock que ya no son el flujo de acceso actual. No usarlas como instrucciones de instalación ni como estado vigente de módulos; seguir `../README_EQUIPO.md`.
 
 Esta sección lista, archivo por archivo, todo lo que se modificó o se creó para dejar funcionando el registro y login reales. Sirve como changelog técnico para que ambos sepan exactamente qué cambió antes de tocar esos mismos archivos.
 
@@ -487,11 +496,11 @@ Las rutas del catálogo Core están separadas de la lectura operacional de espec
 | `GET /api/v1/center/specialties` | `ADMIN`: listar catálogo global y estado solo de su centro |
 | `PUT /api/v1/center/specialties/{id}` | `ADMIN`: crear/actualizar su asociación con `{ is_active: boolean }` |
 
-Respuesta global: `{ "data": [{ "id": 5, "name": "Cardiología", "description": null, "is_active": true }] }`. Respuesta de centro: la misma fila con `"center_is_active": null | true | false`; `null` significa sin asociación, `false` asociación desactivada. `PUT` devuelve `{ "data": <fila actualizada> }`; nunca recibe `medical_center_id` desde React. Resolverlo desde la membresía activa en Core y validar que la especialidad exista y esté activa globalmente antes de ofrecerla. Rechazar `SUPER_ADMIN` en rutas clínicas y `ADMIN` en las de plataforma; la UI por rol no sustituye esta autorización. El código actual usa `center_users.role`; Spatie Permission figura como objetivo de diseño, pero no está instalado ni implementado en este checkout. Alinear políticas y pruebas con el mecanismo que adopte el equipo.
+Respuesta global: `{ "data": [{ "id": 5, "name": "Cardiología", "description": null, "is_active": true }] }`. Respuesta de centro: la misma fila con `"center_is_active": null | true | false`; `null` significa sin asociación, `false` asociación desactivada. `PUT` devuelve `{ "data": <fila actualizada> }`; nunca recibe `medical_center_id` desde React. El centro se resuelve desde la membresía activa en Core. Spatie Permission ya está instalado con Teams por centro; ver `README_SPATIE_PERMISSION.md` y `docs/MATRIZ_ACCESO_ROLES.md`.
 
 Las respuestas conservan `401` sin sesión, `403` con rol/centro incorrecto, `404` para ID inexistente y `422` para datos inválidos. El centro se resuelve desde la sesión y no desde un identificador enviado por React.
 
-La migración `database/migrations/core/2026_10_28_000001_migrate_center_specialties_to_global_catalog.php` conserva las correspondencias antiguas en `core.medical_center_specialty_mappings`, actualiza los IDs de prestaciones y profesionales y elimina la tabla local al terminar cada centro. Debe revisarse y respaldarse el entorno antes de ejecutarla; las bases Center mantienen referencias lógicas a IDs Core porque PostgreSQL no admite esas claves foráneas entre bases. Esta rama deja preparada la migración pero no la ejecuta.
+La migración `database/migrations/core/2026_10_28_000001_migrate_center_specialties_to_global_catalog.php` conserva las correspondencias antiguas en `core.medical_center_specialty_mappings`, actualiza los IDs de prestaciones y profesionales y elimina la tabla local al terminar cada centro. Consta como ejecutada en el entorno local verificado el 31-10-2026; cada integrante debe consultar `php artisan migrate:status` y respaldar sus bases antes de aplicarla. Las bases Center mantienen referencias lógicas a IDs Core porque PostgreSQL no admite esas claves foráneas entre bases.
 
 El frontend ya elimina su usuario visible cuando una API responde `401` y envía al login contextual. Esta rama modificó backend, frontend, migraciones y documentación; no ejecutó migraciones ni cambió datos clínicos.
 

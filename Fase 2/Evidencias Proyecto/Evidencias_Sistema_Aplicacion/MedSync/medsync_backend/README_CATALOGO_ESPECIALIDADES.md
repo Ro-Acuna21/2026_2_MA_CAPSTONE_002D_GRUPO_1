@@ -2,7 +2,7 @@
 
 Este README explica cómo probar el flujo de dos niveles que pidió el profesor: el administrador de la plataforma (`SUPER_ADMIN`) crea las especialidades en un catálogo global, y el administrador de cada centro (`ADMIN`) solo elige cuáles activar en su centro.
 
-Rama de integración: `codex/integracion-especialidades-globales`. Esta guía contempla el catálogo de plataforma, la selección por centro y el uso de esos IDs globales en prestaciones y profesionales.
+Este flujo está integrado en `main`. La guía contempla el catálogo de plataforma, la selección por centro y el uso de esos IDs globales en prestaciones y profesionales. Cada integrante debe consultar `../README_EQUIPO.md` antes de migrar su base local.
 
 ## 1. Qué se agregó
 
@@ -16,7 +16,7 @@ En `medsync_backend`:
 - `app/Services/Specialties/CenterSpecialtyCatalog.php` — valida que el catálogo esté activo globalmente y seleccionado en el centro.
 - `database/migrations/core/2026_10_28_000001_migrate_center_specialties_to_global_catalog.php` — guarda el mapeo de IDs, adapta prestaciones y profesionales y elimina la tabla local de cada centro.
 
-`services.specialty_id` y `professional_specialty.specialty_id` usan los IDs globales. La migración debe ejecutarse en cada entorno antes de usar esta versión; no se ha ejecutado sobre las bases de datos del equipo.
+`services.specialty_id` y `professional_specialty.specialty_id` usan los IDs globales. La migración figura aplicada en el entorno local verificado el 31-10-2026; otros equipos deben revisar `php artisan migrate:status` y aplicarla en sus propias bases después de respaldarlas.
 
 ## 2. Antes de probar
 
