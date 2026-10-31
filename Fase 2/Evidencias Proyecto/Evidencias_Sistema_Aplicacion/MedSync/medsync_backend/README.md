@@ -1,5 +1,7 @@
 # MedSync — Backend (Laravel)
 
+Para configurar HTTPS, sesiones y CORS en un servidor, y respaldar o restaurar Core, bases Center y documentos privados, consultar [`docs/OPERACION_PRODUCCION.md`](docs/OPERACION_PRODUCCION.md).
+
 Backend del proyecto **MedSync** (Duoc UC, Capstone). API REST hecha con **Laravel 13**, **PostgreSQL** y **Laravel Sanctum** (autenticación por sesión/cookies, no tokens), pensada para conectarse al frontend en `medsync_frontend` (React + Vite).
 
 > Este README reemplaza al genérico de Laravel y a `docs/Base_datos_y_modelos.md`, que quedó desactualizado (esquema antiguo, sin timestamps, nombres de tabla en singular). Este documento describe **lo que realmente existe hoy** en el código.

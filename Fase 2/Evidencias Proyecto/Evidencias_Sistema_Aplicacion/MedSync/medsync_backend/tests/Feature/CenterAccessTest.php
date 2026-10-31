@@ -4,6 +4,7 @@ use App\Models\Core\CenterUser;
 use App\Models\Core\MedicalCenter;
 use App\Models\User;
 use App\Notifications\CenterAccessInvitationNotification;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Password;
@@ -101,6 +102,29 @@ it('clears the pending invitation after account activation', function () {
     ])->assertOk();
     expect(Hash::check('NewPassword123!', $user->fresh()->password))->toBeTrue();
     expect(CenterUser::where('user_id', $user->id)->firstOrFail()->invitation_pending)->toBeFalse();
+
+    $this->postJson('/api/auth/activate-account', [
+        'email' => $user->email, 'token' => $token, 'password' => 'AnotherPassword123!',
+        'password_confirmation' => 'AnotherPassword123!',
+    ])->assertUnprocessable();
+    expect(Hash::check('NewPassword123!', $user->fresh()->password))->toBeTrue();
+});
+
+it('rejects an expired invitation token', function () {
+    $this->actingAs($this->platformUser)->postJson('/api/v1/platform/centers/'.$this->center->id.'/administrators', [
+        'name' => 'Admin expirado', 'email' => 'expired-invitation@example.test',
+    ])->assertCreated();
+    $user = User::where('email', 'expired-invitation@example.test')->firstOrFail();
+    $token = Password::broker()->createToken($user);
+    DB::connection('core')->table('password_reset_tokens')->where('email', $user->email)
+        ->update(['created_at' => now()->subMinutes(61)]);
+
+    $this->postJson('/api/auth/activate-account', [
+        'email' => $user->email, 'token' => $token, 'password' => 'NewPassword123!',
+        'password_confirmation' => 'NewPassword123!',
+    ])->assertUnprocessable();
+    expect($user->fresh()->email_verified_at)->toBeNull();
+    expect(CenterUser::where('user_id', $user->id)->firstOrFail()->invitation_pending)->toBeTrue();
 });
 
 it('shows the fixed backend permission catalog only to the center admin', function () {

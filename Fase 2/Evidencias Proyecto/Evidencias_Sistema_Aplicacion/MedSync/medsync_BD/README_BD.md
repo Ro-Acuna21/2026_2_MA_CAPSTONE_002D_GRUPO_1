@@ -1,5 +1,7 @@
 # Respaldo SQL — MedSync
 
+Para respaldos operativos de Core, todas las bases Center registradas y archivos clínicos privados, usar `medsync_backend/scripts/backup-postgres.ps1`. La restauración se prueba en bases nuevas y aisladas; el procedimiento y los ajustes HTTPS están en `medsync_backend/docs/OPERACION_PRODUCCION.md`. Los SQL de esta carpeta cumplen una función documental y pueden no reflejar el esquema vivo.
+
 Este directorio contiene respaldos SQL de la estructura de base de datos utilizada actualmente en el proyecto MedSync.
 
 MedSync utiliza PostgreSQL y trabaja con una arquitectura que separa la información general de la plataforma de los datos propios de cada centro médico.

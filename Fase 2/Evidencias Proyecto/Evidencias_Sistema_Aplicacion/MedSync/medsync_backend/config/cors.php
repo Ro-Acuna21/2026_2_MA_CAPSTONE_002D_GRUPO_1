@@ -19,14 +19,14 @@ return [
 
     'allowed_methods' => ['*'],
 
-    // El frontend puede correr en el puerto configurado por Vite (3000) o
-    // en el puerto alternativo usado para la demo local (5173).
-    'allowed_origins' => [
-        'http://localhost:3000',
-        'http://127.0.0.1:3000',
-        'http://localhost:5173',
-        'http://127.0.0.1:5173',
-    ],
+    // Producción usa el origen HTTPS explícito. Los puertos Vite solo se
+    // habilitan por defecto en entornos locales y de pruebas.
+    'allowed_origins' => array_values(array_filter(array_map('trim', explode(',', (string) env(
+        'CORS_ALLOWED_ORIGINS',
+        env('APP_ENV') === 'production'
+            ? env('FRONTEND_URL', '')
+            : 'http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173'
+    ))))),
 
     'allowed_origins_patterns' => [],
 
