@@ -25,3 +25,7 @@ La arquitectura, reglas de negocio y operación se documentan en `Fase 2/Evidenc
 `SUPER_ADMIN` crea y edita centros desde `/plataforma`; Laravel guarda sus datos en Core y crea automáticamente una base PostgreSQL clínica aislada. Un centro solo se publica después de migrar y verificar esa base. El usuario PostgreSQL configurado requiere privilegio `CREATEDB`. Una cuenta global existente puede iniciar sesión en otro centro y, con consentimiento explícito, crear allí una ficha local sin duplicar la cuenta ni copiar datos clínicos.
 
 La plataforma asigna ADMIN por centro y cada ADMIN asigna recepción dentro de su tenant. Las cuentas nuevas reciben una invitación de activación por correo; el envío depende de un SMTP operativo.
+
+### Roles y permisos por centro
+
+Laravel aplica el catálogo fijo de Spatie en Core con Teams por `medical_center_id`. La plataforma puede cambiar ADMIN y RECEPCIONISTA en una misma membresía; el ADMIN ve el catálogo real del backend en modo lectura. `SUPER_ADMIN` solo conserva `/api/v1/me` entre las rutas con contexto clínico y recibe `403` en el resto. Ver `medsync_backend/docs/MATRIZ_ACCESO_ROLES.md` para el detalle de autorización.

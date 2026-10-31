@@ -147,3 +147,7 @@ Si el login en un centro reconoce una cuenta global sin membresía allí, la rut
 ### Administración de accesos
 
 `/plataforma` asigna ADMIN al centro seleccionado; la administración del centro asigna recepción. La interfaz consulta y escribe membresías en Laravel, muestra invitaciones pendientes y permite desactivar, reactivar y reenviar. No solicita contraseña inicial: el usuario nuevo la crea desde el correo. Una cuenta existente mantiene su contraseña.
+
+### Permisos visibles y cambio de rol
+
+El ADMIN ve los permisos fijos que responde `GET /api/v1/center/permissions`; no se presentan como asignaciones editables. La plataforma lista al personal de cada centro y puede cambiar ADMIN/RECEPCIONISTA sobre la misma membresía. El frontend mantiene reglas locales para pantallas demo aún no integradas; esas reglas no conceden autorización en Laravel. El backend comprueba rol, propiedad y centro activo en cada petición.

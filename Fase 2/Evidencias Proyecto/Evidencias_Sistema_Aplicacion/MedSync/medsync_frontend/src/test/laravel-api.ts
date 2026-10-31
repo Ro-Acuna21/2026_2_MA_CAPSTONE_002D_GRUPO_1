@@ -97,6 +97,16 @@ export function stubLaravelApi(options: {
         return ok({ data: access, account_created: true, invitation_sent: true, message: 'Invitación enviada.' }, 201)
       }
     }
+    const staffMatch = path.match(/^\/api\/v1\/platform\/centers\/(\d+)\/staff(?:\/(\d+)\/role)?$/)
+    if (staffMatch && session.role === 'SUPER_ADMIN') {
+      if (method === 'GET') return ok({ data: [...administrators, ...receptionists] })
+      if (method === 'PATCH') {
+        const item = [...administrators, ...receptionists].find((entry) => entry.id === Number(staffMatch[2]))
+        if (!item) return fail(404)
+        item.role = body?.role as CenterAccess['role']
+        return ok({ data: item })
+      }
+    }
     if (path === '/api/v1/center/receptionists' && session.role === 'ADMIN') {
       if (method === 'GET') return ok({ data: receptionists })
       if (method === 'POST') {
@@ -107,6 +117,14 @@ export function stubLaravelApi(options: {
         return ok({ data: access, account_created: true, invitation_sent: true, message: 'Invitación enviada.' }, 201)
       }
     }
+    if (path === '/api/v1/center/permissions' && session.role === 'ADMIN') return ok({ data: {
+      source: 'fixed_backend_catalog', roles: {
+        ADMIN: ['professionals.manage', 'services.manage'],
+        RECEPCIONISTA: ['patients.manage', 'appointments.view.all'],
+        PROFESIONAL: ['appointments.view.own'],
+        PACIENTE: ['patients.view.own', 'appointments.view.own'],
+      },
+    } })
     if (path === '/api/v1/platform/specialties' && session.role === 'SUPER_ADMIN') {
       if (method === 'GET') return ok({ data: globalSpecialties })
       if (method === 'POST') {

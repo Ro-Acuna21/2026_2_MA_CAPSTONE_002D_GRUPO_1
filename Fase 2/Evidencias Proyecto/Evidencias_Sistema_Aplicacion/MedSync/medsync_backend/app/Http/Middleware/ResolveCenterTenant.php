@@ -31,6 +31,7 @@ class ResolveCenterTenant
 
         // El acceso de plataforma no resuelve ni abre una base clínica.
         if ($user->isSuperAdmin()) {
+            abort_unless($request->is('api/v1/me'), 403, 'La cuenta de plataforma no puede usar rutas clínicas.');
             $user->unsetRelation('roles')->unsetRelation('permissions');
 
             try {

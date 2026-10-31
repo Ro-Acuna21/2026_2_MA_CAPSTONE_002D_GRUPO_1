@@ -27,7 +27,7 @@ El rol global `SUPER_ADMIN` continúa en `users.system_role`: administra la plat
 
 Los controladores de pacientes, agenda, profesionales, acceso de profesionales, prestaciones, disponibilidad y especialidades del centro comprueban permisos Spatie. Las reglas de negocio que dependen de la identidad (por ejemplo, que el paciente opere sobre su propia ficha o que el profesional actualice una cita que le corresponde) siguen comprobándose además de los permisos.
 
-Las pantallas de roles/permisos de la plataforma y el formulario genérico de acceso que actualmente guarda información local en el navegador no quedan conectados por este cambio. Tampoco se añaden todavía módulos de informes o resultados que no tengan lógica de backend funcional. La interfaz debe integrarse en un trabajo posterior si se requiere administrar permisos desde ella.
+La plataforma asigna ADMIN y puede cambiar el rol de personal entre ADMIN y RECEPCIONISTA en una sola membresía del centro. El ADMIN asigna recepción. La pantalla de administración consulta `GET /api/v1/center/permissions` y presenta el catálogo fijo del backend en modo lectura; no hay permisos individuales editables. Informes y resultados siguen sin autorización backend funcional hasta sus respectivos pasos.
 
 ## Archivos principales
 
@@ -37,7 +37,8 @@ Las pantallas de roles/permisos de la plataforma y el formulario genérico de ac
 - `app/Http/Middleware/ResolveCenterTenant.php`: establece y limpia el contexto de Teams.
 - `database/migrations/core/2026_10_28_000002_create_permission_tables.php`: crea las cinco tablas Spatie en Core.
 - `database/migrations/core/2026_10_28_000003_backfill_center_roles_to_spatie.php`: asigna los roles a membresías ya existentes.
-- `tests/Tenant/CenterRolePermissionTest.php`: comprueba roles diferentes para la misma cuenta en dos centros.
+- `tests/Tenant/CenterRolePermissionTest.php` y `RoleAuthorizationMatrixTest.php`: comprueban equipos distintos, endpoints, propiedad e inactividad.
+- `docs/MATRIZ_ACCESO_ROLES.md`: matriz de aceptación por rol y ruta.
 
 ## Migraciones
 
@@ -50,7 +51,7 @@ php artisan migrate --database=core --path=database/migrations/core/2026_10_28_0
 php artisan migrate --database=core --path=database/migrations/core/2026_10_28_000003_backfill_center_roles_to_spatie.php
 ```
 
-Las migraciones Spatie usan explícitamente la conexión `core`. En la base local usada para esta tarea se aplicaron solo esas dos migraciones. `migrate:status` mostró otras migraciones antiguas pendientes; por eso no se ejecutó `php artisan migrate` sin `--path`, que intentaría procesarlas también. Revisa esas migraciones pendientes por separado antes de aplicarlas.
+Las migraciones Spatie usan explícitamente la conexión `core`. Antes de migrar otro entorno, revisar `migrate:status` y respaldar Core y cada base clínica. Las instrucciones históricas de instalación de esta sección no describen por sí solas las migraciones añadidas después; aplicar también las migraciones vigentes del repositorio según el procedimiento de despliegue.
 
 ```powershell
 php artisan migrate:status
@@ -66,6 +67,6 @@ La prueba nueva valida que la misma cuenta recibe permisos de recepción en un c
 php artisan test
 ```
 
-Verificación realizada durante esta implementación: las dos pruebas nuevas de permisos pasaron (2 pruebas, 8 aserciones), incluida una membresía insertada sin eventos para simular datos previos. Todas las migraciones también corrieron correctamente en SQLite en memoria. Se corrigieron los fixtures de catálogo/pivote y se fijó el reloj del caso `NO_SHOW`; luego la suite completa pasó: **30 pruebas, 178 aserciones**.
+La suite actual incluye pruebas de una misma cuenta con roles diferentes en dos centros, lectura y cambio de rol de personal, propiedad de ficha, membresía inactiva y rechazo de `SUPER_ADMIN` en rutas clínicas. Ejecutar `php artisan test` para verificar el resultado en cada entorno.
 
 Además, la validación manual recomendada es iniciar sesión con una misma cuenta que tenga roles distintos en dos centros y confirmar que un endpoint administrativo permitido en el primer centro devuelve `403` en el segundo.

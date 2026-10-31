@@ -21,6 +21,24 @@ class CenterAccessService
             ->map(fn (CenterUser $membership) => $this->present($membership))->all();
     }
 
+    public function staff(MedicalCenter $center): array
+    {
+        return CenterUser::query()->with('user')->where('medical_center_id', $center->id)
+            ->whereIn('role', ['ADMIN', 'RECEPCIONISTA'])->orderBy('id')->get()
+            ->map(fn (CenterUser $membership) => $this->present($membership))->all();
+    }
+
+    public function changeStaffRole(MedicalCenter $center, CenterUser $membership, string $role): array
+    {
+        abort_unless($membership->medical_center_id === $center->id &&
+            in_array($membership->role, ['ADMIN', 'RECEPCIONISTA'], true), 404);
+        if ($center->provisioning_status !== 'READY') {
+            throw ValidationException::withMessages(['center' => ['El centro aún no está preparado.']]);
+        }
+        $membership->update(['role' => $role]);
+        return $this->present($membership->fresh('user'));
+    }
+
     public function assign(MedicalCenter $center, string $role, string $email, string $name): array
     {
         if ($center->provisioning_status !== 'READY') {
@@ -28,7 +46,8 @@ class CenterAccessService
         }
         $email = strtolower(trim($email));
         $created = false;
-        $membership = DB::connection('core')->transaction(function () use ($center, $role, $email, $name, &$created) {
+        $needsInvitation = false;
+        $membership = DB::connection('core')->transaction(function () use ($center, $role, $email, $name, &$created, &$needsInvitation) {
             $user = User::query()->whereRaw('LOWER(TRIM(email)) = ?', [$email])->first();
             if ($user && (! $user->is_active || $user->isSuperAdmin())) {
                 throw ValidationException::withMessages(['email' => ['Esta cuenta no puede recibir acceso a un centro.']]);
@@ -37,6 +56,8 @@ class CenterAccessService
                 $user = User::create(['name' => trim($name), 'email' => $email, 'password' => Str::random(64), 'is_active' => true]);
                 $created = true;
             }
+            $needsInvitation = $created || CenterUser::query()->where('user_id', $user->id)
+                ->where('invitation_pending', true)->exists();
             $membership = CenterUser::query()->where('medical_center_id', $center->id)->where('user_id', $user->id)->first();
             if ($membership && $membership->role !== $role) {
                 throw ValidationException::withMessages(['email' => ['La cuenta ya tiene otro rol en este centro.']]);
@@ -44,20 +65,20 @@ class CenterAccessService
             if (! $membership) {
                 $membership = CenterUser::create([
                     'medical_center_id' => $center->id, 'user_id' => $user->id, 'role' => $role,
-                    'is_active' => true, 'invitation_pending' => $created,
+                    'is_active' => true, 'invitation_pending' => $needsInvitation,
                 ]);
             } elseif (! $membership->is_active) {
                 $membership->update(['is_active' => true]);
             }
             return $membership->load('user');
         });
-        $sent = $created && $this->sendInvitation($membership);
+        $sent = $needsInvitation && $this->sendInvitation($membership);
         return [
             'data' => $this->present($membership->fresh('user')),
             'account_created' => $created,
             'invitation_sent' => $sent,
-            'message' => $created
-                ? ($sent ? 'Cuenta creada e invitación enviada.' : 'Cuenta creada; la invitación no pudo enviarse. Puedes reenviarla.')
+            'message' => $needsInvitation
+                ? ($sent ? 'Acceso guardado e invitación enviada.' : 'Acceso guardado; la invitación no pudo enviarse. Puedes reenviarla.')
                 : 'Acceso del centro guardado sin modificar la contraseña existente.',
         ];
     }

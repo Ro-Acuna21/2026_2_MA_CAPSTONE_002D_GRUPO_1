@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\PlatformSpecialtyController;
 use App\Http\Controllers\Api\PlatformCenterController;
 use App\Http\Controllers\Api\PatientEnrollmentController;
 use App\Http\Controllers\Api\CenterAccessController;
+use App\Http\Controllers\Api\CenterPermissionCatalogController;
 use App\Http\Controllers\Api\CenterSpecialtyController;
 use App\Http\Controllers\Api\AppointmentController;
 use App\Http\Controllers\Api\PatientController;
@@ -41,12 +42,15 @@ Route::middleware('auth:sanctum')->prefix('v1/platform')->group(function () {
     Route::post('/centers/{center}/administrators', [CenterAccessController::class, 'platformStore'])->whereNumber('center');
     Route::patch('/centers/{center}/administrators/{membership}', [CenterAccessController::class, 'platformUpdate'])->whereNumber('center')->whereNumber('membership');
     Route::post('/centers/{center}/administrators/{membership}/resend-invitation', [CenterAccessController::class, 'platformResend'])->whereNumber('center')->whereNumber('membership');
+    Route::get('/centers/{center}/staff', [CenterAccessController::class, 'platformStaff'])->whereNumber('center');
+    Route::patch('/centers/{center}/staff/{membership}/role', [CenterAccessController::class, 'platformChangeStaffRole'])->whereNumber('center')->whereNumber('membership');
     Route::get('/specialties', [PlatformSpecialtyController::class, 'index']);
     Route::post('/specialties', [PlatformSpecialtyController::class, 'store']);
     Route::patch('/specialties/{specialty}', [PlatformSpecialtyController::class, 'update'])->whereNumber('specialty');
 });
 
 Route::middleware(['auth:sanctum', 'tenant.center'])->group(function () {
+    Route::get('/v1/center/permissions', CenterPermissionCatalogController::class);
     Route::get('/v1/center/receptionists', [CenterAccessController::class, 'centerIndex']);
     Route::post('/v1/center/receptionists', [CenterAccessController::class, 'centerStore']);
     Route::patch('/v1/center/receptionists/{membership}', [CenterAccessController::class, 'centerUpdate'])->whereNumber('membership');

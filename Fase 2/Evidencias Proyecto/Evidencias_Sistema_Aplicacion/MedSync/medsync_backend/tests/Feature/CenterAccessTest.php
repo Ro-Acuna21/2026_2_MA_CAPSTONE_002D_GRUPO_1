@@ -7,6 +7,7 @@ use App\Notifications\CenterAccessInvitationNotification;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Password;
+use Spatie\Permission\PermissionRegistrar;
 
 beforeEach(function () {
     Notification::fake();
@@ -48,6 +49,25 @@ it('invites a new administrator and preserves an existing global password', func
     expect(Hash::check('OriginalPassword123', $existing->fresh()->password))->toBeTrue();
 });
 
+it('keeps an unactivated global account pending when assigned to a second center', function () {
+    $otherCenter = MedicalCenter::create([
+        'name' => 'Centro Segundo', 'slug' => 'centro-segundo',
+        'database_name' => 'centro_segundo', 'rut' => '76123457-5', 'is_active' => true,
+    ]);
+    $this->actingAs($this->platformUser)->postJson('/api/v1/platform/centers/'.$this->center->id.'/administrators', [
+        'name' => 'Nueva Admin', 'email' => 'pending@example.test',
+    ])->assertCreated();
+    $user = User::where('email', 'pending@example.test')->firstOrFail();
+    $password = $user->password;
+    $this->postJson('/api/v1/platform/centers/'.$otherCenter->id.'/administrators', [
+        'name' => 'Nueva Admin', 'email' => $user->email,
+    ])->assertCreated()->assertJsonPath('account_created', false)
+        ->assertJsonPath('invitation_sent', true)
+        ->assertJsonPath('data.invitation_pending', true);
+    expect($user->fresh()->password)->toBe($password);
+    Notification::assertSentToTimes($user, CenterAccessInvitationNotification::class, 2);
+});
+
 it('lets only the center admin manage reception and blocks other centers', function () {
     $this->actingAs($this->admin)->withHeader('Origin', 'http://localhost:3000')
         ->withSession(['active_medical_center_id' => $this->center->id]);
@@ -81,4 +101,60 @@ it('clears the pending invitation after account activation', function () {
     ])->assertOk();
     expect(Hash::check('NewPassword123!', $user->fresh()->password))->toBeTrue();
     expect(CenterUser::where('user_id', $user->id)->firstOrFail()->invitation_pending)->toBeFalse();
+});
+
+it('shows the fixed backend permission catalog only to the center admin', function () {
+    $this->actingAs($this->admin)->withHeader('Origin', 'http://localhost:3000')
+        ->withSession(['active_medical_center_id' => $this->center->id])
+        ->getJson('/api/v1/center/permissions')
+        ->assertOk()->assertJsonPath('data.source', 'fixed_backend_catalog')
+        ->assertJsonFragment(['patients.manage']);
+});
+
+it('keeps platform identity outside every clinical route', function () {
+    $this->actingAs($this->platformUser)->withHeader('Origin', 'http://localhost:3000')
+        ->getJson('/api/v1/me')->assertOk()->assertJsonPath('data.role', 'SUPER_ADMIN');
+    $this->getJson('/api/v1/patients')->assertForbidden();
+    $this->getJson('/api/v1/center/permissions')->assertForbidden();
+});
+
+it('changes one staff role within its existing membership without leaking permissions to another center', function () {
+    $otherCenter = MedicalCenter::create([
+        'name' => 'Centro Segundo', 'slug' => 'centro-segundo',
+        'database_name' => 'centro_segundo', 'rut' => '76123457-5', 'is_active' => true,
+    ]);
+    $staff = User::create([
+        'name' => 'Equipo Compartido', 'email' => 'shared-staff@example.test',
+        'password' => 'Password123', 'is_active' => true,
+    ]);
+    $membership = CenterUser::create([
+        'medical_center_id' => $this->center->id, 'user_id' => $staff->id,
+        'role' => 'RECEPCIONISTA', 'is_active' => true,
+    ]);
+    $patientMembership = CenterUser::create([
+        'medical_center_id' => $otherCenter->id, 'user_id' => $staff->id,
+        'role' => 'PACIENTE', 'patient_id' => 1, 'is_active' => true,
+    ]);
+    $this->actingAs($this->platformUser)->patchJson(
+        '/api/v1/platform/centers/'.$this->center->id.'/staff/'.$membership->id.'/role',
+        ['role' => 'ADMIN'],
+    )->assertOk()->assertJsonPath('data.role', 'ADMIN');
+    expect(CenterUser::where('medical_center_id', $this->center->id)->where('user_id', $staff->id)->count())->toBe(1);
+    expect($patientMembership->fresh()->role)->toBe('PACIENTE');
+    $this->patchJson('/api/v1/platform/centers/'.$otherCenter->id.'/staff/'.$patientMembership->id.'/role',
+        ['role' => 'ADMIN'])->assertNotFound();
+    $registrar = app(PermissionRegistrar::class);
+    try {
+        $registrar->setPermissionsTeamId($this->center->id);
+        $staff->unsetRelation('roles')->unsetRelation('permissions');
+        expect($staff->can('professionals.manage'))->toBeTrue();
+        expect($staff->can('patients.manage'))->toBeFalse();
+        $registrar->setPermissionsTeamId($otherCenter->id);
+        $staff->unsetRelation('roles')->unsetRelation('permissions');
+        expect($staff->can('patients.view.own'))->toBeTrue();
+        expect($staff->can('professionals.manage'))->toBeFalse();
+    } finally {
+        $registrar->setPermissionsTeamId(null);
+        $staff->unsetRelation('roles')->unsetRelation('permissions');
+    }
 });

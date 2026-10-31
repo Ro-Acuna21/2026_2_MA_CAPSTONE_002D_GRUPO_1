@@ -9,7 +9,7 @@ Prefijo: `/api/v1`. Las respuestas de recursos usan `{ "data": ... }` y los erro
 - `POST /api/register` — registro público: datos del paciente y `center_slug` obligatorio; devuelve `201` o `422` de validación.
 - `POST /api/login` — login clínico contextual: `{ email, password, center_slug }`
 - `POST /api/logout`
-- `GET /api/v1/me` — usuario, rol y permisos de Spatie
+- `GET /api/v1/me` — identidad, rol y centro activo; los permisos se aplican en Laravel y no se enumeran en esta respuesta.
 
 El frontend envía cookies con `credentials: include`. Configura `SANCTUM_STATEFUL_DOMAINS`, CORS y el dominio de sesión.
 
@@ -42,11 +42,11 @@ Para `POST /api/register`, Laravel valida el `center_slug` contra centros activo
 
 En cada ruta clínica autenticada, Laravel recupera ese centro desde la sesión y configura la conexión `center` con `medical_centers.database_name` antes del route-model binding y de los controladores. No debe confiar en `organization_id`, `medical_center_id` o nombre de base enviado desde el navegador. El acceso de plataforma `SUPER_ADMIN` es independiente y no abre una conexión clínica.
 
-Las cuentas de pacientes y trabajadores son independientes por centro. El correo y el RUT deben usar restricciones únicas compuestas con `organization_id`, por lo que la misma persona puede tener registros separados en dos instituciones sin que una revele la existencia de la otra. Las cookies de sesión deberán limitarse al dominio del portal correspondiente.
+La identidad y contraseña son globales en Core; cada centro conserva su propia ficha clínica y una membresía con un rol. El correo de `core.users` es único globalmente en el esquema actual. Las consultas clínicas usan la base del centro validado en la sesión.
 
 ## Ampliación propuesta: plataforma, registro e informes
 
-Las rutas de esta sección son propuestas para otros módulos; Pacientes y Reservas ya usan API. El rol global `SUPER_ADMIN` administra la plataforma. Las cuentas `ADMIN`, `RECEPCIONISTA`, `PROFESIONAL` y `PACIENTE` pertenecen a un solo centro. La respuesta de sesión incluye el centro, sus permisos y la ficha vinculada.
+Las rutas de esta sección mezclan contratos históricos con módulos pendientes; para los endpoints vigentes de plataforma y accesos, consultar las secciones implementadas al final de este documento. El rol global `SUPER_ADMIN` administra la plataforma. Una cuenta puede tener un rol diferente en cada centro, con una sola membresía por centro. La respuesta de sesión incluye el rol, el centro y la ficha vinculada cuando corresponde.
 
 El acceso visual separado (`/plataforma/acceso`) mejora la navegación, pero la seguridad depende del backend. Laravel debe rechazar cuentas de centro en las rutas de plataforma y rechazar cuentas `SUPER_ADMIN` en las rutas clínicas. El administrador del centro recibe configuración, usuarios y estadísticas agregadas; las APIs de agenda, reservas, pacientes y documentos clínicos no deben autorizarlo.
 
@@ -54,8 +54,9 @@ El acceso visual separado (`/plataforma/acceso`) mejora la navegación, pero la 
 | --- | --- | --- |
 | POST | `/api/register` | Registro del paciente y membresía inicial; validar RUT, duplicados y contraseña en servidor |
 | GET/POST/PATCH | `/api/v1/platform/centers` | Centros, planes, suscripciones y habilitación, exclusivo de plataforma |
-| PUT | `/api/v1/platform/centers/{id}/administrator` | Asignación del administrador de un centro |
-| PUT | `/api/v1/users/{id}/access` | Rol, ficha vinculada y permiso opcional de carga para recepción dentro del centro resuelto |
+| GET/POST | `/api/v1/platform/centers/{id}/administrators` | Asignación persistente de ADMIN; implementado |
+| GET/PATCH | `/api/v1/platform/centers/{id}/staff` | Listado y cambio de rol ADMIN/RECEPCIONISTA en la misma membresía; implementado |
+| GET/POST | `/api/v1/center/receptionists` | Asignación persistente de recepción por ADMIN; implementado |
 | GET/POST/PATCH | `/api/v1/availabilities` | Horarios recurrentes de profesionales; implementado |
 | GET/POST | `/api/v1/result-types` | Tipos documentales propios del centro, separados de prestaciones |
 | GET/POST | `/api/v1/results` | Lista autorizada y carga de borradores |
@@ -99,3 +100,5 @@ Todos usan sesión Sanctum. `GET/POST /api/v1/platform/centers`, `PATCH /api/v1/
 ### Accesos persistentes de centro
 
 `GET/POST /api/v1/platform/centers/{center}/administrators`, `PATCH .../{membership}` y `POST .../{membership}/resend-invitation` requieren `SUPER_ADMIN`. `GET/POST /api/v1/center/receptionists`, `PATCH .../{membership}` y `POST .../{membership}/resend-invitation` requieren ADMIN del tenant activo. `POST` recibe `name,email`; `PATCH` recibe `is_active`. La respuesta informa `invitation_pending`, `invitation_sent_at`, `account_created`, `invitation_sent` y `message`; reenvío fallido devuelve `503`. La cuenta existente conserva su contraseña. `POST /api/auth/activate-account` consume el token y limpia el estado pendiente.
+
+`GET /api/v1/platform/centers/{center}/staff` lista ADMIN y RECEPCIONISTA del centro para `SUPER_ADMIN`. `PATCH /api/v1/platform/centers/{center}/staff/{membership}/role` acepta `role: ADMIN|RECEPCIONISTA` y actualiza la fila existente; rechaza miembros de otro centro y roles PACIENTE/PROFESIONAL. `GET /api/v1/center/permissions` devuelve `{data:{source:"fixed_backend_catalog",roles:{...}}}` solo al ADMIN del centro. Es lectura del catálogo fijo sincronizado por Spatie, no un CRUD de permisos. La matriz de rutas y roles está en `medsync_backend/docs/MATRIZ_ACCESO_ROLES.md`.

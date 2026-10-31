@@ -142,3 +142,7 @@ Una cuenta global autenticada sin membresía en el centro elegido recibe un esta
 ### Paso 3 incorporado: ADMIN y recepción
 
 Se eligió invitación por correo, siguiendo el flujo ya existente para profesionales. `SUPER_ADMIN` crea/asigna únicamente ADMIN, y un ADMIN del centro crea/asigna únicamente RECEPCIONISTA de su tenant. Reutilizar la identidad Core sin cambiar su contraseña, mantener una sola membresía por cuenta y centro y revocar acceso mediante `is_active`. Una cuenta nueva recibe un token temporal; registrar envío fallido y permitir reenvío. No exponer tokens ni datos clínicos en rutas de plataforma.
+
+### Cierre del paso 4: matriz de roles
+
+El catálogo Spatie es fijo y se expone solo en modo lectura al ADMIN. Usar `medsync_backend/docs/MATRIZ_ACCESO_ROLES.md` como matriz vigente por endpoint; confirmar `401`, `403`, propiedad de paciente/profesional, centro/membresía inactivos y una misma cuenta con roles distintos en dos centros. `SUPER_ADMIN` no abre rutas clínicas salvo `/api/v1/me` para recuperar su identidad global. La transición entre ADMIN y RECEPCIONISTA se hace sobre la fila existente de `center_users`, únicamente desde plataforma; no se combinan roles dentro del mismo centro. Los resultados e informes siguen pendientes de backend propio.

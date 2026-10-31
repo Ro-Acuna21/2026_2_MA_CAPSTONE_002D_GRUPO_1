@@ -28,12 +28,20 @@ export function AccessForm({ centerId, platform = false }: { centerId: string; p
     return () => { cancelled = true }
   }, [centerId, platform, reload])
 
+  useEffect(() => {
+    if (!platform) return
+    const refresh = () => setReload((value) => value + 1)
+    window.addEventListener('medsync:staff-updated', refresh)
+    return () => window.removeEventListener('medsync:staff-updated', refresh)
+  }, [platform])
+
   async function assign(values: Record<string, string>) {
     const response = await centerAccessApi.assign(platform, centerId, {
       name: values.name.trim(), email: values.email.trim().toLowerCase(),
     }).catch((failure: unknown) => { throw new Error(firstApiErrorMessage(failure, 'No fue posible guardar el acceso.')) })
     setMemberships((current) => [...current.filter((item) => item.id !== response.data.id), response.data])
-    if (response.account_created && !response.invitation_sent) toast.warning(response.message)
+    if (platform) window.dispatchEvent(new Event('medsync:staff-updated'))
+    if (response.data.invitation_pending && !response.invitation_sent) toast.warning(response.message)
     else toast.success(response.message)
   }
 

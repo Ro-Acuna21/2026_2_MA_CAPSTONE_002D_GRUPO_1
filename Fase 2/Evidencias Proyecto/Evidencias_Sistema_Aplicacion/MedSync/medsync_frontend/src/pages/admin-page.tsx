@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, Input, Select } from "@/components/ui/form-controls";
 import { ActionForm } from "@/components/action-form";
 import { AccessForm } from "@/components/access-form";
+import { CenterPermissionCatalogView } from "@/components/center-permission-catalog";
 import { CenterSpecialtyCatalog } from "@/components/center-specialty-catalog";
 import { useClinic } from "@/state/clinic-store";
 import {
@@ -527,10 +528,11 @@ export function AdminPage() {
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>Usuarios y permisos del centro</CardTitle>
+            <CardTitle>Accesos de recepción y permisos del centro</CardTitle>
           </CardHeader>
           <CardContent>
             <AccessForm centerId={organization!.id} />
+            <div className="mt-8 border-t pt-6"><h3 className="mb-3 font-semibold">Permisos por rol</h3><CenterPermissionCatalogView /></div>
           </CardContent>
         </Card>
         <Card>

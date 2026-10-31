@@ -504,3 +504,7 @@ Para actualizar un entorno existente: respaldar Core y bases clínicas, ejecutar
 ### Accesos de ADMIN y recepción (paso 3 incorporado)
 
 `SUPER_ADMIN` gestiona ADMIN mediante `GET/POST /api/v1/platform/centers/{center}/administrators`, `PATCH .../{membership}` y `POST .../{membership}/resend-invitation`. Un ADMIN de centro gestiona RECEPCIONISTA con `GET/POST /api/v1/center/receptionists` y las mismas operaciones por membresía, resueltas bajo `tenant.center`. Una cuenta existente conserva contraseña; una nueva recibe por SMTP un token de activación válido 60 minutos. `invitation_pending` y `invitation_sent_at` quedan en Core. El envío fallido se informa y permite reintentar. Configurar `MAIL_*` y `FRONTEND_URL`; la plataforma no entra a datos clínicos.
+
+### Cierre de permisos por rol (paso 4)
+
+`GET /api/v1/center/permissions` muestra al ADMIN el catálogo fijo `CenterRolePermissionSync::ROLE_PERMISSIONS`. `SUPER_ADMIN` recibe `403` en rutas clínicas distintas de `/api/v1/me`. La plataforma puede listar personal con `GET /api/v1/platform/centers/{center}/staff` y cambiar una membresía existente entre ADMIN y RECEPCIONISTA con `PATCH .../staff/{membership}/role`; Spatie sincroniza el nuevo rol solo en ese equipo. PACIENTE y PROFESIONAL mantienen sus flujos propios. Una cuenta global puede tener roles distintos en centros distintos. Ver `docs/MATRIZ_ACCESO_ROLES.md` y sus pruebas HTTP. Si una cuenta sigue pendiente de activación al asignarla a otro centro, la nueva membresía también queda pendiente y recibe invitación.

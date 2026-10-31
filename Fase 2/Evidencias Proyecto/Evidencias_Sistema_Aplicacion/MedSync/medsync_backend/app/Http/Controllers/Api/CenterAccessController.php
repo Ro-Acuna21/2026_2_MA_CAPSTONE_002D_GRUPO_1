@@ -9,6 +9,7 @@ use App\Services\Authorization\CenterAccessService;
 use App\Support\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class CenterAccessController extends Controller
 {
@@ -36,6 +37,19 @@ class CenterAccessController extends Controller
     {
         $this->authorizePlatform($request);
         return $this->resend($center, $membership, 'ADMIN');
+    }
+
+    public function platformStaff(Request $request, MedicalCenter $center): JsonResponse
+    {
+        $this->authorizePlatform($request);
+        return response()->json(['data' => $this->access->staff($center)]);
+    }
+
+    public function platformChangeStaffRole(Request $request, MedicalCenter $center, CenterUser $membership): JsonResponse
+    {
+        $this->authorizePlatform($request);
+        $data = $request->validate(['role' => ['required', Rule::in(['ADMIN', 'RECEPCIONISTA'])]]);
+        return response()->json(['data' => $this->access->changeStaffRole($center, $membership, $data['role'])]);
     }
 
     public function centerIndex(Request $request): JsonResponse

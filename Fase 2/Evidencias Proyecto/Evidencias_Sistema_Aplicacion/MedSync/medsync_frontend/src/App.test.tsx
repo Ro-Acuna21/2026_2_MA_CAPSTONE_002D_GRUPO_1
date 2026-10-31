@@ -31,6 +31,23 @@ describe('navegación por roles con sesión Laravel', () => {
     expect(api.requests.some((request) => request.path === '/api/v1/platform/centers' && request.method === 'POST' && request.body?.slug === 'centro-nuevo')).toBe(true)
   })
 
+  it('cambia el rol del personal en la membresía existente desde plataforma', async () => {
+    const api = stubLaravelApi({
+      session: backendUser('SUPER_ADMIN'),
+      platformCenters: [{ id: 1, name: 'Clínica Horizonte', slug: 'clinica-horizonte', rut: '76543210-3',
+        phone: null, email: null, plan: 'STARTER', subscription_status: 'ACTIVE', is_active: true,
+        provisioning_status: 'READY', provisioned_at: null }],
+      receptionists: [{ id: 44, user_id: 9, name: 'Equipo Prueba', email: 'equipo@example.test',
+        role: 'RECEPCIONISTA', is_active: true, invitation_pending: false, invitation_sent_at: null }],
+    })
+    open('/plataforma')
+    fireEvent.click(await screen.findByRole('button', { name: 'Detalle' }))
+    const role = await screen.findByRole('combobox', { name: 'Rol de Equipo Prueba' })
+    fireEvent.change(role, { target: { value: 'ADMIN' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar rol' }))
+    await waitFor(() => expect(api.requests.some((request) => request.path === '/api/v1/platform/centers/1/staff/44/role' && request.method === 'PATCH' && request.body?.role === 'ADMIN')).toBe(true))
+  })
+
   it('redirige al SUPER_ADMIN fuera de una ruta clínica', async () => {
     stubLaravelApi({ session: backendUser('SUPER_ADMIN') })
     open('/centro/clinica-horizonte/pacientes')
@@ -82,6 +99,9 @@ describe('navegación por roles con sesión Laravel', () => {
     expect(screen.queryByRole('link', { name: 'Agenda' })).toBeNull()
     expect(screen.queryByRole('link', { name: 'Reservar hora' })).toBeNull()
     expect(screen.queryByRole('link', { name: 'Pacientes' })).toBeNull()
+    expect(await screen.findByText('Permisos por rol')).toBeDefined()
+    expect(screen.getByText(/Los permisos de estos roles son fijos/)).toBeDefined()
+    expect(await screen.findByText('patients.manage')).toBeDefined()
   })
 
   it('agrupa horarios reales por profesional y desactiva con la API existente', async () => {

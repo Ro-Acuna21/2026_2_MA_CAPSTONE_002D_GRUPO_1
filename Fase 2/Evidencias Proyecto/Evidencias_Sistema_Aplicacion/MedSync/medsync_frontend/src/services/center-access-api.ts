@@ -16,6 +16,11 @@ const base = (platform: boolean, centerId: string) => platform
   : '/api/v1/center/receptionists'
 
 export const centerAccessApi = {
+  staff: (centerId: string) => apiRequest<{ data: CenterAccess[] }>(`/api/v1/platform/centers/${centerId}/staff`),
+  changeStaffRole: (centerId: string, membershipId: number, role: CenterAccess['role']) =>
+    apiRequest<{ data: CenterAccess }>(`/api/v1/platform/centers/${centerId}/staff/${membershipId}/role`, {
+      method: 'PATCH', body: JSON.stringify({ role }),
+    }),
   list: (platform: boolean, centerId: string) => apiRequest<{ data: CenterAccess[] }>(base(platform, centerId)),
   assign: (platform: boolean, centerId: string, input: { name: string; email: string }) =>
     apiRequest<{ data: CenterAccess; message: string; invitation_sent: boolean; account_created: boolean }>(base(platform, centerId), {
