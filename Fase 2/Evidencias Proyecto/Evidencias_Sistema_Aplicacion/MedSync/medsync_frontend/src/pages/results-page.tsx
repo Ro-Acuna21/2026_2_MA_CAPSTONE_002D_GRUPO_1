@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { useClinic } from '@/state/clinic-store'
@@ -6,31 +6,99 @@ import { PageHeading } from '@/components/page-heading'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Field, Input, Select } from '@/components/ui/form-controls'
 import { Button } from '@/components/ui/button'
-import { ActionForm } from '@/components/action-form'
-import { dateFromToday } from '@/lib/utils'
-import type { MedicalResult } from '@/domain/types'
+import { appointmentApi, firstApiErrorMessage, type BackendAppointment } from '@/services/http'
+import { resultApi, type MedicalResult, type ResultType } from '@/services/results-reports-api'
 import { useCenterPath } from '@/lib/tenant'
-import { Trash2 } from 'lucide-react'
 
-function DocumentView({ result }: { result: MedicalResult }) {
-  const [url, setUrl] = useState('')
-  useEffect(() => {
-    let objectUrl = '', cancelled = false
-    if (!/^data:(application\/pdf|image\/png|image\/jpeg|text\/plain)[;,]/.test(result.content)) return
-    fetch(result.content).then((r) => r.blob()).then((blob) => { if (!cancelled) { objectUrl = URL.createObjectURL(blob); setUrl(objectUrl) } }).catch(() => toast.error('No fue posible abrir el documento.'))
-    return () => { cancelled = true; if (objectUrl) URL.revokeObjectURL(objectUrl) }
-  }, [result.content])
-  return <div className="mt-4">{url && <><div className="mb-3 flex flex-wrap gap-4 text-sm font-medium text-primary"><a href={url} download={result.filename} className="underline">Descargar {result.filename}</a><a href={url} target="_blank" rel="noreferrer" className="underline">Abrir en otra pestaña</a></div><iframe sandbox="" title={`Documento: ${result.filename}`} src={url} className="h-96 w-full rounded-lg border bg-white" /></>}</div>
-}
 export function ResultsPage() {
-  const { data, user, addResult, addResultType, publishResult, deleteResult } = useClinic(); const centerPath = useCenterPath()
-  const [patientId, setPatientId] = useState(''), [professionalId, setProfessionalId] = useState(user?.professionalId ?? ''), [file, setFile] = useState<File | null>(null), [preview, setPreview] = useState<string | null>(null)
-  const upload = user?.permissions.includes('results.upload')
-  if (!user || user.role === 'SUPER_ADMIN' || (user.role === 'RECEPCIONISTA' && !upload) || (user.role === 'ADMIN' && !user.permissions.includes('results.types'))) return <Navigate to={centerPath()} replace />
-  const submit = async (v: Record<string, string>) => {
-    if (!file || file.size > 500 * 1024 || !['application/pdf', 'image/png', 'image/jpeg', 'text/plain'].includes(file.type)) throw new Error('Selecciona un PDF, PNG, JPEG o TXT de hasta 500 KB para esta demostración.')
-    const content = await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.onerror = () => reject(new Error('No se pudo leer el archivo.')); reader.readAsDataURL(file) })
-    addResult({ patientId, professionalId: user.role === 'PROFESIONAL' ? user.professionalId! : professionalId, typeId: v.typeId, appointmentId: v.appointmentId || undefined, performedAt: v.performedAt, filename: file.name, content })
+  const { user } = useClinic()
+  const centerPath = useCenterPath()
+  const [types, setTypes] = useState<ResultType[]>([])
+  const [results, setResults] = useState<MedicalResult[]>([])
+  const [appointments, setAppointments] = useState<BackendAppointment[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [typeName, setTypeName] = useState('')
+  const [appointmentId, setAppointmentId] = useState('')
+  const [typeId, setTypeId] = useState('')
+  const [performedAt, setPerformedAt] = useState(new Date().toISOString().slice(0, 10))
+  const [file, setFile] = useState<File | null>(null)
+  const [preview, setPreview] = useState<{ id: number; url: string } | null>(null)
+  const admin = user?.role === 'ADMIN'
+  const professional = user?.role === 'PROFESIONAL'
+
+  const refresh = useCallback(async () => {
+    try {
+      setError('')
+      const [typeResponse, resultResponse, appointmentResponse] = await Promise.all([
+        admin || professional ? resultApi.types() : Promise.resolve({ data: [] }),
+        admin ? Promise.resolve({ data: [] }) : resultApi.list(),
+        professional ? appointmentApi.list() : Promise.resolve({ data: [] }),
+      ])
+      setTypes(typeResponse.data)
+      setResults(resultResponse.data)
+      setAppointments(appointmentResponse.data.filter((item) => item.status === 'ATENDIDA'))
+    } catch (cause) {
+      setError(firstApiErrorMessage(cause, 'No fue posible cargar los resultados.'))
+    } finally { setLoading(false) }
+  }, [admin, professional])
+  useEffect(() => { if (user && ['ADMIN', 'PROFESIONAL', 'PACIENTE'].includes(user.role)) void refresh() }, [refresh, user])
+  useEffect(() => () => { if (preview) URL.revokeObjectURL(preview.url) }, [preview])
+  if (!user || !['ADMIN', 'PROFESIONAL', 'PACIENTE'].includes(user.role)) return <Navigate to={centerPath()} replace />
+
+  async function createType(event: React.FormEvent) {
+    event.preventDefault(); setBusy(true)
+    try { await resultApi.createType(typeName); setTypeName(''); await refresh(); toast.success('Tipo creado.') }
+    catch (cause) { toast.error(firstApiErrorMessage(cause, 'No fue posible crear el tipo.')) }
+    finally { setBusy(false) }
   }
-  return <><PageHeading title={user.role === 'ADMIN' ? 'Tipos de informes' : user.role === 'PACIENTE' ? 'Mis informes y resultados' : 'Informes y resultados'} description={user.role === 'ADMIN' ? 'Define las categorías documentales del centro sin acceder a resultados de pacientes.' : 'Documentos de atenciones realizadas. Este apartado no permite agendar exámenes.'} />{user.permissions.includes('results.types') && <Card className="mb-5"><CardHeader><CardTitle>Tipos de informes del centro</CardTitle></CardHeader><CardContent><ActionForm label="Crear tipo de informe" onSave={(v) => addResultType(v.name)}><Field label="Nombre del tipo"><Input name="name" required maxLength={120} placeholder="Ej.: Informe ADOS o resultado de biopsia" /></Field></ActionForm><p className="mt-4 text-sm text-muted-foreground">{data.resultTypes.map((t) => t.name).join(' · ') || 'Aún no hay tipos de informes.'}</p></CardContent></Card>}{upload && <Card className="mb-5"><CardHeader><CardTitle>Cargar borrador</CardTitle><p className="text-sm text-muted-foreground">El profesional responsable revisa y publica el resultado. Usa documentos ficticios en esta demostración.</p></CardHeader><CardContent><ActionForm reset={false} className="sm:grid-cols-2" label="Guardar borrador" onSave={submit}><Field label="Paciente"><Select required value={patientId} onChange={(e) => setPatientId(e.target.value)}><option value="">Seleccionar paciente</option>{data.patients.map((p) => <option key={p.id} value={p.id}>{p.name} · {p.rut}</option>)}</Select></Field><Field label="Profesional responsable"><Select required value={professionalId} disabled={user.role === 'PROFESIONAL'} onChange={(e) => setProfessionalId(e.target.value)}><option value="">Seleccionar profesional</option>{data.professionals.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</Select></Field><Field label="Tipo de informe"><Select name="typeId" required defaultValue=""><option value="">Seleccionar tipo</option>{data.resultTypes.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</Select></Field><Field label="Fecha de realización"><Input name="performedAt" type="date" required max={dateFromToday()} /></Field><Field label="Atención relacionada (opcional)"><Select name="appointmentId" key={`${patientId}-${professionalId}`} defaultValue=""><option value="">Sin atención vinculada</option>{data.appointments.filter((a) => a.patientId === patientId && a.professionalId === professionalId).map((a) => <option key={a.id} value={a.id}>{a.date} · {a.time}</option>)}</Select></Field><Field label="Documento (máximo 500 KB)"><Input type="file" required accept=".pdf,.png,.jpg,.jpeg,.txt" onChange={(e) => setFile(e.target.files?.[0] ?? null)} /></Field></ActionForm></CardContent></Card>}{user.role !== 'ADMIN' && <div className="grid gap-4">{!data.results.length && <Card><CardContent className="p-8 text-center text-muted-foreground">{user.role === 'PACIENTE' ? 'Aún no tienes informes publicados en este centro.' : 'Aún no hay informes disponibles para tu rol en este centro.'}</CardContent></Card>}{data.results.map((r) => <Card key={r.id}><CardContent className="p-5"><div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="font-semibold">{data.resultTypes.find((t) => t.id === r.typeId)?.name}</h2><p className="mt-1 text-sm text-muted-foreground">{data.organizations.find((o) => o.id === r.organizationId)?.name} · {data.professionals.find((p) => p.id === r.professionalId)?.name}</p>{user.role !== 'PACIENTE' && <p className="text-sm">Paciente: {data.patients.find((p) => p.id === r.patientId)?.name}</p>}<p className="mt-2 text-xs text-muted-foreground">Realizado: {r.performedAt} · {r.publishedAt ? `Publicado: ${r.publishedAt.slice(0, 10)}` : 'Pendiente de publicación'}</p></div><span className="rounded-full bg-secondary px-3 py-1 text-xs">{r.status === 'PUBLISHED' ? 'Publicado' : 'Borrador'}</span></div><div className="mt-4 flex flex-wrap gap-3"><Button variant="outline" onClick={() => setPreview(preview === r.id ? null : r.id)}>{preview === r.id ? 'Cerrar documento' : 'Ver documento'}</Button>{user.permissions.includes('results.publish') && r.status === 'DRAFT' && r.professionalId === user.professionalId && <Button onClick={() => { try { publishResult(r.id) } catch (error) { toast.error((error as Error).message) } }}>Publicar para el paciente</Button>}{user.role === 'PROFESIONAL' && r.professionalId === user.professionalId && <Button variant="destructive" onClick={() => { if (!window.confirm('¿Eliminar este informe? Esta acción lo quitará del portal del paciente.')) return; try { deleteResult(r.id) } catch (error) { toast.error((error as Error).message) } }}><Trash2 className="size-4" /> Eliminar</Button>}</div>{preview === r.id && <DocumentView result={r} />}</CardContent></Card>)}</div>}</>
+  async function createResult(event: React.FormEvent) {
+    event.preventDefault()
+    if (!file || file.size > 5 * 1024 * 1024) { toast.error('Selecciona un archivo de hasta 5 MB.'); return }
+    const form = new FormData()
+    form.set('appointment_id', appointmentId); form.set('result_type_id', typeId); form.set('performed_at', performedAt); form.set('file', file)
+    setBusy(true)
+    try { await resultApi.create(form); setFile(null); await refresh(); toast.success('Borrador guardado.') }
+    catch (cause) { toast.error(firstApiErrorMessage(cause, 'No fue posible guardar el borrador.')) }
+    finally { setBusy(false) }
+  }
+  async function changeStatus(result: MedicalResult, action: 'publish' | 'void') {
+    const reason = action === 'void' ? window.prompt('Motivo de anulación (mínimo 5 caracteres):') : null
+    if (action === 'void' && reason === null) return
+    setBusy(true)
+    try {
+      if (action === 'publish') await resultApi.publish(result.id)
+      else await resultApi.void(result.id, reason ?? '')
+      await refresh(); toast.success(action === 'publish' ? 'Resultado publicado.' : 'Resultado anulado.')
+    } catch (cause) { toast.error(firstApiErrorMessage(cause, 'No fue posible cambiar el estado.')) }
+    finally { setBusy(false) }
+  }
+  async function openFile(result: MedicalResult) {
+    const first = result.files[0]; if (!first) return
+    try { const blob = await resultApi.download(result.id, first.id); setPreview({ id: result.id, url: URL.createObjectURL(blob) }) }
+    catch (cause) { toast.error(firstApiErrorMessage(cause, 'No fue posible abrir el documento.')) }
+  }
+  return <>
+    <PageHeading title={admin ? 'Tipos de informes' : professional ? 'Informes y resultados' : 'Mis informes y resultados'} description="Documentos clínicos del centro, con acceso según tu rol." />
+    {loading && <p>Cargando resultados…</p>}
+    {error && <p role="alert" className="mb-4 text-destructive">{error}</p>}
+    {admin && <Card className="mb-5"><CardHeader><CardTitle>Tipos de informe</CardTitle></CardHeader><CardContent>
+      <form onSubmit={createType} className="flex flex-wrap items-end gap-3"><Field label="Nombre"><Input required maxLength={120} value={typeName} onChange={(event) => setTypeName(event.target.value)} /></Field><Button disabled={busy}>Crear tipo</Button></form>
+      <div className="mt-4 grid gap-2">{types.map((type) => <div key={type.id} className="flex items-center justify-between rounded border p-3"><span>{type.name} · {type.is_active ? 'Activo' : 'Inactivo'}</span><Button variant="outline" disabled={busy} onClick={async () => { try { await resultApi.updateType(type.id, { is_active: !type.is_active }); await refresh() } catch (cause) { toast.error(firstApiErrorMessage(cause, 'No se pudo actualizar.')) } }}>{type.is_active ? 'Desactivar' : 'Activar'}</Button></div>)}</div>
+    </CardContent></Card>}
+    {professional && <Card className="mb-5"><CardHeader><CardTitle>Cargar borrador</CardTitle></CardHeader><CardContent><form onSubmit={createResult} className="grid gap-4 sm:grid-cols-2">
+      <Field label="Atención realizada"><Select required value={appointmentId} onChange={(event) => setAppointmentId(event.target.value)}><option value="">Seleccionar atención</option>{appointments.map((item) => <option key={item.id} value={item.id}>{item.appointment_date} · {item.patient?.first_name} {item.patient?.last_name} · {item.service?.name}</option>)}</Select></Field>
+      <Field label="Tipo de informe"><Select required value={typeId} onChange={(event) => setTypeId(event.target.value)}><option value="">Seleccionar tipo</option>{types.map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}</Select></Field>
+      <Field label="Fecha de realización"><Input type="date" required max={new Date().toISOString().slice(0, 10)} value={performedAt} onChange={(event) => setPerformedAt(event.target.value)} /></Field>
+      <Field label="Documento ficticio (PDF, PNG, JPEG o TXT; máximo 5 MB)"><Input type="file" required accept=".pdf,.png,.jpg,.jpeg,.txt" onChange={(event) => setFile(event.target.files?.[0] ?? null)} /></Field>
+      <Button disabled={busy || !appointments.length}>Guardar borrador</Button>
+    </form>{!appointments.length && <p className="mt-3 text-sm text-muted-foreground">Necesitas una atención marcada como atendida para cargar un resultado.</p>}</CardContent></Card>}
+    {!admin && !loading && !error && <div className="grid gap-4">{!results.length && <Card><CardContent className="p-8 text-center text-muted-foreground">No hay resultados disponibles.</CardContent></Card>}{results.map((result) => <Card key={result.id}><CardContent className="p-5">
+      <div className="flex justify-between gap-3"><div><h2 className="font-semibold">{result.result_type_name}</h2><p className="text-sm text-muted-foreground">{professional ? result.patient_name : result.professional_name} · {result.performed_at}</p></div><span>{result.status === 'PUBLISHED' ? 'Publicado' : result.status === 'VOIDED' ? 'Anulado' : 'Borrador'}</span></div>
+      {result.void_reason && <p className="mt-2 text-sm">Motivo: {result.void_reason}</p>}
+      <div className="mt-4 flex flex-wrap gap-2"><Button variant="outline" onClick={() => void openFile(result)}>Abrir documento</Button>{professional && result.status === 'DRAFT' && <Button disabled={busy} onClick={() => void changeStatus(result, 'publish')}>Publicar</Button>}{professional && result.status !== 'VOIDED' && <Button variant="destructive" disabled={busy} onClick={() => void changeStatus(result, 'void')}>Anular</Button>}</div>
+      {preview?.id === result.id && <div className="mt-4"><a className="text-primary underline" href={preview.url} download={result.files[0]?.filename}>Descargar {result.files[0]?.filename}</a><iframe sandbox="" title="Documento clínico" src={preview.url} className="mt-3 h-96 w-full rounded border" /></div>}
+    </CardContent></Card>)}</div>}
+  </>
 }

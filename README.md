@@ -29,3 +29,6 @@ La plataforma asigna ADMIN por centro y cada ADMIN asigna recepción dentro de s
 ### Roles y permisos por centro
 
 Laravel aplica el catálogo fijo de Spatie en Core con Teams por `medical_center_id`. La plataforma puede cambiar ADMIN y RECEPCIONISTA en una misma membresía; el ADMIN ve el catálogo real del backend en modo lectura. `SUPER_ADMIN` solo conserva `/api/v1/me` entre las rutas con contexto clínico y recibe `403` en el resto. Ver `medsync_backend/docs/MATRIZ_ACCESO_ROLES.md` para el detalle de autorización.
+
+## Pasos 5 y 6 · 31-10-2026
+MedSync pasos 5 y 6: resultados médicos privados, precios históricos y reportes por centro. Detalle en `Fase 2/Evidencias Proyecto/Evidencias_Sistema_Aplicacion/MedSync/README_RESULTADOS_PRECIOS_REPORTES.md`.

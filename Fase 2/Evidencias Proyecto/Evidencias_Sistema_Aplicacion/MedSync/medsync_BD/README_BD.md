@@ -268,3 +268,6 @@ El esquema vivo de Core incluye `medical_centers.provisioning_status` y `medical
 La migración Core `2026_10_31_000002` agrega `center_users.invitation_pending` y `invitation_sent_at` para las invitaciones de ADMIN y recepción. El SQL de respaldo puede no reflejar esas columnas; aplicar migraciones Laravel antes de operar.
 
 El cierre de permisos del paso 4 no agrega tablas ni columnas. Las tablas Spatie ya residen en Core con Teams por `medical_center_id`; el cambio ADMIN/RECEPCIONISTA actualiza la misma fila de `center_users` y su asignación de rol del equipo, sin mover datos clínicos.
+
+## Pasos 5 y 6 · 31-10-2026
+Resultados, precios y reportes (pasos 5 y 6): ver `README_RESULTADOS_PRECIOS_REPORTES.md` en la raíz MedSync. API de archivos privados, permisos por centro, vigencia de tarifas e indicadores estimados; aplicar la migración Core de permisos y respaldar almacenamiento local privado.

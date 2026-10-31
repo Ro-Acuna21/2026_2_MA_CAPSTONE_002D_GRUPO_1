@@ -146,3 +146,6 @@ Se eligió invitación por correo, siguiendo el flujo ya existente para profesio
 ### Cierre del paso 4: matriz de roles
 
 El catálogo Spatie es fijo y se expone solo en modo lectura al ADMIN. Usar `medsync_backend/docs/MATRIZ_ACCESO_ROLES.md` como matriz vigente por endpoint; confirmar `401`, `403`, propiedad de paciente/profesional, centro/membresía inactivos y una misma cuenta con roles distintos en dos centros. `SUPER_ADMIN` no abre rutas clínicas salvo `/api/v1/me` para recuperar su identidad global. La transición entre ADMIN y RECEPCIONISTA se hace sobre la fila existente de `center_users`, únicamente desde plataforma; no se combinan roles dentro del mismo centro. Los resultados e informes siguen pendientes de backend propio.
+
+## Pasos 5 y 6 · 31-10-2026
+Resultados, precios y reportes (pasos 5 y 6): ver `README_RESULTADOS_PRECIOS_REPORTES.md` en la raíz MedSync. API de archivos privados, permisos por centro, vigencia de tarifas e indicadores estimados; aplicar la migración Core de permisos y respaldar almacenamiento local privado.

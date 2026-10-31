@@ -151,3 +151,6 @@ Si el login en un centro reconoce una cuenta global sin membresía allí, la rut
 ### Permisos visibles y cambio de rol
 
 El ADMIN ve los permisos fijos que responde `GET /api/v1/center/permissions`; no se presentan como asignaciones editables. La plataforma lista al personal de cada centro y puede cambiar ADMIN/RECEPCIONISTA sobre la misma membresía. El frontend mantiene reglas locales para pantallas demo aún no integradas; esas reglas no conceden autorización en Laravel. El backend comprueba rol, propiedad y centro activo en cada petición.
+
+## Pasos 5 y 6 · 31-10-2026
+Resultados, precios y reportes (pasos 5 y 6): ver `README_RESULTADOS_PRECIOS_REPORTES.md` en la raíz MedSync. API de archivos privados, permisos por centro, vigencia de tarifas e indicadores estimados; aplicar la migración Core de permisos y respaldar almacenamiento local privado.

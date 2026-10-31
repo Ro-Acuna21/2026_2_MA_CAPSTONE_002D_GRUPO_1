@@ -70,3 +70,6 @@ php artisan test
 La suite actual incluye pruebas de una misma cuenta con roles diferentes en dos centros, lectura y cambio de rol de personal, propiedad de ficha, membresía inactiva y rechazo de `SUPER_ADMIN` en rutas clínicas. Ejecutar `php artisan test` para verificar el resultado en cada entorno.
 
 Además, la validación manual recomendada es iniciar sesión con una misma cuenta que tenga roles distintos en dos centros y confirmar que un endpoint administrativo permitido en el primer centro devuelve `403` en el segundo.
+
+## Pasos 5 y 6 · 31-10-2026
+Resultados, precios y reportes (pasos 5 y 6): ver `README_RESULTADOS_PRECIOS_REPORTES.md` en la raíz MedSync. API de archivos privados, permisos por centro, vigencia de tarifas e indicadores estimados; aplicar la migración Core de permisos y respaldar almacenamiento local privado.

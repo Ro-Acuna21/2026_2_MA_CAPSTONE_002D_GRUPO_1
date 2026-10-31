@@ -17,6 +17,9 @@ class CenterRolePermissionSync
             'services.manage',
             'availability.manage',
             'center.specialties.manage',
+            'results.types.manage',
+            'service_prices.manage',
+            'reports.view',
         ],
         'RECEPCIONISTA' => [
             'patients.manage',
@@ -28,6 +31,7 @@ class CenterRolePermissionSync
         'PROFESIONAL' => [
             'appointments.view.own',
             'appointments.status.manage.own',
+            'results.manage.own',
         ],
         'PACIENTE' => [
             'patients.view.own',
@@ -36,6 +40,7 @@ class CenterRolePermissionSync
             'appointments.create.own',
             'appointments.reschedule.own',
             'appointments.cancel.own',
+            'results.view.own',
         ],
     ];
 

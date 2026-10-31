@@ -508,3 +508,6 @@ Para actualizar un entorno existente: respaldar Core y bases clínicas, ejecutar
 ### Cierre de permisos por rol (paso 4)
 
 `GET /api/v1/center/permissions` muestra al ADMIN el catálogo fijo `CenterRolePermissionSync::ROLE_PERMISSIONS`. `SUPER_ADMIN` recibe `403` en rutas clínicas distintas de `/api/v1/me`. La plataforma puede listar personal con `GET /api/v1/platform/centers/{center}/staff` y cambiar una membresía existente entre ADMIN y RECEPCIONISTA con `PATCH .../staff/{membership}/role`; Spatie sincroniza el nuevo rol solo en ese equipo. PACIENTE y PROFESIONAL mantienen sus flujos propios. Una cuenta global puede tener roles distintos en centros distintos. Ver `docs/MATRIZ_ACCESO_ROLES.md` y sus pruebas HTTP. Si una cuenta sigue pendiente de activación al asignarla a otro centro, la nueva membresía también queda pendiente y recibe invitación.
+
+## Pasos 5 y 6 · 31-10-2026
+Resultados, precios y reportes (pasos 5 y 6): ver `README_RESULTADOS_PRECIOS_REPORTES.md` en la raíz MedSync. API de archivos privados, permisos por centro, vigencia de tarifas e indicadores estimados; aplicar la migración Core de permisos y respaldar almacenamiento local privado.

@@ -132,3 +132,6 @@ La migración Core `2026_10_31_000002` agrega `center_users.invitation_pending` 
 ### Autorización por equipo (paso 4)
 
 Spatie persiste roles y asignaciones en Core con Teams por `medical_center_id`; no se duplican tablas de permisos en cada base clínica. La membresía única `(medical_center_id,user_id)` mantiene un rol por centro y su `is_active` determina el acceso. Cambiar ADMIN/RECEPCIONISTA actualiza esa fila y sincroniza Spatie; la misma cuenta puede conservar otro rol en otro centro. El catálogo fijo se consulta por API en modo lectura. Este paso no añade migraciones de esquema.
+
+## Pasos 5 y 6 · 31-10-2026
+Resultados, precios y reportes (pasos 5 y 6): ver `README_RESULTADOS_PRECIOS_REPORTES.md` en la raíz MedSync. API de archivos privados, permisos por centro, vigencia de tarifas e indicadores estimados; aplicar la migración Core de permisos y respaldar almacenamiento local privado.
