@@ -5,21 +5,42 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Field, Input, Select, Textarea } from '@/components/ui/form-controls'
 import { statusNames, type Slot } from '@/domain/types'
-import { dateFromToday, formatDateTime } from '@/lib/utils'
+import { dateFromToday } from '@/lib/utils'
 import { useClinic } from '@/state/clinic-store'
+import { appointmentApi, firstApiErrorMessage, type AppointmentHistoryResponse } from '@/services/http'
 import { useEffect, useState, type FormEvent } from 'react'
 import { toast } from 'sonner'
 import { useCenterPath } from '@/lib/tenant'
 import { canPatientModifyAppointment } from '@/domain/appointment-rules'
 
 export function AppointmentHistoryPage() {
-  const { id } = useParams(); const { data, user } = useClinic(); const centerPath = useCenterPath(); const appointment = data.appointments.find((a) => a.id === id)
-  const allowed = appointment && (user?.role === 'RECEPCIONISTA' || appointment.patientId === user?.patientId || appointment.professionalId === user?.professionalId)
-  if (!allowed || !appointment) return <Navigate to={centerPath('/citas')} replace />
-  const history = data.history.filter((item) => item.appointmentId === appointment.id).sort((a, b) => b.at.localeCompare(a.at))
-  return <><PageHeading title="Historial de la cita" description={`${formatDateTime(appointment.date, appointment.time)} · ${data.professionals.find((p) => p.id === appointment.professionalId)?.name}`} action={<Button asChild variant="outline"><Link to={centerPath('/citas')}><ArrowLeft className="size-4" /> Volver</Link></Button>} /><Card className="max-w-3xl"><CardContent className="p-6">{history.length > 0 ? <ol className="relative border-l border-border pl-7">{history.map((entry) => <li className="relative pb-8 last:pb-0" key={entry.id}><span className="absolute -left-[38px] grid size-5 place-items-center rounded-full bg-primary text-white"><CheckCircle2 className="size-3" /></span><p className="font-semibold">{entry.type.replaceAll('_', ' ')}</p><p className="mt-1 text-sm text-muted-foreground">{entry.from && `${statusNames[entry.from]} → `}{entry.to && statusNames[entry.to]}{entry.oldDate && <><br />{entry.oldDate} → {entry.newDate}</>}{entry.oldProfessionalId && entry.newProfessionalId && <><br />{data.professionals.find((p) => p.id === entry.oldProfessionalId)?.name} → {data.professionals.find((p) => p.id === entry.newProfessionalId)?.name}</>}{entry.reason && <><br />Motivo: {entry.reason}</>}</p><small className="mt-2 block text-xs text-muted-foreground">{new Intl.DateTimeFormat('es-CL', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(entry.at))} · {data.users.find((u) => u.id === entry.userId)?.email}</small></li>)}</ol> : <p className="text-sm text-muted-foreground">Esta reserva todavía no tiene historial registrado en el frontend (el historial real se guarda en Laravel, pero esta pantalla aún no lo consulta).</p>}</CardContent></Card></>
+  const { id } = useParams()
+  const { user } = useClinic()
+  const centerPath = useCenterPath()
+  const [history, setHistory] = useState<AppointmentHistoryResponse['data'] | null>(null)
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [reload, setReload] = useState(0)
+  useEffect(() => {
+    if (!id || !/^\d+$/.test(id) || !user || !['RECEPCIONISTA', 'PROFESIONAL', 'PACIENTE'].includes(user.role)) return
+    let live = true
+    appointmentApi.history(Number(id)).then((response) => {
+      if (live) { setHistory(response.data); setError('') }
+    }).catch((cause) => {
+      if (live) setError(firstApiErrorMessage(cause, 'No fue posible cargar el historial.'))
+    }).finally(() => { if (live) setLoading(false) })
+    return () => { live = false }
+  }, [id, user, reload])
+  if (!id || !/^\d+$/.test(id) || !user || !['RECEPCIONISTA', 'PROFESIONAL', 'PACIENTE'].includes(user.role)) return <Navigate to={centerPath('/citas')} replace />
+  const appointment = history?.appointment
+  return <><PageHeading title="Historial de la cita" description={appointment ? `${appointment.appointment_date} · ${appointment.start_time} · ${appointment.professional?.first_name ?? ''} ${appointment.professional?.last_name ?? ''}` : 'Eventos persistidos en Laravel'} action={<Button asChild variant="outline"><Link to={centerPath('/citas')}><ArrowLeft className="size-4" /> Volver</Link></Button>} />
+    <Card className="max-w-3xl"><CardContent className="p-6">
+      {loading && <p role="status">Cargando historial…</p>}
+      {error && <div><p role="alert" className="text-destructive">{error}</p><Button variant="outline" onClick={() => { setLoading(true); setReload((n) => n + 1) }}>Reintentar</Button></div>}
+      {!loading && !error && history && (history.events.length ? <ol className="relative border-l border-border pl-7">{history.events.map((event) => <li className="relative pb-8 last:pb-0" key={event.id}><span className="absolute -left-[38px] grid size-5 place-items-center rounded-full bg-primary text-white"><CheckCircle2 className="size-3" /></span><p className="font-semibold">{event.event_type.replaceAll('_', ' ')}</p><p className="mt-1 text-sm text-muted-foreground">{event.previous_status && `${statusNames[event.previous_status]} → `}{event.new_status && statusNames[event.new_status]}{event.old_date && <><br />{event.old_date} → {event.new_date}</>}{event.old_professional_id && event.new_professional_id && <><br />{event.old_professional_name ?? `Profesional #${event.old_professional_id}`} → {event.new_professional_name ?? `Profesional #${event.new_professional_id}`}</>}{event.reason && <><br />Motivo: {event.reason}</>}</p><small className="mt-2 block text-xs text-muted-foreground">{new Date(event.created_at).toLocaleString('es-CL')}</small></li>)}</ol> : <p className="text-sm text-muted-foreground">Esta cita todavía no tiene eventos de historial.</p>)}
+    </CardContent></Card>
+  </>
 }
-
 export function ReschedulePage() {
   const { id } = useParams()
   const { data, user, slots, patientSlots, professionalsForService, reschedule } = useClinic()

@@ -14,6 +14,7 @@ Estado verificado para las rutas Laravel disponibles al 31-10-2026. `SUPER_ADMIN
 | `/api/v1/patients` listado/alta | 403 | 403 | Centro activo | 403 | 403 |
 | `/api/v1/patients/{id}` lectura/edición | 403 | 403 | Centro activo | 403 | 403 salvo ficha propia |
 | `/api/v1/appointments` agenda | 403 | 403 | Agenda del centro | Agenda propia | 403 |
+| `/api/v1/appointments/{id}/history` | 403 | 403 | Citas del centro | Cita asignada | Cita propia, sin motivo interno |
 | Crear/reprogramar citas | 403 | 403 | Para paciente del centro | 403 | Solo propias |
 | Cambiar estado de cita | 403 | 403 | Según regla clínica | Solo cita propia autorizada | 403 |
 | Cancelar cita propia | 403 | 403 | Mediante gestión de estado | 403 | Solo propia y plazo permitido |

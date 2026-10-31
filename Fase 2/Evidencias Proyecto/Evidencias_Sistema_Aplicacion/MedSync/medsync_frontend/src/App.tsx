@@ -152,7 +152,7 @@ export default function App() {
           <Route
             element={
               <RoleRoute
-                allowed={["ADMIN", "RECEPCIONISTA", "PROFESIONAL", "PACIENTE"]}
+                allowed={["ADMIN", "PROFESIONAL", "PACIENTE"]}
               />
             }
           >

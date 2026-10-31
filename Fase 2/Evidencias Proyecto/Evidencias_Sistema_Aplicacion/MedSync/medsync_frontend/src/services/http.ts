@@ -499,6 +499,18 @@ export interface AppointmentsResponse {
   data: BackendAppointment[];
 }
 
+export interface AppointmentHistoryResponse {
+  data: {
+    appointment: BackendAppointment;
+    events: {
+      id: number; event_type: string; previous_status: AppointmentStatus | null; new_status: AppointmentStatus | null;
+      old_date: string | null; new_date: string | null; old_professional_id: number | null;
+      new_professional_id: number | null; old_professional_name: string | null; new_professional_name: string | null;
+      reason: string | null; created_at: string;
+    }[];
+  };
+}
+
 export interface CreateAppointmentPayload {
   service_id: number;
   professional_id: number;
@@ -531,6 +543,8 @@ export const appointmentApi = {
   my: () => apiRequest<AppointmentsResponse>("/api/v1/appointments/my"),
 
   list: () => apiRequest<AppointmentsResponse>("/api/v1/appointments"),
+
+  history: (id: number) => apiRequest<AppointmentHistoryResponse>(`/api/v1/appointments/${id}/history`),
 
   patients: () => apiRequest<PatientsResponse>("/api/v1/patients"),
 

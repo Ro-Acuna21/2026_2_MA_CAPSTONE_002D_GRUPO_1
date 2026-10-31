@@ -20,7 +20,8 @@ El frontend envía cookies con `credentials: include`. Configura `SANCTUM_STATEF
 | GET | `/api/v1/bootstrap` | Catálogos y datos iniciales visibles para el rol |
 | GET | `/api/v1/appointments` | Agenda paginada y filtrable |
 | POST | `/api/v1/appointments` | Crear reserva |
-| GET | `/api/v1/appointments/{id}` | Detalle e historial |
+| GET | `/api/v1/appointments/{id}` | Detalle de la cita |
+| GET | `/api/v1/appointments/{id}/history` | Eventos persistidos para recepción, paciente dueño o profesional asignado |
 | PATCH | `/api/v1/appointments/{id}` | Estado o reprogramación |
 | GET | `/api/v1/slots` | Disponibilidad por profesional, prestación y fecha |
 | GET/POST | `/api/v1/patients` | Listado de pacientes activos y alta por recepción; implementado |
@@ -31,6 +32,8 @@ El frontend envía cookies con `credentials: include`. Configura `SANCTUM_STATEF
 | GET | `/api/v1/reports/summary` | Indicadores administrativos |
 
 La API es responsable de validar disponibilidad, prevenir solapamientos, registrar historial y aplicar permisos. Nunca debe confiar en los controles visuales del frontend.
+
+El historial devuelve `{ data: { appointment, events } }`, con eventos en orden descendente. Cada evento incluye tipo, estados y fechas anteriores/nuevos, profesional anterior/nuevo con nombre, motivo y fecha de registro. El motivo se omite para el paciente porque puede contener información interna de personal. La plataforma y ADMIN no acceden a este recurso clínico.
 
 Pacientes usa `{ data: ... }` con identificador, nombres, RUT, nacimiento, correo, teléfono, previsión, seguro complementario, dirección, consentimiento, estado y vínculo de cuenta. El listado conserva `id`, `first_name`, `last_name` y `rut` para Reservas. `POST` devuelve `201`; las lecturas y `PATCH`, `200`. RUT, consentimiento, vínculo de cuenta y estado no son editables. El paciente solo accede a su propia ficha y no cambia correo ni previsión; recepción puede corregir el correo antes de vincular una cuenta. Se usan `401`, `403`, `404` y `422` según autenticación, permisos, existencia y validación. La conexión clínica se resuelve desde Core, nunca desde el navegador.
 

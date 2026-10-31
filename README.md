@@ -1,37 +1,39 @@
-# Capstone-MedSync-002D-GRUPO-1
+# MedSync
 
-## MedSync
+MedSync es una plataforma de gestión clínica para varios centros. Una cuenta de plataforma administra centros, planes y suscripciones; cada centro trabaja con su propia base clínica PostgreSQL. Laravel resuelve el centro desde la sesión autenticada y aplica los permisos en el servidor.
 
-Proyecto Capstone de una plataforma SaaS multi-centro para gestión clínica. La implementación se encuentra en:
+## Componentes
 
-- `Fase 2/Evidencias Proyecto/Evidencias_Sistema_Aplicacion/MedSync/medsync_frontend`: React, TypeScript y Vite.
-- `Fase 2/Evidencias Proyecto/Evidencias_Sistema_Aplicacion/MedSync/medsync_backend`: Laravel, Sanctum y PostgreSQL.
+| Componente | Tecnología | Ubicación |
+| --- | --- | --- |
+| Interfaz web | React, TypeScript, Vite | `Fase 2/Evidencias Proyecto/Evidencias_Sistema_Aplicacion/MedSync/medsync_frontend` |
+| API y autenticación | Laravel, Sanctum, Spatie Permission | `Fase 2/Evidencias Proyecto/Evidencias_Sistema_Aplicacion/MedSync/medsync_backend` |
+| Datos | PostgreSQL: Core y una base clínica por centro | Configuración en el backend |
 
-### Accesos principales
+Core conserva centros, usuarios globales, membresías, catálogo de planes y suscripciones. Cada base clínica conserva pacientes, profesionales, prestaciones, disponibilidad, citas, resultados médicos, precios e historial. `SUPER_ADMIN` administra la plataforma sin acceso a datos clínicos; ADMIN, recepción, profesional y paciente usan permisos del centro activo.
 
-- `/`: landing pública de MediSync.
-- `/centros`: directorio público de centros asociados.
-- `/centros/{slug}`: micrositio público de un centro.
-- `/ingresar`: selector de centro; no presupone ningún tenant.
-- `/centro/{slug}/ingresar`: acceso clínico contextual.
-- `/plataforma/acceso`: acceso exclusivo de `SUPER_ADMIN`.
+## Funciones principales
 
-El selector de acceso y registro consulta `GET /api/public/centers`; `POST /api/register` exige `center_slug`. Laravel valida el centro activo en Core y resuelve su base clínica desde `medical_centers.database_name`. El despliegue local puede tener solo un centro aprovisionado aunque el flujo ya acepta otros centros configurados en Core.
+- Directorio público de centros, selección explícita de centro, registro y acceso contextual.
+- Administración de centros, personal, especialidades, prestaciones y horarios.
+- Reservas de pacientes y recepción, agenda, reprogramación y consulta del historial de citas.
+- Resultados médicos con documentos privados, borrador, publicación, anulación y descarga autorizada.
+- Tarifas con vigencia e historial, indicadores clínicos y reportes comerciales por centro.
+- Catálogo de planes, suscripciones y pagos informados manualmente. La interfaz muestra el estado persistido; MedSync no procesa cobros bancarios.
 
-La arquitectura, reglas de negocio y operación se documentan en `Fase 2/Evidencias Proyecto/Evidencias_Sistema_Aplicacion/MedSync/INDICACIONES_BACKEND.md`, `REQUERIMIENTOS_BD.md` y los README de frontend/backend.
+## Accesos web
 
-### Pasos 1 y 2: centros e incorporación de pacientes
+| Ruta | Uso |
+| --- | --- |
+| `/` y `/centros` | Sitio y directorio públicos |
+| `/ingresar` | Selección de centro |
+| `/centro/{slug}/ingresar` | Acceso clínico del centro |
+| `/plataforma/acceso` | Acceso de administración de plataforma |
 
-`SUPER_ADMIN` crea y edita centros desde `/plataforma`; Laravel guarda sus datos en Core y crea automáticamente una base PostgreSQL clínica aislada. Un centro solo se publica después de migrar y verificar esa base. El usuario PostgreSQL configurado requiere privilegio `CREATEDB`. Una cuenta global existente puede iniciar sesión en otro centro y, con consentimiento explícito, crear allí una ficha local sin duplicar la cuenta ni copiar datos clínicos.
+## Ejecución local
 
-La plataforma asigna ADMIN por centro y cada ADMIN asigna recepción dentro de su tenant. Las cuentas nuevas reciben una invitación de activación por correo; el envío depende de un SMTP operativo.
+Se requieren PHP 8.3 o superior con `pdo_pgsql`, Composer, PostgreSQL y Node.js. En `medsync_backend`, instalar dependencias con `composer install`, copiar `.env.example` a `.env`, configurar las conexiones Core y Center, y ejecutar `php artisan key:generate`, `php artisan migrate` y `php artisan db:seed`. Iniciar la API con `php artisan serve`.
 
-### Roles y permisos por centro
+En `medsync_frontend`, ejecutar `npm install` y `npm run dev`. La interfaz se abre en `http://localhost:3000` y, por defecto, llama a la API en `http://localhost:8000`; `VITE_API_URL` permite cambiar esa dirección.
 
-Laravel aplica el catálogo fijo de Spatie en Core con Teams por `medical_center_id`. La plataforma puede cambiar ADMIN y RECEPCIONISTA en una misma membresía; el ADMIN ve el catálogo real del backend en modo lectura. `SUPER_ADMIN` solo conserva `/api/v1/me` entre las rutas con contexto clínico y recibe `403` en el resto. Ver `medsync_backend/docs/MATRIZ_ACCESO_ROLES.md` para el detalle de autorización.
-
-## Pasos 5 y 6 · 31-10-2026
-MedSync pasos 5 y 6: resultados médicos privados, precios históricos y reportes por centro. Detalle en `Fase 2/Evidencias Proyecto/Evidencias_Sistema_Aplicacion/MedSync/README_RESULTADOS_PRECIOS_REPORTES.md`.
-
-## Paso 7 y revisión final · 31-10-2026
-Planes, suscripciones y pagos manuales se guardan en Core; plataforma y centro leen el mismo estado. No hay cobro integrado ni afirmación automática de «pago al día». La revisión integral y sus pendientes están en `README_SUSCRIPCIONES_Y_REVISION_FINAL.md` de la raíz MedSync.
+La configuración de bases, migraciones y centros existentes se explica en [README del backend](Fase%202/Evidencias%20Proyecto/Evidencias_Sistema_Aplicacion/MedSync/medsync_backend/README.md). El [contrato de API](Fase%202/Evidencias%20Proyecto/Evidencias_Sistema_Aplicacion/MedSync/medsync_frontend/docs/api-contract.md) y la [matriz de roles](Fase%202/Evidencias%20Proyecto/Evidencias_Sistema_Aplicacion/MedSync/medsync_backend/docs/MATRIZ_ACCESO_ROLES.md) detallan rutas y permisos. Para ejecutar las pruebas: `php artisan test` en el backend y `npm test` en el frontend.

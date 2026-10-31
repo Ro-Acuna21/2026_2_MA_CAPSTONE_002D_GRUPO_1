@@ -305,3 +305,40 @@ it('impide que un profesional cambie el estado de una cita asignada a otro profe
         @unlink($path);
     }
 });
+
+it('serves appointment history only to the owner, assigned professional or reception', function () {
+    $path = tempnam(sys_get_temp_dir(), 'appointment-history-');
+    try {
+        prepareAppointmentWorkflowDatabase('center', $path);
+        [$center, , $client] = appointmentWorkflowClient($this, $path, 'appointment-history', 'RECEPCIONISTA');
+        DB::connection('center')->table('appointment_history')->insert([
+            'appointment_id' => 19, 'event_type' => 'CREACION', 'new_status' => 'PENDIENTE',
+            'old_professional_id' => 1, 'new_professional_id' => 2, 'reason' => 'Motivo interno de prueba',
+            'created_at' => now(),
+        ]);
+        $client->getJson('/api/v1/appointments/19/history')->assertOk()
+            ->assertJsonPath('data.appointment.id', 19)
+            ->assertJsonPath('data.events.0.event_type', 'CREACION')
+            ->assertJsonPath('data.events.0.old_professional_name', 'Profesional A')
+            ->assertJsonPath('data.events.0.reason', 'Motivo interno de prueba');
+        $makeUser = function (string $email, string $role, ?int $patientId, ?int $professionalId) use ($center) {
+            $user = User::create(['name' => $role, 'email' => $email, 'password' => 'Password123', 'is_active' => true]);
+            CenterUser::create(['medical_center_id' => $center->id, 'user_id' => $user->id,
+                'role' => $role, 'patient_id' => $patientId, 'professional_id' => $professionalId, 'is_active' => true]);
+            return $user;
+        };
+        $owner = $makeUser('history-owner@example.test', 'PACIENTE', 1, null);
+        $professional = $makeUser('history-prof@example.test', 'PROFESIONAL', null, 1);
+        $other = $makeUser('history-other@example.test', 'PACIENTE', 2, null);
+        $admin = $makeUser('history-admin@example.test', 'ADMIN', null, null);
+        $session = ['active_medical_center_id' => $center->id];
+        $this->actingAs($owner, 'sanctum')->withSession($session)->getJson('/api/v1/appointments/19/history')
+            ->assertOk()->assertJsonPath('data.events.0.reason', null);
+        $this->actingAs($professional, 'sanctum')->withSession($session)->getJson('/api/v1/appointments/19/history')->assertOk();
+        $this->actingAs($other, 'sanctum')->withSession($session)->getJson('/api/v1/appointments/19/history')->assertForbidden();
+        $this->actingAs($admin, 'sanctum')->withSession($session)->getJson('/api/v1/appointments/19/history')->assertForbidden();
+    } finally {
+        DB::purge('center');
+        if (is_file($path)) unlink($path);
+    }
+});

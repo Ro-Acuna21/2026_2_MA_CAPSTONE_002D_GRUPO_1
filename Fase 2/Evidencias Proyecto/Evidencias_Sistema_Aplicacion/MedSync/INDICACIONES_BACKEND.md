@@ -73,7 +73,7 @@ El permiso opcional `results.upload` puede habilitar a recepción a cargar borra
 Usar prefijo `/api/v1`, respuestas de recursos como `{ "data": ... }`, paginación estándar de Laravel y errores de validación como `{ "message": "...", "errors": { "campo": ["..."] } }`.
 
 - Autenticación: `GET /sanctum/csrf-cookie`, `GET /api/public/centers`, `POST /api/login`, `POST /api/logout`, `GET /api/v1/me`, `POST /api/register`. El login clínico recibe `email`, `password` y `center_slug`; Laravel valida el slug y la membresía antes de guardar el centro activo en sesión. El registro también exige `center_slug`, valida que el centro esté activo en Core y resuelve su base clínica antes de consultar o crear pacientes.
-- Agenda: `GET/POST/PATCH /api/v1/appointments`, `GET /api/v1/appointments/{id}`, `GET /api/v1/slots`; recepción obtiene sus pacientes activos desde `GET /api/v1/patients`.
+- Agenda: `GET/POST/PATCH /api/v1/appointments`, `GET /api/v1/appointments/{id}`, `GET /api/v1/appointments/{id}/history`, `GET /api/v1/slots`; recepción obtiene sus pacientes activos desde `GET /api/v1/patients`. El historial se lee desde la base clínica del centro activo; recepción ve las citas del centro y paciente/profesional solo las propias. El motivo interno no se entrega al paciente.
 - Gestión del centro: `GET/POST/PATCH /api/v1/patients`, `/professionals`, `/specialties`, `/services`, `/availability`, `/result-types`.
 - Resultados: `GET/POST /api/v1/results`, `POST /api/v1/results/{id}/publish`, `GET /api/v1/results/{id}/document`.
 - Plataforma: `GET/POST/PATCH /api/v1/platform/centers` y `PUT /api/v1/platform/centers/{id}/administrator`.

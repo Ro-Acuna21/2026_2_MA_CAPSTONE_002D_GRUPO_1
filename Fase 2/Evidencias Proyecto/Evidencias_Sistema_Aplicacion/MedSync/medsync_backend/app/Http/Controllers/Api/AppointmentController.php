@@ -141,6 +141,42 @@ class AppointmentController extends Controller
         ]);
     }
 
+    /** Historial inmutable de una cita del centro activo. */
+    public function history(Request $request, Appointment $appointment)
+    {
+        $member = $this->tenantContext->centerUser();
+        $allowed = ($member->role === 'RECEPCIONISTA' && $request->user()->can('appointments.view.all'))
+            || ($member->role === 'PROFESIONAL' && $member->professional_id === $appointment->professional_id && $request->user()->can('appointments.view.own'))
+            || ($member->role === 'PACIENTE' && $member->patient_id === $appointment->patient_id && $request->user()->can('appointments.view.own'));
+        abort_unless($allowed, 403);
+
+        $events = $appointment->history()->reorder('created_at', 'desc')->orderByDesc('id')->get();
+        $professionalIds = $events->flatMap(fn ($event) => [$event->old_professional_id, $event->new_professional_id])->filter()->unique();
+        $names = Professional::withTrashed()->whereIn('id', $professionalIds)->get()->mapWithKeys(
+            fn ($professional) => [$professional->id => trim($professional->first_name.' '.$professional->last_name)]
+        );
+
+        return response()->json([
+            'data' => [
+                'appointment' => $this->presentAppointment($appointment),
+                'events' => $events->map(fn ($event) => [
+                    'id' => $event->id,
+                    'event_type' => $event->event_type,
+                    'previous_status' => $event->previous_status,
+                    'new_status' => $event->new_status,
+                    'old_date' => $event->old_date?->toDateString(),
+                    'new_date' => $event->new_date?->toDateString(),
+                    'old_professional_id' => $event->old_professional_id,
+                    'new_professional_id' => $event->new_professional_id,
+                    'old_professional_name' => $names[$event->old_professional_id] ?? null,
+                    'new_professional_name' => $names[$event->new_professional_id] ?? null,
+                    'reason' => $member->role === 'PACIENTE' ? null : $event->reason,
+                    'created_at' => $event->created_at?->toIso8601String(),
+                ]),
+            ],
+        ]);
+    }
+
     /**
      * PATCH /api/v1/appointments/{appointment}/reschedule
      */

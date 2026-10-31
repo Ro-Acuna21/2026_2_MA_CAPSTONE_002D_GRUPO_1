@@ -157,3 +157,5 @@ Resultados, precios y reportes (pasos 5 y 6): ver `README_RESULTADOS_PRECIOS_REP
 
 ## Paso 7 y revisión final · 31-10-2026
 Planes, suscripciones y pagos manuales se guardan en Core; plataforma y centro leen el mismo estado. No hay cobro integrado ni afirmación automática de «pago al día». La revisión integral y sus pendientes están en `README_SUSCRIPCIONES_Y_REVISION_FINAL.md` de la raíz MedSync.
+
+El historial de `/centro/{centerSlug}/citas/{id}` consulta `GET /api/v1/appointments/{id}/history` y muestra eventos persistidos con estados de carga y error. Laravel comprueba la propiedad de la cita y no entrega motivos internos al paciente.

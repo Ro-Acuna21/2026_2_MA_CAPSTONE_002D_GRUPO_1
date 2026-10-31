@@ -103,6 +103,7 @@ Route::middleware(['auth:sanctum', 'tenant.center'])->group(function () {
     Route::get('/v1/appointments/available-slots', [AppointmentController::class, 'availableSlots']);
     Route::get('/v1/appointments', [AppointmentController::class, 'index']);
     Route::get('/v1/appointments/my', [AppointmentController::class, 'myAppointments']);
+    Route::get('/v1/appointments/{appointment}/history', [AppointmentController::class, 'history'])->whereNumber('appointment');
     Route::post('/v1/appointments', [AppointmentController::class, 'store']);
     Route::patch('/v1/appointments/{appointment}/reschedule', [AppointmentController::class, 'reschedule']);
     Route::patch('/v1/appointments/{appointment}/status', [AppointmentController::class, 'updateStatus']);
