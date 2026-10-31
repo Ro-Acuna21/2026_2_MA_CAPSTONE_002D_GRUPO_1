@@ -1,6 +1,7 @@
 import { vi } from 'vitest'
 import type { AuthUser, BackendAvailability, BackendProfessional } from '@/services/http'
 import type { Role } from '@/domain/types'
+import type { GlobalSpecialty } from '@/services/specialty-catalog-api'
 
 export const centers = [
   { id: 1, name: 'Clínica Horizonte', slug: 'clinica-horizonte' },
@@ -28,12 +29,14 @@ export function stubLaravelApi(options: {
   professionals?: BackendProfessional[]
   availabilities?: BackendAvailability[]
   unauthorizedServices?: boolean
+  globalSpecialties?: GlobalSpecialty[]
 } = {}) {
   const requests: RequestRecord[] = []
   let session = options.session ?? null
   const publishedCenters = options.centers ?? centers
   const patientRecords = [...(options.patients ?? [])]
   const availabilityRecords = [...(options.availabilities ?? [])]
+  const globalSpecialties = [...(options.globalSpecialties ?? [])]
   const ok = (data: unknown, status = 200) => ({ ok: true, status, json: async () => structuredClone(data) })
   const fail = (status: number) => ({ ok: false, status, json: async () => ({ message: 'Sin acceso' }) })
 
@@ -55,6 +58,18 @@ export function stubLaravelApi(options: {
     }
     if (path === '/api/logout') { session = null; return { ok: true, status: 204 } }
     if (!session) return fail(401)
+    if (path === '/api/v1/platform/specialties' && session.role === 'SUPER_ADMIN') {
+      if (method === 'GET') return ok({ data: globalSpecialties })
+      if (method === 'POST') {
+        const specialty = {
+          id: Math.max(0, ...globalSpecialties.map((item) => item.id)) + 1,
+          name: String(body?.name), description: body?.description ? String(body.description) : null,
+          is_active: true,
+        }
+        globalSpecialties.push(specialty)
+        return ok({ data: specialty }, 201)
+      }
+    }
     if (path === '/api/v1/professionals') return ok({ data: options.professionals ?? [] })
     if (path === '/api/v1/availabilities' && method === 'GET') return ok({ data: availabilityRecords })
     if (path.startsWith('/api/v1/availabilities/') && method === 'PATCH') {

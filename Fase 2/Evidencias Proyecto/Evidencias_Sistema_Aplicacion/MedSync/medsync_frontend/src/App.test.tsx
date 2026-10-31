@@ -81,12 +81,15 @@ describe('navegación por roles con sesión Laravel', () => {
     await waitFor(() => expect(api.requests.some((request) => request.path === '/api/v1/availabilities/1' && request.method === 'PATCH' && request.body?.is_active === false)).toBe(true))
   })
 
-  it('muestra integración pendiente para el catálogo global sin ofrecer guardados ficticios', async () => {
-    stubLaravelApi({ session: backendUser('SUPER_ADMIN') })
+  it('crea una especialidad global mediante la API de plataforma', async () => {
+    const api = stubLaravelApi({ session: backendUser('SUPER_ADMIN') })
     open('/plataforma/especialidades')
     expect(await screen.findByRole('heading', { name: 'Catálogo global de especialidades' })).toBeDefined()
-    expect(await screen.findByText(/catálogo global aún no está disponible en el backend/i)).toBeDefined()
-    expect(screen.queryByRole('button', { name: 'Crear especialidad' })).toBeNull()
+    expect(await screen.findByText('Todavía no hay especialidades globales.')).toBeDefined()
+    fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Cardiología' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Crear especialidad' }))
+    expect(await screen.findByText('Cardiología · Activa')).toBeDefined()
+    expect(api.requests.some((request) => request.path === '/api/v1/platform/specialties' && request.method === 'POST' && request.body?.name === 'Cardiología')).toBe(true)
   })
 
   it('vuelve al acceso del centro cuando expira la sesión al cargar reservas', async () => {
