@@ -111,3 +111,11 @@ Resultados, precios y reportes (pasos 5 y 6): ver `README_RESULTADOS_PRECIOS_REP
 
 ## Paso 7: suscripciones persistidas (31-10-2026)
 `GET /api/public/plans` publica planes activos. `GET/POST /api/v1/platform/plans` y `PATCH /api/v1/platform/plans/{plan}` son solo de SUPER_ADMIN. `GET /api/v1/platform/centers/{center}/subscription`, `POST /api/v1/platform/centers/{center}/subscriptions`, `PATCH /api/v1/platform/centers/{center}/subscriptions/{subscription}` y `POST .../payments` operan Core, no bases clínicas. `GET /api/v1/center/subscription` da al ADMIN del centro la misma suscripción abierta e historial visible para plataforma. `PAID` es un registro manual con fecha y referencia, nunca una confirmación bancaria.
+
+## Revisión 02-11-2026
+
+- `GET /api/public/plans`: planes activos con `name`, `description`, `monthly_price_clp`, `professional_limit`, `user_limit` y `features` para `/planes`.
+- `POST /api/public/commercial-inquiries`: `plan_id` opcional (activo), `contact_name`, `center_name`, `email`, `phone` y `message` opcionales. Responde `201 {message}`; validación `422`; límite `5/minuto`. Guarda en Core, sin suscripción, correo automático ni pago.
+- `GET /api/v1/platform/commercial-inquiries`: últimas 100 solicitudes con plan; requiere sesión `SUPER_ADMIN`. Otros roles reciben `403`.
+- `GET /api/public/centers`: centros activos con `id`, `name`, `slug`, `phone`, `description`, `address`, `commune`, `region` y `specialties`; nunca incluye `database_name`. `POST/PATCH /api/v1/platform/centers` aceptan `public_description`, `address_line`, `commune` y `region` además de los campos anteriores.
+- `GET /api/v1/services`: cada prestación incluye `current_price_clp` o `null`. `GET /api/v1/services/{service}/price?date=YYYY-MM-DD` devuelve `{data:{service_id,date,amount_clp}}`; requiere centro activo, devuelve `404` para prestación inactiva o especialidad deshabilitada. `amount_clp: null` significa tarifa no informada. La respuesta no constituye un pago ni una garantía de tarifa posterior.

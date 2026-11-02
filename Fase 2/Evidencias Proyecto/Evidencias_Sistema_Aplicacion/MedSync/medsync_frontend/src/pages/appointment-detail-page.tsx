@@ -33,7 +33,7 @@ export function AppointmentHistoryPage() {
   }, [id, user, reload])
   if (!id || !/^\d+$/.test(id) || !user || !['RECEPCIONISTA', 'PROFESIONAL', 'PACIENTE'].includes(user.role)) return <Navigate to={centerPath('/citas')} replace />
   const appointment = history?.appointment
-  return <><PageHeading title="Historial de la cita" description={appointment ? `${appointment.appointment_date} · ${appointment.start_time} · ${appointment.professional?.first_name ?? ''} ${appointment.professional?.last_name ?? ''}` : 'Eventos persistidos en Laravel'} action={<Button asChild variant="outline"><Link to={centerPath('/citas')}><ArrowLeft className="size-4" /> Volver</Link></Button>} />
+  return <><PageHeading title="Historial de la cita" description={appointment ? `${appointment.appointment_date} · ${appointment.start_time} · ${appointment.professional?.first_name ?? ''} ${appointment.professional?.last_name ?? ''}` : 'Historial registrado de la cita'} action={<Button asChild variant="outline"><Link to={centerPath('/citas')}><ArrowLeft className="size-4" /> Volver</Link></Button>} />
     <Card className="max-w-3xl"><CardContent className="p-6">
       {loading && <p role="status">Cargando historial…</p>}
       {error && <div><p role="alert" className="text-destructive">{error}</p><Button variant="outline" onClick={() => { setLoading(true); setReload((n) => n + 1) }}>Reintentar</Button></div>}

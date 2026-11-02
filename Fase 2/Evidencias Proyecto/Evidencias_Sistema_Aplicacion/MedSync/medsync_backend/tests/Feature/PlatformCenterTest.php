@@ -21,12 +21,16 @@ it('creates only a provisioned center and publishes it after success', function 
 
     $this->actingAs($this->platformUser)->postJson('/api/v1/platform/centers', [
         'name' => 'Centro Nuevo', 'slug' => 'centro-nuevo', 'rut' => '12.345.678-5',
+        'public_description' => 'Atención de prueba para la comunidad.',
+        'address_line' => 'Calle Ficticia 123', 'commune' => 'Santiago', 'region' => 'Metropolitana',
         'plan' => 'STARTER', 'subscription_status' => 'TRIAL', 'is_active' => true,
     ])->assertCreated()->assertJsonPath('data.provisioning_status', 'READY');
 
     $center = MedicalCenter::where('slug', 'centro-nuevo')->firstOrFail();
     expect($center->database_name)->toMatch('/^medsync_c_[a-z0-9]+$/');
-    $this->getJson('/api/public/centers')->assertOk()->assertJsonFragment(['slug' => 'centro-nuevo']);
+    $this->getJson('/api/public/centers')->assertOk()->assertJsonFragment(['slug' => 'centro-nuevo'])
+        ->assertJsonPath('data.0.address', 'Calle Ficticia 123')
+        ->assertJsonPath('data.0.description', 'Atención de prueba para la comunidad.');
     $this->postJson('/api/v1/platform/centers', [
         'name' => 'Centro Repetido', 'slug' => 'centro-nuevo', 'rut' => '12.345.678-5',
         'plan' => 'STARTER', 'subscription_status' => 'TRIAL', 'is_active' => true,

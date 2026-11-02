@@ -17,6 +17,7 @@ class MedicalCenter extends Model
         'rut',
         'phone',
         'email',
+        'public_description',
         'is_active',
         'plan',
         'subscription_status',
@@ -42,6 +43,10 @@ public function primaryAddress()
     return $this->hasOne(MedicalCenterAddress::class, 'medical_center_id')
         ->where('is_primary', true);
 }
+    public function selectedSpecialties()
+    {
+        return $this->hasMany(MedicalCenterSpecialty::class, 'medical_center_id')->where('is_active', true);
+    }
 
     public function centerUsers()
     {

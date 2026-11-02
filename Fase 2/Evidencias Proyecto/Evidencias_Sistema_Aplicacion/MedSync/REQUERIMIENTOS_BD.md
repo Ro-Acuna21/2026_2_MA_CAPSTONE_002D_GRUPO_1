@@ -138,3 +138,7 @@ Resultados, precios y reportes (pasos 5 y 6): ver `README_RESULTADOS_PRECIOS_REP
 
 ## Paso 7: estado comercial persistido (31-10-2026)
 Core `plans`, `subscriptions` y `subscription_payments` son la fuente comercial. La suscripción abierta es única por centro. La migración `2026_10_31_000004` agrega precio de contratación y actor del pago manual; `2026_10_31_000005` impide referencias duplicadas por suscripción. Los campos comerciales de `medical_centers` son de compatibilidad; la interfaz lee la suscripción abierta. Ver `README_SUSCRIPCIONES_Y_REVISION_FINAL.md` en la raíz MedSync.
+
+## Correcciones de revisión · 02-11-2026
+
+Core incorpora `commercial_inquiries` para contactos comerciales sin datos clínicos y `medical_centers.public_description` para la ficha pública. La dirección usa `medical_center_addresses`, sin duplicar columnas. Las especialidades públicas se derivan de `medical_center_specialties` y del catálogo global activo. El valor de una prestación se consulta en la base clínica del centro y en `service_prices` según la fecha de cita; no se infiere de los reportes ni se registra como pago. Respaldar Core y todas las bases Center antes de aplicar migraciones; los respaldos locales no forman parte del repositorio.

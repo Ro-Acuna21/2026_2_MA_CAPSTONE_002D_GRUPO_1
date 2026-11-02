@@ -525,3 +525,11 @@ Resultados, precios y reportes (pasos 5 y 6): ver `README_RESULTADOS_PRECIOS_REP
 
 ## Paso 7 y revisión final · 31-10-2026
 Planes, suscripciones y pagos manuales se guardan en Core; plataforma y centro leen el mismo estado. No hay cobro integrado ni afirmación automática de «pago al día». La revisión integral y sus pendientes están en `README_SUSCRIPCIONES_Y_REVISION_FINAL.md` de la raíz MedSync.
+
+## Revisión comercial y pública · 02-11-2026
+
+Las migraciones Core `2026_11_02_000001` y `2026_11_02_000002` agregan `commercial_inquiries` y `medical_centers.public_description`. El formulario de `/planes` usa `POST /api/public/commercial-inquiries` con validación y límite de 5 solicitudes por minuto por cliente; `GET /api/v1/platform/commercial-inquiries` es exclusivo de `SUPER_ADMIN`. La solicitud se persiste en Core y no envía correo ni procesa pagos. No almacenar antecedentes clínicos en ese formulario.
+
+La administración de centros acepta `public_description`, `address_line`, `commune` y `region`; la dirección se conserva en `medical_center_addresses`. `GET /api/public/centers` publica solo centros activos con estos campos, teléfono y especialidades activas seleccionadas. El nombre `database_name` sigue generado y validado en el servidor y nunca se publica.
+
+`GET /api/v1/services` incorpora `current_price_clp`. `GET /api/v1/services/{service}/price?date=YYYY-MM-DD` devuelve `amount_clp` vigente en la fecha indicada, o `null` si no hay tarifa; requiere sesión y centro activo, y nunca concede permiso para administrar precios. El valor es informativo: reservar no implica pago. Respaldar Core y cada base Center antes de ejecutar `php artisan migrate --force`; no usar `migrate:fresh` en bases con datos.

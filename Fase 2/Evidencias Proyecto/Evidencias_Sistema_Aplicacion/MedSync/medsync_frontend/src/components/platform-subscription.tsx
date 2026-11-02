@@ -34,7 +34,7 @@ export function PlatformSubscription({ centerId, onChanged }: { centerId: number
     event.preventDefault(); setBusy(true)
     try {
       await subscriptionApi.create(centerId, { plan_id: Number(planId), status, started_at: startedAt, renews_at: renewsAt || null, notes: notes || null })
-      await refresh(); onChanged(); toast.success('Suscripción guardada en Core.')
+      await refresh(); onChanged(); toast.success('Suscripción guardada.')
     } catch (cause) { toast.error(firstApiErrorMessage(cause, 'No fue posible asignar la suscripción.')) }
     finally { setBusy(false) }
   }
@@ -59,7 +59,7 @@ export function PlatformSubscription({ centerId, onChanged }: { centerId: number
     } catch (cause) { toast.error(firstApiErrorMessage(cause, 'No fue posible registrar el pago.')) }
     finally { setBusy(false) }
   }
-  return <Card className="mt-5"><CardHeader><CardTitle>Suscripción y pagos registrados</CardTitle><p className="text-sm text-muted-foreground">Cobro externo y registro manual. El estado se informa según los registros de Core; no se verifica con un proveedor de pago.</p></CardHeader><CardContent className="grid gap-6">
+  return <Card className="mt-5"><CardHeader><CardTitle>Suscripción y pagos registrados</CardTitle><p className="text-sm text-muted-foreground">Los cobros se realizan fuera de MedSync y se registran manualmente aquí. El sistema no verifica pagos de forma automática.</p></CardHeader><CardContent className="grid gap-6">
     {error && <p role="alert" className="text-destructive">{error} <Button variant="outline" onClick={() => void refresh()}>Reintentar</Button></p>}
     {data?.current ? <div className="rounded border p-4"><p className="font-semibold">{data.current.plan?.name} · {labels[data.current.status]}</p><p className="text-sm">Inicio: {data.current.started_at} · Renovación indicada: {data.current.renews_at ?? 'Sin fecha'} · Precio al contratar: {data.current.monthly_price_clp_snapshot == null ? 'No registrado' : clp.format(data.current.monthly_price_clp_snapshot)}</p><Field label="Cambiar estado registrado"><Select disabled={busy} value={data.current.status} onChange={(e) => void changeStatus(e.target.value as Subscription['status'])}>{Object.entries(labels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</Select></Field></div> : <p>Este centro aún no tiene suscripción registrada.</p>}
     <form onSubmit={assign} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><h3 className="sm:col-span-2 lg:col-span-4 font-semibold">{data?.current ? 'Cambiar de plan (conserva historial)' : 'Asignar suscripción'}</h3>

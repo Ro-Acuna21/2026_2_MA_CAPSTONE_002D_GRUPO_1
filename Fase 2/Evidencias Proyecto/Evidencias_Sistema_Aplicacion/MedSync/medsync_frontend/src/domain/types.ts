@@ -13,7 +13,7 @@ export interface User {
   memberships?: Membership[]; passwordHash?: string; passwordSalt?: string
 }
 export type SubscriptionStatus = 'TRIAL' | 'ACTIVE' | 'EXPIRED' | 'SUSPENDED'
-export interface Organization { id: string; name: string; slug: string; plan: 'STARTER' | 'PRO'; active: boolean; subscription?: SubscriptionStatus }
+export interface Organization { id: string; name: string; slug: string; plan: 'STARTER' | 'PRO'; active: boolean; subscription?: SubscriptionStatus; publicDescription?: string | null; address?: string | null; commune?: string | null; region?: string | null; phone?: string | null; specialties?: string[] }
 export interface Patient {
   id: string; organizationId: string; rut: string; name: string; email: string; phone: string
   birthDate: string; address: string; consent: boolean; active: boolean

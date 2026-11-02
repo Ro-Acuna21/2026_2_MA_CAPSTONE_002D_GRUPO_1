@@ -12,6 +12,8 @@ import { useCenterPath } from '@/lib/tenant'
 import type { Slot } from '@/domain/types'
 import { appointmentApi, firstApiErrorMessage, type BackendPatientSummary, type BackendService } from '@/services/http'
 
+const clp = new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 })
+
 export function BookingPage() {
   const { user, patientSlots, professionalsForService, createAppointment } = useClinic()
   const navigate = useNavigate()
@@ -35,6 +37,9 @@ export function BookingPage() {
   const [patients, setPatients] = useState<BackendPatientSummary[]>([])
   const [realProfessionals, setRealProfessionals] = useState<{ id: string; name: string }[]>([])
   const [available, setAvailable] = useState<Slot[]>([])
+  const [priceState, setPriceState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
+  const [price, setPrice] = useState<number | null>(null)
+  const [priceRetry, setPriceRetry] = useState(0)
 
   const specialties = Array.from(
     new Map(catalog.filter((service) => service.specialty).map((service) => [String(service.specialty!.id), service.specialty!])).values(),
@@ -110,11 +115,23 @@ export function BookingPage() {
     }
   }, [professionalId, serviceId, date, patientSlots])
 
+  useEffect(() => {
+    if (!serviceId || !date) { setPrice(null); setPriceState('idle'); return }
+    let active = true
+    setPriceState('loading')
+    appointmentApi.servicePrice(Number(serviceId), date).then(({ data }) => {
+      if (active) { setPrice(data.amount_clp); setPriceState('ready') }
+    }).catch(() => {
+      if (active) { setPrice(null); setPriceState('error') }
+    })
+    return () => { active = false }
+  }, [serviceId, date, priceRetry])
+
   if (!['RECEPCIONISTA', 'PACIENTE'].includes(user?.role ?? '')) return <Navigate to="/" replace />
 
   const next = () => {
     if (step === 1 && (catalogState !== 'ready' || !specialtyId || !professionalId || !serviceId || (staff && !patientId))) return
-    if (step === 2 && (!date || !time)) return
+    if (step === 2 && (!date || !time || priceState !== 'ready')) return
     setStep(Math.min(3, step + 1))
   }
 
@@ -139,6 +156,7 @@ export function BookingPage() {
 
   const selectedProfessionalName = realProfessionals.find((p) => p.id === professionalId)?.name
   const selectedPatient = patients.find((patient) => String(patient.id) === patientId)
+  const selectedService = catalog.find((service) => String(service.id) === serviceId)
 
   const selection = `${specialties.find((s) => String(s.id) === specialtyId)?.name} · ${selectedProfessionalName}`
 
@@ -232,10 +250,11 @@ export function BookingPage() {
                     <option value="">Seleccionar</option>
                     {services.map((s) => (
                       <option key={s.id} value={s.id}>
-                        {s.name} · {s.duration_minutes} min
+                        {s.name} · {s.duration_minutes} min · {s.current_price_clp == null ? 'Precio no informado' : clp.format(s.current_price_clp)}
                       </option>
                     ))}
                   </Select>
+                  <p className="mt-1 text-xs text-muted-foreground">Precio vigente hoy; se comprobará nuevamente para la fecha de tu cita.</p>
                 </Field>
                 <Field className="sm:col-span-2" label="Profesional">
                   <Select
@@ -290,6 +309,11 @@ export function BookingPage() {
                     )}
                   </div>
                 </div>
+                <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 text-sm">
+                  {priceState === 'loading' && <p role="status">Consultando precio para la fecha elegida…</p>}
+                  {priceState === 'error' && <div role="alert"><p>No fue posible consultar el precio de esta prestación.</p><Button className="mt-2" type="button" variant="outline" onClick={() => setPriceRetry((value) => value + 1)}>Reintentar</Button></div>}
+                  {priceState === 'ready' && <p><strong>Precio para el {date}:</strong> {price == null ? 'No informado' : clp.format(price)}. La reserva no realiza un pago.</p>}
+                </div>
               </div>
             )}
 
@@ -305,7 +329,7 @@ export function BookingPage() {
                 </div>
                 <div>
                   <dt className="text-xs text-muted-foreground">Atención</dt>
-                  <dd className="font-medium">{catalog.find((s) => String(s.id) === serviceId)?.name}</dd>
+                  <dd className="font-medium">{selectedService?.name}</dd>
                 </div>
                 <div>
                   <dt className="text-xs text-muted-foreground">Profesional</dt>
@@ -316,6 +340,11 @@ export function BookingPage() {
                   <dd className="font-medium">
                     {date} · {time}
                   </dd>
+                </div>
+                <div className="sm:col-span-2">
+                  <dt className="text-xs text-muted-foreground">Precio informado para la fecha de la cita</dt>
+                  <dd className="font-medium">{price == null ? 'No informado' : clp.format(price)}</dd>
+                  <p className="mt-1 text-xs text-muted-foreground">Confirmar la reserva no registra un pago.</p>
                 </div>
               </dl>
             )}

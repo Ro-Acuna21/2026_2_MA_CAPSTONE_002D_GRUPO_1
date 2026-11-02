@@ -22,6 +22,10 @@ function CenterForm({ center, onSaved }: { center?: PlatformCenter; onSaved: (in
     await onSaved({
       name: values.name.trim(), slug: values.slug.trim(), rut: values.rut.trim(),
       email: values.email.trim() || null, phone: values.phone.trim() || null,
+      public_description: values.public_description.trim() || null,
+      address_line: values.address_line.trim() || null,
+      commune: values.commune.trim() || null,
+      region: values.region.trim() || null,
       is_active: values.is_active === 'true',
     })
   }}>
@@ -30,6 +34,10 @@ function CenterForm({ center, onSaved }: { center?: PlatformCenter; onSaved: (in
     <Field label="RUT del centro"><Input name="rut" defaultValue={center?.rut} required placeholder="12.345.678-5" /></Field>
     <Field label="Correo de contacto"><Input name="email" type="email" defaultValue={center?.email ?? ''} /></Field>
     <Field label="Teléfono"><Input name="phone" defaultValue={center?.phone ?? ''} /></Field>
+    <Field label="Dirección pública"><Input name="address_line" defaultValue={center?.address_line ?? ''} maxLength={200} /></Field>
+    <Field label="Comuna"><Input name="commune" defaultValue={center?.commune ?? ''} maxLength={100} /></Field>
+    <Field label="Región"><Input name="region" defaultValue={center?.region ?? ''} maxLength={100} /></Field>
+    <Field label="Descripción pública" className="sm:col-span-2"><textarea name="public_description" defaultValue={center?.public_description ?? ''} maxLength={2000} className="min-h-24 w-full rounded-md border border-input bg-background p-3 text-sm" /></Field>
     <Field label="Acceso del centro"><Select name="is_active" defaultValue={String(center?.is_active ?? true)}><option value="true">Habilitado</option><option value="false">Deshabilitado</option></Select></Field>
   </ActionForm>
 }
@@ -78,7 +86,7 @@ export function PlatformPage() {
     })
     setCenters((current) => [...current.filter((item) => item.id !== response.data.id), response.data].sort((a, b) => a.name.localeCompare(b.name, 'es')))
     setShowCreate(false)
-    toast.success(center ? 'Centro actualizado en Core.' : 'Centro creado y base clínica preparada.')
+    toast.success(center ? 'Centro actualizado.' : 'Centro creado y base clínica preparada.')
     window.dispatchEvent(new Event('medsync:centers-updated'))
   }
 
@@ -101,8 +109,8 @@ export function PlatformPage() {
   }
 
   return <>
-    <PageHeading eyebrow="Plataforma MedSync" title="Comercial y suscripciones" description="Centros registrados en Core y estado de su base clínica." action={<Button onClick={() => setShowCreate((value) => !value)}>{showCreate ? 'Cerrar' : 'Crear centro'}</Button>} />
-    {status === 'loading' && <p role="status" className="mb-6">Cargando centros desde Core…</p>}
+    <PageHeading eyebrow="Plataforma MedSync" title="Comercial y suscripciones" description="Centros registrados y estado de preparación de su base clínica." action={<Button onClick={() => setShowCreate((value) => !value)}>{showCreate ? 'Cerrar' : 'Crear centro'}</Button>} />
+    {status === 'loading' && <p role="status" className="mb-6">Cargando centros…</p>}
     {status === 'error' && <div className="mb-6"><p role="alert" className="text-rose-700">{error}</p><Button variant="outline" onClick={() => { setStatus('loading'); setReload((value) => value + 1) }}>Reintentar</Button></div>}
     {status === 'ready' && <>
       {error && <p role="alert" className="mb-6 text-rose-700">{error}</p>}

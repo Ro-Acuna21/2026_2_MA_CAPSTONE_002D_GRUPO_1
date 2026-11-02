@@ -188,9 +188,9 @@ function CatalogForm({
               required
             >
               <option value="">Seleccionar</option>
-              {data.specialties.map((s) => (
+              {data.specialties.filter((s) => s.active || s.id === service?.specialtyId).map((s) => (
                 <option key={s.id} value={s.id}>
-                  {s.name}
+                  {s.name}{s.active ? '' : ' (inactiva)'}
                 </option>
               ))}
             </Select>
@@ -381,7 +381,7 @@ function AvailabilitySection() {
 }
 
 export function AdminPage() {
-  const { data, user, organization } = useClinic();
+  const { data, user, organization, catalogLoad, reloadCatalog } = useClinic();
   const [backendProfessionals, setBackendProfessionals] = useState<
     Record<number, BackendProfessional>
   >({});
@@ -507,15 +507,18 @@ export function AdminPage() {
             <CardTitle>Prestaciones del centro</CardTitle>
           </CardHeader>
           <CardContent>
-            <details className="mb-4">
+            {catalogLoad.status === 'loading' && <p role="status" className="mb-4 text-sm text-muted-foreground">Cargando especialidades y prestaciones del centro…</p>}
+            {catalogLoad.status === 'error' && <div role="alert" className="mb-4 text-sm text-destructive"><p>{catalogLoad.error}</p><Button className="mt-2" type="button" variant="outline" onClick={reloadCatalog}>Reintentar</Button></div>}
+            {catalogLoad.status === 'ready' && data.specialties.every((specialty) => !specialty.active) && <p className="mb-4 text-sm text-muted-foreground">Activa una especialidad del centro antes de crear prestaciones.</p>}
+            {catalogLoad.status === 'ready' && data.specialties.some((specialty) => specialty.active) && <details className="mb-4">
               <summary className="cursor-pointer font-medium text-primary">
                 Nueva prestación
               </summary>
               <div className="mt-4">
                 <CatalogForm kind="service" />
               </div>
-            </details>
-            {data.services.map((s) => (
+            </details>}
+            {catalogLoad.status === 'ready' && data.services.map((s) => (
               <details className="mb-2 rounded-lg border p-3" key={s.id}>
                 <summary className="cursor-pointer">
                   Prestación · {s.name} · {s.duration} min

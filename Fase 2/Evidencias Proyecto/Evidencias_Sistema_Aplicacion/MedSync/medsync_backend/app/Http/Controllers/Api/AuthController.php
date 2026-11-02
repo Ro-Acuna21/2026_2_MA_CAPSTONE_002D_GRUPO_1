@@ -34,8 +34,22 @@ class AuthController extends Controller
         return response()->json([
             'data' => MedicalCenter::query()
                 ->where('is_active', true)
+                ->with(['primaryAddress', 'selectedSpecialties.specialty'])
                 ->orderBy('name')
-                ->get(['id', 'name', 'slug']),
+                ->get(['id', 'name', 'slug', 'phone', 'public_description'])
+                ->map(fn (MedicalCenter $center) => [
+                    'id' => $center->id,
+                    'name' => $center->name,
+                    'slug' => $center->slug,
+                    'phone' => $center->phone,
+                    'description' => $center->public_description,
+                    'address' => $center->primaryAddress?->address_line,
+                    'commune' => $center->primaryAddress?->commune,
+                    'region' => $center->primaryAddress?->region,
+                    'specialties' => $center->selectedSpecialties
+                        ->filter(fn ($selection) => $selection->specialty?->is_active)
+                        ->pluck('specialty.name')->values(),
+                ]),
         ]);
     }
 

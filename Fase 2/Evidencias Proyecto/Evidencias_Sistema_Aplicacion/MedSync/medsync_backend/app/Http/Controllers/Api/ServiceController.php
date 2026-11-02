@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Center\Service;
+use App\Models\Center\ServicePrice;
 use App\Services\Appointments\AppointmentService;
 use App\Support\TenantContext;
 use Illuminate\Http\Request;
@@ -67,6 +68,19 @@ class ServiceController extends Controller
                 'last_name' => $professional->last_name,
             ]),
         ]);
+    }
+
+    /** Precio informativo vigente para la fecha de la cita. No registra un pago. */
+    public function price(Request $request, Service $service)
+    {
+        $data = $request->validate(['date' => ['required', 'date_format:Y-m-d']]);
+        abort_unless($service->is_active && $this->specialtyCatalog->isAvailable((int) $service->specialty_id), 404);
+
+        return response()->json(['data' => [
+            'service_id' => $service->id,
+            'date' => $data['date'],
+            'amount_clp' => $this->priceForDate($service->id, $data['date']),
+        ]]);
     }
 
     /**
@@ -154,7 +168,7 @@ class ServiceController extends Controller
     {
         $exists = Service::query()
             ->where('specialty_id', $specialtyId)
-            ->whereRaw('LOWER(BTRIM(name)) = ?', [mb_strtolower($name)])
+            ->whereRaw('LOWER(TRIM(name)) = ?', [mb_strtolower($name)])
             ->when(
                 $excludeId,
                 fn ($query) => $query->where('id', '!=', $excludeId)
@@ -195,6 +209,7 @@ class ServiceController extends Controller
             'name' => $service->name,
             'description' => $service->description,
             'duration_minutes' => $service->duration_minutes,
+            'current_price_clp' => $this->priceForDate($service->id, now()->toDateString()),
             'specialty' => $service->specialty ? [
                 'id' => $service->specialty->id,
                 'name' => $service->specialty->name,
@@ -207,5 +222,15 @@ class ServiceController extends Controller
         }
 
         return $payload;
+    }
+
+    private function priceForDate(int $serviceId, string $date): ?int
+    {
+        $price = ServicePrice::query()->where('service_id', $serviceId)
+            ->whereDate('effective_from', '<=', $date)
+            ->where(fn ($query) => $query->whereNull('effective_to')->orWhereDate('effective_to', '>=', $date))
+            ->orderByDesc('effective_from')->first();
+
+        return $price ? (int) $price->amount_clp : null;
     }
 }

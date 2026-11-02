@@ -152,3 +152,7 @@ Resultados, precios y reportes (pasos 5 y 6): ver `README_RESULTADOS_PRECIOS_REP
 
 ## Paso 7 y revisión final · 31-10-2026
 Planes, suscripciones y pagos manuales se guardan en Core; plataforma y centro leen el mismo estado. No hay cobro integrado ni afirmación automática de «pago al día». La revisión integral y sus pendientes están en `README_SUSCRIPCIONES_Y_REVISION_FINAL.md` de la raíz MedSync.
+
+## Correcciones de revisión · 02-11-2026
+
+La página pública `/planes` consulta planes activos reales y crea solicitudes comerciales en Core; solo `SUPER_ADMIN` puede leerlas. Solicitar información no crea un centro, suscripción ni pago. El formulario debe excluir datos clínicos. El directorio público usa únicamente centros activos; descripción, dirección y especialidades provienen del registro Core del centro, nunca de un nombre de base suministrado por el navegador. La reserva comunica al paciente la tarifa vigente para la fecha elegida y distingue «sin precio informado» de cero pesos; la cita `PENDIENTE` no se computa como ingreso cobrado.
