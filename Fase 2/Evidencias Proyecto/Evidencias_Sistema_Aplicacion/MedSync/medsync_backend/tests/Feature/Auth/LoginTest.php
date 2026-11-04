@@ -3,6 +3,7 @@
 use App\Models\Core\CenterUser;
 use App\Models\Core\MedicalCenter;
 use App\Models\User;
+use App\Models\Center\Patient;
 
 beforeEach(function () {
     $this->center = MedicalCenter::create([
@@ -20,10 +21,15 @@ beforeEach(function () {
         'is_active' => true,
     ]);
 
+    $patient = Patient::create([
+        'user_id' => $this->user->id, 'first_name' => 'Ana', 'last_name' => 'Soto',
+        'rut' => '12345678-5', 'email' => $this->user->email, 'is_active' => true,
+    ]);
     CenterUser::create([
         'medical_center_id' => $this->center->id,
         'user_id' => $this->user->id,
         'role' => 'PACIENTE',
+        'patient_id' => $patient->id,
         'is_active' => true,
     ]);
 });

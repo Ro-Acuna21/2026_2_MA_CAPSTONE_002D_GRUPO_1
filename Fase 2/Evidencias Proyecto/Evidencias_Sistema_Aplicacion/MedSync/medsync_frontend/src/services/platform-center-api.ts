@@ -19,7 +19,10 @@ export interface PlatformCenter {
   subscription_renews_at?: string | null
 }
 
-export type CenterInput = Pick<PlatformCenter, 'name' | 'slug' | 'rut' | 'phone' | 'email' | 'public_description' | 'address_line' | 'commune' | 'region' | 'is_active'>
+export type CenterInput = Pick<PlatformCenter, 'name' | 'slug' | 'rut' | 'phone' | 'email' | 'public_description' | 'address_line' | 'is_active'> & {
+  region_code?: string | null
+  commune_code?: string | null
+}
 
 export const platformCenterApi = {
   list: () => apiRequest<{ data: PlatformCenter[] }>('/api/v1/platform/centers'),

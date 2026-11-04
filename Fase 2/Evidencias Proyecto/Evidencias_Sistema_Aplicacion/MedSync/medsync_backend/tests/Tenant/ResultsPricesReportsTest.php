@@ -16,7 +16,7 @@ function prepareResultsTenant(string $path): void
     config(['database.connections.center' => array_merge(config('database.connections.center'), ['driver' => 'sqlite', 'url' => null, 'database' => $path])]);
     DB::purge('center');
     $schema = Schema::connection('center');
-    $schema->create('patients', function (Blueprint $t) { $t->id(); $t->string('first_name'); $t->string('last_name'); $t->timestamps(); $t->softDeletes(); });
+    $schema->create('patients', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('user_id')->nullable(); $t->string('email')->nullable(); $t->boolean('is_active')->default(true); $t->string('first_name'); $t->string('last_name'); $t->timestamps(); $t->softDeletes(); });
     $schema->create('professionals', function (Blueprint $t) { $t->id(); $t->string('first_name'); $t->string('last_name'); $t->timestamps(); $t->softDeletes(); });
     $schema->create('services', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('specialty_id')->nullable(); $t->string('name'); $t->boolean('is_active')->default(true); $t->timestamps(); });
     $schema->create('appointments', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('patient_id'); $t->unsignedBigInteger('professional_id'); $t->unsignedBigInteger('service_id'); $t->date('appointment_date'); $t->string('status'); $t->timestamps(); });
@@ -38,6 +38,10 @@ function resultsActor(string $slug, string $dbPath, string $role, ?int $patient 
 {
     $center ??= MedicalCenter::create(['name'=>$slug,'slug'=>$slug,'database_name'=>$dbPath,'rut'=>$slug === 'results-isolated' ? '76123457-5' : '76123456-7','is_active'=>true]);
     $user = User::create(['name'=>$slug,'email'=>$slug.'@example.test','password'=>'Password123','is_active'=>true]);
+    if ($role === 'PACIENTE' && $patient) {
+        DB::connection('center')->table('patients')->where('id', $patient)
+            ->update(['user_id' => $user->id, 'email' => $user->email]);
+    }
     CenterUser::create(['medical_center_id'=>$center->id,'user_id'=>$user->id,'role'=>$role,'patient_id'=>$patient,'professional_id'=>$professional,'is_active'=>true]);
     return [$center, $user];
 }

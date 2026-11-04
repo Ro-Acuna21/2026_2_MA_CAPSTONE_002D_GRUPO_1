@@ -6,6 +6,7 @@ import { PageHeading } from '@/components/page-heading'
 import { ActionForm } from '@/components/action-form'
 import { AccessForm } from '@/components/access-form'
 import { PlatformStaffRoles } from '@/components/platform-staff-roles'
+import { PatientAddressFields } from '@/components/patient-address-fields'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Field, Input, Select } from '@/components/ui/form-controls'
@@ -19,13 +20,17 @@ const provisioningLabels = { PENDING: 'Preparando base', READY: 'Base lista', FA
 
 function CenterForm({ center, onSaved }: { center?: PlatformCenter; onSaved: (input: CenterInput) => Promise<void> }) {
   return <ActionForm reset={!center} className="sm:grid-cols-2" label={center ? 'Guardar cambios' : 'Crear centro'} onSave={async (values) => {
+    const keepLegacyAddress = Boolean(center?.region && center?.commune && center.address_line === values.address.trim()
+      && !values.region_code && !values.commune_code)
     await onSaved({
       name: values.name.trim(), slug: values.slug.trim(), rut: values.rut.trim(),
       email: values.email.trim() || null, phone: values.phone.trim() || null,
       public_description: values.public_description.trim() || null,
-      address_line: values.address_line.trim() || null,
-      commune: values.commune.trim() || null,
-      region: values.region.trim() || null,
+      ...(keepLegacyAddress ? {} : {
+        address_line: values.address.trim() || null,
+        region_code: values.region_code || null,
+        commune_code: values.commune_code || null,
+      }),
       is_active: values.is_active === 'true',
     })
   }}>
@@ -34,9 +39,7 @@ function CenterForm({ center, onSaved }: { center?: PlatformCenter; onSaved: (in
     <Field label="RUT del centro"><Input name="rut" defaultValue={center?.rut} required placeholder="12.345.678-5" /></Field>
     <Field label="Correo de contacto"><Input name="email" type="email" defaultValue={center?.email ?? ''} /></Field>
     <Field label="Teléfono"><Input name="phone" defaultValue={center?.phone ?? ''} /></Field>
-    <Field label="Dirección pública"><Input name="address_line" defaultValue={center?.address_line ?? ''} maxLength={200} /></Field>
-    <Field label="Comuna"><Input name="commune" defaultValue={center?.commune ?? ''} maxLength={100} /></Field>
-    <Field label="Región"><Input name="region" defaultValue={center?.region ?? ''} maxLength={100} /></Field>
+    <PatientAddressFields address={center?.address_line} region={center?.region} commune={center?.commune} preserveLegacy />
     <Field label="Descripción pública" className="sm:col-span-2"><textarea name="public_description" defaultValue={center?.public_description ?? ''} maxLength={2000} className="min-h-24 w-full rounded-md border border-input bg-background p-3 text-sm" /></Field>
     <Field label="Acceso del centro"><Select name="is_active" defaultValue={String(center?.is_active ?? true)}><option value="true">Habilitado</option><option value="false">Deshabilitado</option></Select></Field>
   </ActionForm>

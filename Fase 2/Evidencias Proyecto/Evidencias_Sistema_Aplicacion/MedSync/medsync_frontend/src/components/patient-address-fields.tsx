@@ -16,10 +16,12 @@ export function PatientAddressFields({
   address = '',
   region = '',
   commune = '',
+  preserveLegacy = false,
 }: {
   address?: string | null
   region?: string | null
   commune?: string | null
+  preserveLegacy?: boolean
 }) {
   const [regions, setRegions] = useState<TerritorialRegion[]>([])
   const [selectedRegion, setSelectedRegion] = useState('')
@@ -54,7 +56,9 @@ export function PatientAddressFields({
     () => regions.find((item) => item.code === selectedRegion)?.communes ?? [],
     [regions, selectedRegion],
   )
-  const hasAddressDetails = Boolean(addressLine.trim() || selectedRegion || selectedCommune)
+  const unchangedLegacy = preserveLegacy && Boolean(region && commune)
+    && addressLine === (address ?? '') && !selectedCommune
+  const hasAddressDetails = Boolean(addressLine.trim() || selectedRegion || selectedCommune) && !unchangedLegacy
 
   return <>
     <Field className="sm:col-span-2" label="Dirección (opcional)">

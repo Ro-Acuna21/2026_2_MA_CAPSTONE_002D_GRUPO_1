@@ -142,3 +142,7 @@ Core `plans`, `subscriptions` y `subscription_payments` son la fuente comercial.
 ## Correcciones de revisión · 02-11-2026
 
 Core incorpora `commercial_inquiries` para contactos comerciales sin datos clínicos y `medical_centers.public_description` para la ficha pública. La dirección usa `medical_center_addresses`, sin duplicar columnas. Las especialidades públicas se derivan de `medical_center_specialties` y del catálogo global activo. El valor de una prestación se consulta en la base clínica del centro y en `service_prices` según la fecha de cita; no se infiere de los reportes ni se registra como pago. Respaldar Core y todas las bases Center antes de aplicar migraciones; los respaldos locales no forman parte del repositorio.
+
+## Verificación de migraciones y membresías · 03-11-2026
+
+La migración Center `2026_11_02_000001` solo retira `specialties` cuando está vacía; conserva filas de `services` y `professional_specialty` con IDs globales y tolera claves foráneas ya retiradas por Core. Los centros anteriores pueden tener el registro de migraciones en Core, sin tabla `migrations` en cada base Center; consultar `scripts/audit_migration_status.php` antes de decidir cómo aplicar nuevas migraciones. No inicializar un registro local ni ejecutar todas las migraciones Center sobre bases existentes sin reconciliar previamente ese historial. `center_users.patient_id` no tiene FK entre bases; su integridad se verifica en la aplicación por centro, usuario y correo.

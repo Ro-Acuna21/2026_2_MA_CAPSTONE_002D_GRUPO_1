@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Core\MedicalCenter;
 use App\Rules\ValidRut;
 use App\Services\Tenants\CenterProvisioner;
+use App\Services\TerritorialCatalog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -15,7 +16,7 @@ use Throwable;
 
 class PlatformCenterController extends Controller
 {
-    public function __construct(private readonly CenterProvisioner $provisioner) {}
+    public function __construct(private readonly CenterProvisioner $provisioner, private readonly TerritorialCatalog $territorial) {}
 
     public function index(Request $request): JsonResponse
     {
@@ -38,20 +39,21 @@ class PlatformCenterController extends Controller
             'phone' => ['nullable', 'string', 'max:20'],
             'public_description' => ['nullable', 'string', 'max:2000'],
             'address_line' => ['nullable', 'string', 'max:200'],
-            'commune' => ['nullable', 'string', 'max:100'],
-            'region' => ['nullable', 'string', 'max:100'],
+            'region_code' => ['nullable', 'string', 'regex:/^\d{2}$/'],
+            'commune_code' => ['nullable', 'string', 'regex:/^\d{5}$/'],
             'is_active' => ['required', 'boolean'],
         ]);
 
+        $address = $this->addressData($data);
         $activate = (bool) $data['is_active'];
         $center = MedicalCenter::create([
-            ...collect($data)->except(['address_line', 'commune', 'region'])->all(),
+            ...collect($data)->except(['address_line', 'region_code', 'commune_code'])->all(),
             'database_name' => 'medsync_c_'.Str::lower((string) Str::ulid()),
             'provisioning_status' => 'PENDING',
             'is_active' => false,
         ]);
 
-        $this->saveAddress($center, $data);
+        $this->saveAddress($center, $address);
 
         return $this->provision($center, $activate, 201);
     }
@@ -70,15 +72,18 @@ class PlatformCenterController extends Controller
             'phone' => ['sometimes', 'nullable', 'string', 'max:20'],
             'public_description' => ['sometimes', 'nullable', 'string', 'max:2000'],
             'address_line' => ['sometimes', 'nullable', 'string', 'max:200'],
-            'commune' => ['sometimes', 'nullable', 'string', 'max:100'],
-            'region' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'region_code' => ['sometimes', 'nullable', 'string', 'regex:/^\d{2}$/'],
+            'commune_code' => ['sometimes', 'nullable', 'string', 'regex:/^\d{5}$/'],
             'is_active' => ['sometimes', 'boolean'],
         ]);
         if (($data['is_active'] ?? false) && $center->provisioning_status !== 'READY') {
             throw ValidationException::withMessages(['is_active' => ['El centro aún no tiene una base clínica lista.']]);
         }
-        $center->update(collect($data)->except(['address_line', 'commune', 'region'])->all());
-        if (array_key_exists('address_line', $data)) $this->saveAddress($center, $data);
+        $addressChanged = array_key_exists('address_line', $data)
+            || array_key_exists('region_code', $data) || array_key_exists('commune_code', $data);
+        $address = $addressChanged ? $this->addressData($data) : null;
+        $center->update(collect($data)->except(['address_line', 'region_code', 'commune_code'])->all());
+        if ($addressChanged) $this->saveAddress($center, $address);
 
         return response()->json(['data' => $this->present($center->fresh())]);
     }
@@ -128,15 +133,28 @@ class PlatformCenterController extends Controller
         ];
     }
 
-    private function saveAddress(MedicalCenter $center, array $data): void
+    private function addressData(array $data): ?array
     {
-        if (empty($data['address_line'])) {
+        $line = trim((string) ($data['address_line'] ?? ''));
+        $regionCode = trim((string) ($data['region_code'] ?? ''));
+        $communeCode = trim((string) ($data['commune_code'] ?? ''));
+        if ($line === '' && $regionCode === '' && $communeCode === '') return null;
+        if ($line === '') {
+            throw ValidationException::withMessages(['address_line' => ['Ingresa la dirección para guardar la región y comuna.']]);
+        }
+        $location = $this->territorial->resolve($regionCode, $communeCode);
+        return ['address_line' => $line, ...$location];
+    }
+
+    private function saveAddress(MedicalCenter $center, ?array $address): void
+    {
+        if ($address === null) {
             $center->primaryAddress()->delete();
             return;
         }
         $center->primaryAddress()->updateOrCreate(
             ['medical_center_id' => $center->id, 'is_primary' => true],
-            ['address_line' => trim($data['address_line']), 'commune' => $data['commune'] ?? null, 'region' => $data['region'] ?? null]
+            $address
         );
     }
 }

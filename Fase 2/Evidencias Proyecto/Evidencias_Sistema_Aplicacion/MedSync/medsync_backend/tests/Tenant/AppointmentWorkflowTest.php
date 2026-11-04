@@ -21,6 +21,7 @@ function prepareAppointmentWorkflowDatabase(string $connection, string $path): v
     Schema::connection($connection)->create('patients', function (Blueprint $table) {
         $table->id();
         $table->unsignedBigInteger('user_id')->nullable();
+        $table->string('email')->nullable();
         $table->string('first_name');
         $table->string('last_name');
         $table->boolean('is_active')->default(true);
@@ -180,6 +181,10 @@ function appointmentWorkflowClient(
         'role' => $role, 'patient_id' => $patientId,
         'professional_id' => $professionalId, 'is_active' => true,
     ]);
+    if ($role === 'PACIENTE' && $patientId) {
+        DB::connection('center')->table('patients')->where('id', $patientId)
+            ->update(['user_id' => $user->id, 'email' => $user->email]);
+    }
 
     return [$center, $user, $test->withHeader('Origin', 'http://localhost:3000')
         ->withSession(['active_medical_center_id' => $center->id])
@@ -353,6 +358,10 @@ it('serves appointment history only to the owner, assigned professional or recep
             ->assertJsonPath('data.events.0.reason', 'Motivo interno de prueba');
         $makeUser = function (string $email, string $role, ?int $patientId, ?int $professionalId) use ($center) {
             $user = User::create(['name' => $role, 'email' => $email, 'password' => 'Password123', 'is_active' => true]);
+            if ($role === 'PACIENTE' && $patientId) {
+                DB::connection('center')->table('patients')->where('id', $patientId)
+                    ->update(['user_id' => $user->id, 'email' => $user->email]);
+            }
             CenterUser::create(['medical_center_id' => $center->id, 'user_id' => $user->id,
                 'role' => $role, 'patient_id' => $patientId, 'professional_id' => $professionalId, 'is_active' => true]);
             return $user;

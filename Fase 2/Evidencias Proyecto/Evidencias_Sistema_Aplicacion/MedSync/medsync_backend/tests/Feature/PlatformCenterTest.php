@@ -22,12 +22,13 @@ it('creates only a provisioned center and publishes it after success', function 
     $this->actingAs($this->platformUser)->postJson('/api/v1/platform/centers', [
         'name' => 'Centro Nuevo', 'slug' => 'centro-nuevo', 'rut' => '12.345.678-5',
         'public_description' => 'Atención de prueba para la comunidad.',
-        'address_line' => 'Calle Ficticia 123', 'commune' => 'Santiago', 'region' => 'Metropolitana',
+        'address_line' => 'Calle Ficticia 123', 'region_code' => '13', 'commune_code' => '13101',
         'plan' => 'STARTER', 'subscription_status' => 'TRIAL', 'is_active' => true,
     ])->assertCreated()->assertJsonPath('data.provisioning_status', 'READY');
 
     $center = MedicalCenter::where('slug', 'centro-nuevo')->firstOrFail();
     expect($center->database_name)->toMatch('/^medsync_c_[a-z0-9]+$/');
+    expect($center->primaryAddress->commune)->toBe('Santiago');
     $this->getJson('/api/public/centers')->assertOk()->assertJsonFragment(['slug' => 'centro-nuevo'])
         ->assertJsonPath('data.0.address', 'Calle Ficticia 123')
         ->assertJsonPath('data.0.description', 'Atención de prueba para la comunidad.');
@@ -35,6 +36,24 @@ it('creates only a provisioned center and publishes it after success', function 
         'name' => 'Centro Repetido', 'slug' => 'centro-nuevo', 'rut' => '12.345.678-5',
         'plan' => 'STARTER', 'subscription_status' => 'TRIAL', 'is_active' => true,
     ])->assertUnprocessable();
+});
+
+it('rejects a commune outside its region and preserves legacy addresses on unrelated edits', function () {
+    $center = MedicalCenter::create([
+        'name' => 'Centro Legado', 'slug' => 'centro-legado', 'rut' => '76543210-3',
+        'database_name' => 'medsync_legacy', 'is_active' => true,
+    ]);
+    $center->primaryAddress()->create([
+        'address_line' => 'Calle 1', 'region' => 'Nombre legado', 'commune' => 'Comuna legada', 'is_primary' => true,
+    ]);
+    $this->actingAs($this->platformUser)->patchJson('/api/v1/platform/centers/'.$center->id, [
+        'name' => 'Centro Legado Editado',
+    ])->assertOk();
+    expect($center->fresh()->primaryAddress->region)->toBe('Nombre legado');
+    $this->patchJson('/api/v1/platform/centers/'.$center->id, [
+        'address_line' => 'Calle 2', 'region_code' => '13', 'commune_code' => '05101',
+    ])->assertUnprocessable()->assertJsonValidationErrors('commune_code');
+    expect($center->fresh()->primaryAddress->address_line)->toBe('Calle 1');
 });
 
 it('keeps a failed center unavailable and permits retry on the same record', function () {
