@@ -3,6 +3,7 @@
 use App\Models\Core\MedicalCenter;
 use App\Models\User;
 use App\Services\Tenants\CenterProvisioner;
+use App\Services\Tenants\CenterDatabaseName;
 
 beforeEach(function () {
     $this->platformUser = User::create([
@@ -23,11 +24,12 @@ it('creates only a provisioned center and publishes it after success', function 
         'name' => 'Centro Nuevo', 'slug' => 'centro-nuevo', 'rut' => '12.345.678-5',
         'public_description' => 'Atención de prueba para la comunidad.',
         'address_line' => 'Calle Ficticia 123', 'region_code' => '13', 'commune_code' => '13101',
+        'database_name' => 'base_inyectada',
         'plan' => 'STARTER', 'subscription_status' => 'TRIAL', 'is_active' => true,
     ])->assertCreated()->assertJsonPath('data.provisioning_status', 'READY');
 
     $center = MedicalCenter::where('slug', 'centro-nuevo')->firstOrFail();
-    expect($center->database_name)->toMatch('/^medsync_c_[a-z0-9]+$/');
+    expect($center->database_name)->toBe('medsync_centro_nuevo');
     expect($center->primaryAddress->commune)->toBe('Santiago');
     $this->getJson('/api/public/centers')->assertOk()->assertJsonFragment(['slug' => 'centro-nuevo'])
         ->assertJsonPath('data.0.address', 'Calle Ficticia 123')
@@ -36,6 +38,35 @@ it('creates only a provisioned center and publishes it after success', function 
         'name' => 'Centro Repetido', 'slug' => 'centro-nuevo', 'rut' => '12.345.678-5',
         'plan' => 'STARTER', 'subscription_status' => 'TRIAL', 'is_active' => true,
     ])->assertUnprocessable();
+});
+
+it('uses safe readable names and leaves an existing center database unchanged when its slug changes', function () {
+    expect(CenterDatabaseName::fromSlug('clinica-maipu'))->toBe('medsync_clinica_maipu');
+    $long = 'centro-'.str_repeat('a', 80);
+    $name = CenterDatabaseName::fromSlug($long);
+    expect(strlen($name))->toBe(63);
+    expect($name)->not->toBe(CenterDatabaseName::fromSlug($long.'b'));
+
+    $center = MedicalCenter::create([
+        'name' => 'Centro Histórico', 'slug' => 'centro-historico', 'rut' => '76543210-3',
+        'database_name' => 'medsync_c_01old', 'is_active' => true,
+    ]);
+    $this->actingAs($this->platformUser)->patchJson('/api/v1/platform/centers/'.$center->id, [
+        'slug' => 'centro-renombrado',
+    ])->assertOk();
+    expect($center->fresh()->database_name)->toBe('medsync_c_01old');
+});
+
+it('refuses a generated database name already assigned to another center', function () {
+    MedicalCenter::create([
+        'name' => 'Centro Previo', 'slug' => 'otro-slug', 'rut' => '76543210-3',
+        'database_name' => 'medsync_centro_nuevo', 'is_active' => true,
+    ]);
+    $this->actingAs($this->platformUser)->postJson('/api/v1/platform/centers', [
+        'name' => 'Centro Nuevo', 'slug' => 'centro-nuevo', 'rut' => '12.345.678-5',
+        'database_name' => 'base_inyectada', 'is_active' => true,
+    ])->assertUnprocessable()->assertJsonValidationErrors('slug');
+    expect(MedicalCenter::count())->toBe(1);
 });
 
 it('rejects a commune outside its region and preserves legacy addresses on unrelated edits', function () {

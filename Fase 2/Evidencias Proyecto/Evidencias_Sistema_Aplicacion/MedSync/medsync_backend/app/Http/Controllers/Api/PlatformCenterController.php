@@ -6,10 +6,11 @@ use App\Http\Controllers\Controller;
 use App\Models\Core\MedicalCenter;
 use App\Rules\ValidRut;
 use App\Services\Tenants\CenterProvisioner;
+use App\Services\Tenants\CenterDatabaseName;
 use App\Services\TerritorialCatalog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Throwable;
@@ -45,10 +46,18 @@ class PlatformCenterController extends Controller
         ]);
 
         $address = $this->addressData($data);
+        $databaseName = CenterDatabaseName::fromSlug($data['slug']);
+        if (MedicalCenter::query()->where('database_name', $databaseName)->exists()
+            || (DB::connection('core')->getDriverName() === 'pgsql'
+                && DB::connection('core')->selectOne('SELECT 1 AS present FROM pg_database WHERE datname = ?', [$databaseName]))) {
+            throw ValidationException::withMessages([
+                'slug' => ['El nombre de base derivado de esta dirección ya está en uso. Elige otra dirección para el centro.'],
+            ]);
+        }
         $activate = (bool) $data['is_active'];
         $center = MedicalCenter::create([
             ...collect($data)->except(['address_line', 'region_code', 'commune_code'])->all(),
-            'database_name' => 'medsync_c_'.Str::lower((string) Str::ulid()),
+            'database_name' => $databaseName,
             'provisioning_status' => 'PENDING',
             'is_active' => false,
         ]);

@@ -162,3 +162,7 @@ La página pública `/planes` consulta planes activos reales y crea solicitudes 
 Para una membresía `PACIENTE`, el login y cada petición clínica comprueban existencia, actividad, `user_id` y correo de la ficha local en el centro resuelto por Core. Una referencia ausente o reutilizada no habilita acceso. El usuario autenticado puede completar una ficha nueva o reutilizar una ficha propia solo tras confirmar RUT y fecha de nacimiento; una ficha de recepción sin titularidad probada requiere verificación presencial. La membresía Core se actualiza en su misma fila. La cuenta global se confirma primero; si falla una escritura posterior, el reintento recupera la ficha propia sin duplicarla. No se enlaza una ficha preexistente por mera coincidencia de RUT y correo en el registro público.
 
 Los centros se crean y editan con códigos CUT de región y comuna validados contra el catálogo territorial existente. Core conserva los nombres canónicos en `medical_center_addresses`; una edición sin cambios de dirección mantiene los nombres históricos.
+
+### Nombre de base para centros nuevos · 03-11-2026
+
+El servidor deriva `database_name` del slug validado: `clinica-maipu` produce `medsync_clinica_maipu`. Si supera 63 bytes, conserva un prefijo legible y agrega un sufijo estable para evitar colisiones por truncamiento. Antes de crear el centro comprueba que el nombre no esté asignado en Core ni exista ya en PostgreSQL. Los centros existentes conservan su `database_name` al editar el slug; no se renombran bases ni se modifican fichas clínicas.

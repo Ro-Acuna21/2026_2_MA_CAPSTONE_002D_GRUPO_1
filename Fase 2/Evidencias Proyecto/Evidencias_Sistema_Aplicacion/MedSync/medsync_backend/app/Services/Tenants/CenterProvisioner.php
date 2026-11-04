@@ -18,11 +18,12 @@ class CenterProvisioner
             return;
         }
 
+        $allowExistingDatabase = $center->provisioning_status === 'FAILED';
         $center->update(['provisioning_status' => 'PENDING', 'is_active' => false]);
         $originalConnection = config('database.connections.center');
 
         try {
-            $this->createDatabaseIfMissing($center->database_name);
+            $this->createDatabaseIfMissing($center->database_name, $allowExistingDatabase);
             config(['database.connections.center.database' => $center->database_name]);
             DB::purge('center');
 
@@ -64,7 +65,7 @@ class CenterProvisioner
         }
     }
 
-    protected function createDatabaseIfMissing(string $databaseName): void
+    protected function createDatabaseIfMissing(string $databaseName, bool $allowExisting = false): void
     {
         if (! preg_match('/^[a-z][a-z0-9_]{0,62}$/', $databaseName)) {
             throw new RuntimeException('El nombre de base clínica almacenado no es válido.');
@@ -77,6 +78,9 @@ class CenterProvisioner
             'SELECT 1 AS present FROM pg_database WHERE datname = ?',
             [$databaseName]
         );
+        if ($exists && ! $allowExisting) {
+            throw new RuntimeException('La base clínica ya existe; se detiene el aprovisionamiento para no reutilizar datos de otro centro.');
+        }
         if (! $exists) {
             DB::connection('core')->statement('CREATE DATABASE "'.$databaseName.'"');
         }
