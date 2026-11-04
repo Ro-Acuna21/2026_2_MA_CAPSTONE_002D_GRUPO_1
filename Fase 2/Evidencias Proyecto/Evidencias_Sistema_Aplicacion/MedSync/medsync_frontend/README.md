@@ -147,3 +147,11 @@ Resultados, precios y reportes (pasos 5 y 6): ver `README_RESULTADOS_PRECIOS_REP
 Planes, suscripciones y pagos manuales se guardan en Core; plataforma y centro leen el mismo estado. No hay cobro integrado ni afirmación automática de «pago al día». La revisión integral y sus pendientes están en `README_SUSCRIPCIONES_Y_REVISION_FINAL.md` de la raíz MedSync.
 
 El historial de `/centro/{centerSlug}/citas/{id}` consulta `GET /api/v1/appointments/{id}/history` y muestra eventos persistidos con estados de carga y error. Laravel comprueba la propiedad de la cita y no entrega motivos internos al paciente.
+
+## Revisión de interfaz · 02-11-2026
+
+`/planes` muestra los planes activos del catálogo real con descripción, funcionalidades, límites y precio publicado. El botón «Conocer plan» abre esa página con el plan seleccionado; la solicitud comercial se guarda en Core y el `SUPER_ADMIN` la consulta en `/plataforma/solicitudes`. Este flujo no inicia sesión clínica, crea una suscripción ni cobra.
+
+Los centros nuevos pueden recibir descripción, dirección, comuna y región desde la administración de plataforma. El selector, el directorio y la ficha pública priorizan los datos de la API; cuando faltan, indican que la información aún no está publicada. Los permisos por rol se presentan como acciones entendibles sin mostrar claves internas. La marca visible se escribe **MedSync**.
+
+La reserva presenta el precio vigente hoy al elegir prestación y consulta nuevamente el precio aplicable a la fecha de la cita antes de confirmar. Un precio ausente se muestra como «No informado»; la confirmación no registra un pago.

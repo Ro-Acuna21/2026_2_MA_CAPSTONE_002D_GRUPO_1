@@ -157,3 +157,14 @@ it('rechaza un correo ya registrado en el mismo centro', function () {
 
     $response->assertUnprocessable();
 });
+
+it('no vincula una ficha de recepción usando solo RUT y correo', function () {
+    Patient::create([
+        'first_name' => 'Juan', 'last_name' => 'Pérez', 'rut' => '12345678-5',
+        'email' => 'juan.perez@example.com', 'is_active' => true,
+    ]);
+    $this->postJson('/api/register', validRegisterPayload())
+        ->assertUnprocessable()->assertJsonValidationErrors('rut');
+    expect(User::where('email', 'juan.perez@example.com')->exists())->toBeFalse();
+    expect(Patient::count())->toBe(1);
+});

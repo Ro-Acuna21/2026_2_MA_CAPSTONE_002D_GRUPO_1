@@ -187,7 +187,7 @@ export interface MessageResponse {
   message: string;
 }
 export interface PublicCentersResponse {
-  data: { id: number; name: string; slug: string }[];
+  data: { id: number; name: string; slug: string; description?: string | null; address?: string | null; commune?: string | null; region?: string | null; phone?: string | null; specialties?: string[] }[];
 }
 export const publicCenterApi = {
   list: () => apiRequest<PublicCentersResponse>("/api/public/centers"),
@@ -325,6 +325,7 @@ export interface BackendService {
   name: string;
   description: string | null;
   duration_minutes: number;
+  current_price_clp?: number | null;
   specialty: BackendSpecialtySummary | null;
   // Solo vienen en las respuestas que recibe el administrador del
   // centro (GET/POST/PATCH /api/v1/services), no en el catálogo del
@@ -529,6 +530,8 @@ export interface RescheduleAppointmentPayload {
 
 export const appointmentApi = {
   services: () => apiRequest<ServicesResponse>("/api/v1/services"),
+  servicePrice: (serviceId: number, date: string) =>
+    apiRequest<{ data: { service_id: number; date: string; amount_clp: number | null } }>(`/api/v1/services/${serviceId}/price?date=${encodeURIComponent(date)}`),
 
   professionalsForService: (serviceId: number) =>
     apiRequest<ServiceProfessionalsResponse>(

@@ -23,9 +23,11 @@ use App\Http\Controllers\Api\ServicePriceController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\PlanController;
 use App\Http\Controllers\Api\SubscriptionController;
+use App\Http\Controllers\Api\CommercialInquiryController;
 Route::get('/public/centers', [AuthController::class, 'publicCenters']);
 Route::get('/public/territorial-catalog', [TerritorialCatalogController::class, 'index']);
 Route::get('/public/plans', [PlanController::class, 'publicIndex']);
+Route::post('/public/commercial-inquiries', [CommercialInquiryController::class, 'store'])->middleware('throttle:5,1');
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 Route::post(
@@ -41,6 +43,7 @@ Route::middleware('auth:sanctum')->group(function () {
 // Catálogo global de especialidades (plataforma): exclusivo de SUPER_ADMIN,
 // nunca abre una conexión clínica (ver api-contract.md, 24-10-2026).
 Route::middleware('auth:sanctum')->prefix('v1/platform')->group(function () {
+    Route::get('/commercial-inquiries', [CommercialInquiryController::class, 'index']);
     Route::get('/plans', [PlanController::class, 'index']);
     Route::post('/plans', [PlanController::class, 'store']);
     Route::patch('/plans/{plan}', [PlanController::class, 'update'])->whereNumber('plan');
@@ -96,6 +99,7 @@ Route::middleware(['auth:sanctum', 'tenant.center'])->group(function () {
 
     // Reservas y disponibilidad (README_RESERVAS_DISPONIBILIDAD_BD.md).
     Route::get('/v1/services', [ServiceController::class, 'index']);
+    Route::get('/v1/services/{service}/price', [ServiceController::class, 'price'])->whereNumber('service');
     Route::get('/v1/services/{service}/professionals', [ServiceController::class, 'professionals']);
     Route::get('/v1/availabilities', [AvailabilityController::class, 'index']);
     Route::post('/v1/availabilities', [AvailabilityController::class, 'store']);

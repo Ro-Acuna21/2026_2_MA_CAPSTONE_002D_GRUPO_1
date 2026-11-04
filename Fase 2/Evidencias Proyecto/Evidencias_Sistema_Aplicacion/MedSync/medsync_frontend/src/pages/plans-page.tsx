@@ -41,12 +41,12 @@ export function PlansPage() {
     try {
       if (editing) await planApi.update(editing.id, payload)
       else await planApi.create(payload)
-      setShowForm(false); setEditing(null); await refresh(); toast.success('Plan guardado en Core.')
+      setShowForm(false); setEditing(null); await refresh(); toast.success('Plan guardado.')
     } catch (cause) { toast.error(firstApiErrorMessage(cause, 'No fue posible guardar el plan.')) }
     finally { setBusy(false) }
   }
   return <>
-    <PageHeading eyebrow="Comercial MedSync" title="Planes de suscripción" description="Catálogo persistido en Core. Los cambios de precio afectan nuevas suscripciones; las existentes conservan su importe de alta." action={<Button asChild variant="outline"><Link to="/plataforma"><ChevronLeft className="size-4" /> Volver a suscripciones</Link></Button>} />
+    <PageHeading eyebrow="Comercial MedSync" title="Planes de suscripción" description="Los cambios de precio afectan nuevas suscripciones; las existentes conservan su importe de alta." action={<Button asChild variant="outline"><Link to="/plataforma"><ChevronLeft className="size-4" /> Volver a suscripciones</Link></Button>} />
     <Button className="mb-5" onClick={() => { setEditing(null); setShowForm(true) }}>Crear plan</Button>
     {error && <p role="alert" className="mb-4 text-destructive">{error} <Button variant="outline" onClick={() => void refresh()}>Reintentar</Button></p>}
     {loading && <p>Cargando planes…</p>}

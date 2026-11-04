@@ -100,8 +100,8 @@ describe('navegación por roles con sesión Laravel', () => {
     expect(screen.queryByRole('link', { name: 'Reservar hora' })).toBeNull()
     expect(screen.queryByRole('link', { name: 'Pacientes' })).toBeNull()
     expect(await screen.findByText('Permisos por rol')).toBeDefined()
-    expect(screen.getByText(/Los permisos de estos roles son fijos/)).toBeDefined()
-    expect(await screen.findByText('patients.manage')).toBeDefined()
+    expect(screen.getByText(/Estas acciones corresponden al centro activo/)).toBeDefined()
+    expect(await screen.findByText('Registrar y editar pacientes del centro')).toBeDefined()
   })
 
   it('agrupa horarios reales por profesional y desactiva con la API existente', async () => {

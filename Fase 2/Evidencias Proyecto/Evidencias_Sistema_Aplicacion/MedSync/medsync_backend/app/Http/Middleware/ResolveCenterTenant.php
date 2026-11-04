@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use App\Models\Core\CenterUser;
 use App\Models\Core\MedicalCenter;
 use App\Services\Tenants\TenantConnectionResolver;
+use App\Services\Patients\PatientMembershipIntegrity;
 use App\Support\TenantContext;
 use Closure;
 use Illuminate\Http\Request;
@@ -16,6 +17,7 @@ class ResolveCenterTenant
     public function __construct(
         private readonly TenantConnectionResolver $connectionResolver,
         private readonly TenantContext $tenantContext,
+        private readonly PatientMembershipIntegrity $patientMembershipIntegrity,
     ) {
     }
 
@@ -28,6 +30,7 @@ class ResolveCenterTenant
         $user = $request->user();
 
         abort_unless($user, 401, 'Debes iniciar sesión.');
+        abort_unless($user->is_active, 403, 'La cuenta se encuentra inactiva.');
 
         // El acceso de plataforma no resuelve ni abre una base clínica.
         if ($user->isSuperAdmin()) {
@@ -64,6 +67,11 @@ class ResolveCenterTenant
         abort_unless($centerUser, 403, 'Tu cuenta no tiene acceso activo a este centro médico.');
 
         $this->connectionResolver->connect($medicalCenter);
+        if ($centerUser->role === 'PACIENTE' && ! $this->patientMembershipIntegrity->valid($centerUser, $user)) {
+            $request->session()->forget('active_medical_center_id');
+            $request->session()->put('pending_patient_center_id', $medicalCenter->id);
+            abort(403, 'La ficha de paciente necesita verificación antes de continuar.');
+        }
         $this->tenantContext->set($medicalCenter, $centerUser);
         $permissionRegistrar->setPermissionsTeamId($medicalCenter->id);
         $user->unsetRelation('roles')->unsetRelation('permissions');

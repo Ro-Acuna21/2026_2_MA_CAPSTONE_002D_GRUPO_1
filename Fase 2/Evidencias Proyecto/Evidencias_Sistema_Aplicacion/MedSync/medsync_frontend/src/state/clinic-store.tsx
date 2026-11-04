@@ -243,6 +243,8 @@ interface ClinicContextValue {
   data: ClinicData;
   availabilityLoad: { status: "loading" | "ready" | "error"; error?: string };
   reloadAvailability(): void;
+  catalogLoad: { status: "loading" | "ready" | "error"; error?: string };
+  reloadCatalog(): void;
 
   user: User | null;
 
@@ -365,6 +367,12 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
   } | null>(null);
   const [availabilityReloadToken, setAvailabilityReloadToken] = useState(0);
   const [specialtyReloadToken, setSpecialtyReloadToken] = useState(0);
+  const [catalogRequest, setCatalogRequest] = useState<{
+    organizationId: string;
+    status: "loading" | "ready" | "error";
+    error?: string;
+  } | null>(null);
+  const reloadCatalog = useCallback(() => setSpecialtyReloadToken((token) => token + 1), []);
   const reloadAvailability = useCallback(() => {
     setAvailabilityReloadToken((token) => token + 1);
   }, []);
@@ -413,9 +421,10 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
       if (!mounted) return;
       const centers: Organization[] = response.data.map((center) => {
         const known = initialOrganizations.find((item) => item.slug === center.slug);
+        const publicDetails = { publicDescription: center.description ?? null, address: center.address ?? null, commune: center.commune ?? null, region: center.region ?? null, phone: center.phone ?? null, specialties: center.specialties ?? [] };
         return known
-          ? { ...known, name: center.name, active: true }
-          : { id: `center-${center.id}`, name: center.name, slug: center.slug, plan: "STARTER", subscription: "ACTIVE", active: true };
+          ? { ...known, ...publicDetails, name: center.name, active: true }
+          : { id: `center-${center.id}`, name: center.name, slug: center.slug, plan: "STARTER", subscription: "ACTIVE", active: true, ...publicDetails };
       });
       setPublicOrganizations(centers);
       setAllData((current) => ({
@@ -700,8 +709,11 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    let cancelled = false;
+    setCatalogRequest({ organizationId: organization.id, status: "loading" });
     Promise.all([specialtyApi.list(), serviceApi.list()])
       .then(([specialtiesResponse, servicesResponse]) => {
+        if (cancelled) return;
         const realSpecialties = specialtiesResponse.data.map((item) =>
           mapBackendSpecialty(item, organization.id),
         );
@@ -727,8 +739,11 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
             ...realServices,
           ],
         }));
+        setCatalogRequest({ organizationId: organization.id, status: "ready" });
       })
       .catch((error) => {
+        if (cancelled) return;
+        setCatalogRequest({ organizationId: organization.id, status: "error", error: firstApiErrorMessage(error, "No fue posible cargar especialidades y prestaciones.") });
         console.error("No fue posible cargar el catálogo del centro:", error);
         toast.error(
           firstApiErrorMessage(
@@ -737,6 +752,7 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
           ),
         );
       });
+    return () => { cancelled = true; };
   }, [authLoading, user, organization, specialtyReloadToken]);
 
   /*
@@ -2180,10 +2196,13 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
     }
 
     if (kind === "service") {
+      if (catalogRequest?.organizationId !== organization.id || catalogRequest.status !== "ready") {
+        throw new Error("Espera a que cargue el catálogo real del centro antes de guardar la prestación.");
+      }
       if (
         !input.name?.trim() ||
         !data.specialties.some(
-          (specialty) => specialty.id === input.specialtyId,
+          (specialty) => specialty.id === input.specialtyId && specialty.active,
         ) ||
         !Number.isInteger(Number(input.duration)) ||
         Number(input.duration) < 5 ||
@@ -2574,6 +2593,10 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
       ? { status: availabilityRequest.status, error: availabilityRequest.error }
       : { status: "loading" as const },
     reloadAvailability,
+    catalogLoad: organization && catalogRequest?.organizationId === organization.id
+      ? { status: catalogRequest.status, error: catalogRequest.error }
+      : { status: "loading" as const },
+    reloadCatalog,
 
     user,
 

@@ -152,3 +152,17 @@ Resultados, precios y reportes (pasos 5 y 6): ver `README_RESULTADOS_PRECIOS_REP
 
 ## Paso 7 y revisión final · 31-10-2026
 Planes, suscripciones y pagos manuales se guardan en Core; plataforma y centro leen el mismo estado. No hay cobro integrado ni afirmación automática de «pago al día». La revisión integral y sus pendientes están en `README_SUSCRIPCIONES_Y_REVISION_FINAL.md` de la raíz MedSync.
+
+## Correcciones de revisión · 02-11-2026
+
+La página pública `/planes` consulta planes activos reales y crea solicitudes comerciales en Core; solo `SUPER_ADMIN` puede leerlas. Solicitar información no crea un centro, suscripción ni pago. El formulario debe excluir datos clínicos. El directorio público usa únicamente centros activos; descripción, dirección y especialidades provienen del registro Core del centro, nunca de un nombre de base suministrado por el navegador. La reserva comunica al paciente la tarifa vigente para la fecha elegida y distingue «sin precio informado» de cero pesos; la cita `PENDIENTE` no se computa como ingreso cobrado.
+
+## Integridad de fichas y direcciones · 03-11-2026
+
+Para una membresía `PACIENTE`, el login y cada petición clínica comprueban existencia, actividad, `user_id` y correo de la ficha local en el centro resuelto por Core. Una referencia ausente o reutilizada no habilita acceso. El usuario autenticado puede completar una ficha nueva o reutilizar una ficha propia solo tras confirmar RUT y fecha de nacimiento; una ficha de recepción sin titularidad probada requiere verificación presencial. La membresía Core se actualiza en su misma fila. La cuenta global se confirma primero; si falla una escritura posterior, el reintento recupera la ficha propia sin duplicarla. No se enlaza una ficha preexistente por mera coincidencia de RUT y correo en el registro público.
+
+Los centros se crean y editan con códigos CUT de región y comuna validados contra el catálogo territorial existente. Core conserva los nombres canónicos en `medical_center_addresses`; una edición sin cambios de dirección mantiene los nombres históricos.
+
+### Nombre de base para centros nuevos · 03-11-2026
+
+El servidor deriva `database_name` del slug validado: `clinica-maipu` produce `medsync_clinica_maipu`. Si supera 63 bytes, conserva un prefijo legible y agrega un sufijo estable para evitar colisiones por truncamiento. Antes de crear el centro comprueba que el nombre no esté asignado en Core ni exista ya en PostgreSQL. Los centros existentes conservan su `database_name` al editar el slug; no se renombran bases ni se modifican fichas clínicas.

@@ -112,6 +112,7 @@ it('restringe el acceso a recepción y permite al paciente editar solo su propia
         ]);
         $center = MedicalCenter::create(['name' => 'Centro A', 'slug' => 'pacientes-own', 'database_name' => $path, 'rut' => '76543210-3', 'is_active' => true]);
         $patient = User::create(['name' => 'Ana', 'email' => 'ana@example.com', 'password' => 'Password123', 'is_active' => true]);
+        DB::connection('patient_own')->table('patients')->where('id', 1)->update(['user_id' => $patient->id]);
         CenterUser::create(['medical_center_id' => $center->id, 'user_id' => $patient->id, 'role' => 'PACIENTE', 'patient_id' => 1, 'is_active' => true]);
         $this->getJson('/api/v1/patients')->assertUnauthorized();
         $client = $this->withHeader('Origin', 'http://localhost:3000')->withSession(['active_medical_center_id' => $center->id])->actingAs($patient, 'sanctum');

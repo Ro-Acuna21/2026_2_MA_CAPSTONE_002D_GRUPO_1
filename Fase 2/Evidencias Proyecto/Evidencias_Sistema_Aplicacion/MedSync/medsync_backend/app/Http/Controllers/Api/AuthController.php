@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use App\Models\Center\PatientAddress;
 use App\Services\Tenants\TenantConnectionResolver;
+use App\Services\Patients\PatientMembershipIntegrity;
 use App\Services\TerritorialCatalog;
 use App\Support\TenantContext;
 use Illuminate\Validation\ValidationException;
@@ -25,6 +26,7 @@ class AuthController extends Controller
         private readonly TenantConnectionResolver $connectionResolver,
         private readonly TenantContext $tenantContext,
         private readonly TerritorialCatalog $territorialCatalog,
+        private readonly PatientMembershipIntegrity $patientMembershipIntegrity,
     ) {
     }
 
@@ -34,8 +36,22 @@ class AuthController extends Controller
         return response()->json([
             'data' => MedicalCenter::query()
                 ->where('is_active', true)
+                ->with(['primaryAddress', 'selectedSpecialties.specialty'])
                 ->orderBy('name')
-                ->get(['id', 'name', 'slug']),
+                ->get(['id', 'name', 'slug', 'phone', 'public_description'])
+                ->map(fn (MedicalCenter $center) => [
+                    'id' => $center->id,
+                    'name' => $center->name,
+                    'slug' => $center->slug,
+                    'phone' => $center->phone,
+                    'description' => $center->public_description,
+                    'address' => $center->primaryAddress?->address_line,
+                    'commune' => $center->primaryAddress?->commune,
+                    'region' => $center->primaryAddress?->region,
+                    'specialties' => $center->selectedSpecialties
+                        ->filter(fn ($selection) => $selection->specialty?->is_active)
+                        ->pluck('specialty.name')->values(),
+                ]),
         ]);
     }
 
@@ -104,44 +120,29 @@ if ($existingUser) {
             ]);
         }
 
-        [$patient, $centerUser] = DB::transaction(function () use ($data, $rut, $medicalCenter, $healthInsurance, $addressData) {
-            $existingPatient = Patient::where(function ($query) use ($rut, $data) {
-    $query->where('rut', $rut)
-        ->orWhereRaw(
-            'LOWER(TRIM(email)) = ?',
-            [$data['email']]
-        );
-})
-->first();
+        if (Patient::withTrashed()->where('rut', $rut)
+            ->orWhereRaw('LOWER(TRIM(email)) = ?', [$data['email']])->exists()) {
+            throw ValidationException::withMessages([
+                'rut' => ['Ya existe una ficha con este RUT o correo. Contacta a recepción para verificar tu identidad.'],
+            ]);
+        }
 
-            $rutMatches = $existingPatient && $existingPatient->rut === $rut;
-            $emailMatches = $existingPatient
-    && strtolower(trim($existingPatient->email)) === $data['email'];
-
-            if ($existingPatient && $existingPatient->user_id) {
-                throw ValidationException::withMessages([
-                    'email' => ['Ya existe una cuenta registrada con ese RUT o correo en este centro.'],
-                ]);
-            }
-
-            if ($existingPatient && ! ($rutMatches && $emailMatches)) {
-                // Solo coincide uno de los dos datos: recepción debe corregirlo primero.
-                throw ValidationException::withMessages([
-                    'rut' => ['El RUT o el correo ya están asociados a otra ficha de este centro. Contacta a recepción para corregir tus datos.'],
-                ]);
-            }
-
-            $user = User::create([
+        // Commit the global account first. If either later connection fails,
+        // the account remains usable for the verified enrollment retry.
+        $user = User::create([
                 'name' => trim($data['first_name'].' '.$data['last_name']),
                 'email' => $data['email'],
                 'password' => $data['password'],
                 'is_active' => true,
             ]);
 
-            if ($existingPatient) {
-                $existingPatient->update(['user_id' => $user->id]);
-                $patient = $existingPatient;
-            } else {
+        $patient = DB::connection('center')->transaction(function () use ($data, $rut, $user, $healthInsurance, $addressData) {
+            if (Patient::withTrashed()->where('rut', $rut)
+                ->orWhereRaw('LOWER(TRIM(email)) = ?', [$data['email']])->exists()) {
+                throw ValidationException::withMessages([
+                    'rut' => ['Ya existe una ficha con este RUT o correo. Contacta a recepción para verificar tu identidad.'],
+                ]);
+            }
                 $patient = Patient::create([
                     'user_id' => $user->id,
                     'health_insurance_id' => $healthInsurance->id,
@@ -156,7 +157,6 @@ if ($existingUser) {
                     'consent_version' => 'v1',
                     'is_active' => true,
                 ]);
-            }
             if ($addressData !== null) {
                 PatientAddress::updateOrCreate(
                     ['patient_id' => $patient->id, 'is_primary' => true],
@@ -164,7 +164,10 @@ if ($existingUser) {
                 );
             }
 
-            $centerUser = CenterUser::firstOrCreate(
+            return $patient;
+        });
+
+        $centerUser = DB::connection('core')->transaction(fn () => CenterUser::firstOrCreate(
                 [
                     'medical_center_id' => $medicalCenter->id,
                     'user_id' => $user->id,
@@ -174,10 +177,7 @@ if ($existingUser) {
                     'patient_id' => $patient->id,
                     'is_active' => true,
                 ]
-            );
-
-            return [$patient, $centerUser];
-        });
+            ));
 
         return response()->json([
             'data' => $this->presentUser($patient->user()->first(), $centerUser),
@@ -285,6 +285,18 @@ if ($existingUser) {
         }
 
         $this->connectionResolver->connect($medicalCenter);
+        if ($centerUser->role === 'PACIENTE' && ! $this->patientMembershipIntegrity->valid($centerUser, $user)) {
+            if ($request->hasSession()) {
+                $request->session()->regenerate();
+                $request->session()->forget('active_medical_center_id');
+                $request->session()->put('pending_patient_center_id', $medicalCenter->id);
+            }
+
+            return response()->json([
+                'code' => 'CENTER_ENROLLMENT_REQUIRED',
+                'message' => 'Confirma tus datos para recuperar tu ficha de paciente en este centro.',
+            ], 409);
+        }
         $centerUser->load(['patient', 'professional']);
 
         if ($request->hasSession()) {

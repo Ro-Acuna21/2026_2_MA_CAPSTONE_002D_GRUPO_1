@@ -53,6 +53,7 @@ it('enforces role, ownership, inactive membership and tenant switching on HTTP r
         $centerA = MedicalCenter::create(['name' => 'Centro A', 'slug' => 'roles-a', 'database_name' => $pathA, 'rut' => '76543210-3', 'is_active' => true]);
         $centerB = MedicalCenter::create(['name' => 'Centro B', 'slug' => 'roles-b', 'database_name' => $pathB, 'rut' => '76543211-1', 'is_active' => true]);
         $user = User::create(['name' => 'Cuenta compartida', 'email' => 'roles@example.test', 'password' => 'Password123', 'is_active' => true]);
+        DB::connection('role_matrix_b')->table('patients')->where('id', 1)->update(['user_id' => $user->id, 'email' => $user->email]);
         $reception = CenterUser::create(['medical_center_id' => $centerA->id, 'user_id' => $user->id, 'role' => 'RECEPCIONISTA', 'is_active' => true]);
         CenterUser::create(['medical_center_id' => $centerB->id, 'user_id' => $user->id, 'role' => 'PACIENTE', 'patient_id' => 1, 'is_active' => true]);
         $client = $this->withHeader('Origin', 'http://localhost:3000')->actingAs($user, 'sanctum');

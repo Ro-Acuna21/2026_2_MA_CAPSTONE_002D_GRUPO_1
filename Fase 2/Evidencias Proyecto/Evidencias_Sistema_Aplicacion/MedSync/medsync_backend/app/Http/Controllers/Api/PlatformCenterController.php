@@ -6,16 +6,18 @@ use App\Http\Controllers\Controller;
 use App\Models\Core\MedicalCenter;
 use App\Rules\ValidRut;
 use App\Services\Tenants\CenterProvisioner;
+use App\Services\Tenants\CenterDatabaseName;
+use App\Services\TerritorialCatalog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Throwable;
 
 class PlatformCenterController extends Controller
 {
-    public function __construct(private readonly CenterProvisioner $provisioner) {}
+    public function __construct(private readonly CenterProvisioner $provisioner, private readonly TerritorialCatalog $territorial) {}
 
     public function index(Request $request): JsonResponse
     {
@@ -36,16 +38,31 @@ class PlatformCenterController extends Controller
             'rut' => ['required', 'string', new ValidRut(), Rule::unique('core.medical_centers', 'rut')],
             'email' => ['nullable', 'email', 'max:150'],
             'phone' => ['nullable', 'string', 'max:20'],
+            'public_description' => ['nullable', 'string', 'max:2000'],
+            'address_line' => ['nullable', 'string', 'max:200'],
+            'region_code' => ['nullable', 'string', 'regex:/^\d{2}$/'],
+            'commune_code' => ['nullable', 'string', 'regex:/^\d{5}$/'],
             'is_active' => ['required', 'boolean'],
         ]);
 
+        $address = $this->addressData($data);
+        $databaseName = CenterDatabaseName::fromSlug($data['slug']);
+        if (MedicalCenter::query()->where('database_name', $databaseName)->exists()
+            || (DB::connection('core')->getDriverName() === 'pgsql'
+                && DB::connection('core')->selectOne('SELECT 1 AS present FROM pg_database WHERE datname = ?', [$databaseName]))) {
+            throw ValidationException::withMessages([
+                'slug' => ['El nombre de base derivado de esta dirección ya está en uso. Elige otra dirección para el centro.'],
+            ]);
+        }
         $activate = (bool) $data['is_active'];
         $center = MedicalCenter::create([
-            ...$data,
-            'database_name' => 'medsync_c_'.Str::lower((string) Str::ulid()),
+            ...collect($data)->except(['address_line', 'region_code', 'commune_code'])->all(),
+            'database_name' => $databaseName,
             'provisioning_status' => 'PENDING',
             'is_active' => false,
         ]);
+
+        $this->saveAddress($center, $address);
 
         return $this->provision($center, $activate, 201);
     }
@@ -62,12 +79,20 @@ class PlatformCenterController extends Controller
             'rut' => ['sometimes', 'required', 'string', new ValidRut(), Rule::unique('core.medical_centers', 'rut')->ignore($center->id)],
             'email' => ['sometimes', 'nullable', 'email', 'max:150'],
             'phone' => ['sometimes', 'nullable', 'string', 'max:20'],
+            'public_description' => ['sometimes', 'nullable', 'string', 'max:2000'],
+            'address_line' => ['sometimes', 'nullable', 'string', 'max:200'],
+            'region_code' => ['sometimes', 'nullable', 'string', 'regex:/^\d{2}$/'],
+            'commune_code' => ['sometimes', 'nullable', 'string', 'regex:/^\d{5}$/'],
             'is_active' => ['sometimes', 'boolean'],
         ]);
         if (($data['is_active'] ?? false) && $center->provisioning_status !== 'READY') {
             throw ValidationException::withMessages(['is_active' => ['El centro aún no tiene una base clínica lista.']]);
         }
-        $center->update($data);
+        $addressChanged = array_key_exists('address_line', $data)
+            || array_key_exists('region_code', $data) || array_key_exists('commune_code', $data);
+        $address = $addressChanged ? $this->addressData($data) : null;
+        $center->update(collect($data)->except(['address_line', 'region_code', 'commune_code'])->all());
+        if ($addressChanged) $this->saveAddress($center, $address);
 
         return response()->json(['data' => $this->present($center->fresh())]);
     }
@@ -105,12 +130,40 @@ class PlatformCenterController extends Controller
 
     private function present(MedicalCenter $center): array
     {
-        $center->loadMissing('currentSubscription.plan');
+        $center->loadMissing('currentSubscription.plan', 'primaryAddress');
         return [
-            ...$center->only(['id', 'name', 'slug', 'rut', 'phone', 'email', 'is_active', 'provisioning_status', 'provisioned_at']),
+            ...$center->only(['id', 'name', 'slug', 'rut', 'phone', 'email', 'public_description', 'is_active', 'provisioning_status', 'provisioned_at']),
+            'address_line' => $center->primaryAddress?->address_line,
+            'commune' => $center->primaryAddress?->commune,
+            'region' => $center->primaryAddress?->region,
             'plan' => $center->currentSubscription?->plan?->code,
             'subscription_status' => $center->currentSubscription?->status,
             'subscription_renews_at' => $center->currentSubscription?->renews_at?->toDateString(),
         ];
+    }
+
+    private function addressData(array $data): ?array
+    {
+        $line = trim((string) ($data['address_line'] ?? ''));
+        $regionCode = trim((string) ($data['region_code'] ?? ''));
+        $communeCode = trim((string) ($data['commune_code'] ?? ''));
+        if ($line === '' && $regionCode === '' && $communeCode === '') return null;
+        if ($line === '') {
+            throw ValidationException::withMessages(['address_line' => ['Ingresa la dirección para guardar la región y comuna.']]);
+        }
+        $location = $this->territorial->resolve($regionCode, $communeCode);
+        return ['address_line' => $line, ...$location];
+    }
+
+    private function saveAddress(MedicalCenter $center, ?array $address): void
+    {
+        if ($address === null) {
+            $center->primaryAddress()->delete();
+            return;
+        }
+        $center->primaryAddress()->updateOrCreate(
+            ['medical_center_id' => $center->id, 'is_primary' => true],
+            $address
+        );
     }
 }
