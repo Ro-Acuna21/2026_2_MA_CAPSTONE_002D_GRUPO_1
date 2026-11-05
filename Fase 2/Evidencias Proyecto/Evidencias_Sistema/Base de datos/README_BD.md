@@ -1,8 +1,8 @@
 # Respaldo SQL — MedSync
 
-Para actualizar el entorno de cada integrante, seguir [`../README_EQUIPO.md`](../README_EQUIPO.md) antes de aplicar migraciones.
+Para actualizar el entorno de cada integrante, seguir [`../MedSync/README_EQUIPO.md`](../MedSync/README_EQUIPO.md) antes de aplicar migraciones.
 
-Para respaldos operativos de Core, todas las bases Center registradas y archivos clínicos privados, usar `medsync_backend/scripts/backup-postgres.ps1`. La restauración se prueba en bases nuevas y aisladas; el procedimiento y los ajustes HTTPS están en `medsync_backend/docs/OPERACION_PRODUCCION.md`. Los SQL de esta carpeta cumplen una función documental y pueden no reflejar el esquema vivo.
+Para respaldos operativos de Core, todas las bases Center registradas y archivos clínicos privados, usar `../MedSync/medsync_backend/scripts/backup-postgres.ps1`. La restauración se prueba en bases nuevas y aisladas; el procedimiento y los ajustes HTTPS están en `../MedSync/medsync_backend/docs/OPERACION_PRODUCCION.md`. Los SQL de esta carpeta cumplen una función documental y pueden no reflejar el esquema vivo.
 
 Este directorio contiene respaldos SQL de la estructura de base de datos utilizada actualmente en el proyecto MedSync.
 
@@ -15,7 +15,7 @@ Actualmente se utilizan dos bases de datos principales:
 
 La fuente principal para crear, modificar y versionar la estructura de las bases de datos son las migraciones de Laravel ubicadas en:
 
-medsync_backend/database/migrations/
+../MedSync/medsync_backend/database/migrations/
 
 Por lo tanto, los archivos SQL almacenados en esta carpeta no reemplazan las migraciones de Laravel. Su objetivo es servir como respaldo documental de la estructura actual de las bases de datos y permitir revisar o recrear manualmente el esquema en caso de ser necesario.
 
@@ -243,15 +243,15 @@ La estructura oficial de las bases de datos se encuentra definida mediante migra
 
 En caso de existir diferencias entre los respaldos SQL almacenados en esta carpeta y las migraciones del proyecto, se debe considerar como válida la estructura definida en:
 
-medsync_backend/database/migrations/
+../MedSync/medsync_backend/database/migrations/
 
 Los respaldos SQL cumplen principalmente una función documental y de apoyo.
 
 ## Catálogo global de especialidades (actualización 28-10-2026)
 
-La migración versionada `medsync_backend/database/migrations/core/2026_10_24_000001_create_specialty_catalog_tables.php` crea en **Core** `specialties(id, name, description, is_active, timestamps)` y `medical_center_specialties(id, medical_center_id, specialty_id, is_active, timestamps)`. La segunda tabla tiene claves foráneas hacia `medical_centers` y `specialties` de Core y una restricción única centro-especialidad. Esta es la ubicación adecuada para el catálogo común y las selecciones; un centro no debe administrar nombres globales ni consultar las selecciones de otro centro.
+La migración versionada `../MedSync/medsync_backend/database/migrations/core/2026_10_24_000001_create_specialty_catalog_tables.php` crea en **Core** `specialties(id, name, description, is_active, timestamps)` y `medical_center_specialties(id, medical_center_id, specialty_id, is_active, timestamps)`. La segunda tabla tiene claves foráneas hacia `medical_centers` y `specialties` de Core y una restricción única centro-especialidad. Esta es la ubicación adecuada para el catálogo común y las selecciones; un centro no debe administrar nombres globales ni consultar las selecciones de otro centro.
 
-La migración `medsync_backend/database/migrations/core/2026_10_28_000001_migrate_center_specialties_to_global_catalog.php` transforma las referencias de cada centro para que `services.specialty_id` y `professional_specialty.specialty_id` contengan IDs de `core.specialties`, elimina las claves foráneas locales y luego retira `center.specialties`. Conserva el mapeo y los datos de cada especialidad local en `core.medical_center_specialty_mappings`. Consta aplicada en el entorno local verificado el 31-10-2026; cada integrante debe comprobar `migrate:status` y respaldar sus bases antes de ejecutarla en su equipo.
+La migración `../MedSync/medsync_backend/database/migrations/core/2026_10_28_000001_migrate_center_specialties_to_global_catalog.php` transforma las referencias de cada centro para que `services.specialty_id` y `professional_specialty.specialty_id` contengan IDs de `core.specialties`, elimina las claves foráneas locales y luego retira `center.specialties`. Conserva el mapeo y los datos de cada especialidad local en `core.medical_center_specialty_mappings`. Consta aplicada en el entorno local verificado el 31-10-2026; cada integrante debe comprobar `migrate:status` y respaldar sus bases antes de ejecutarla en su equipo.
 
 Antes de aplicar la migración, respaldar Core y todas las bases de centros. Revisar nombres duplicados locales: la migración se detiene en ese centro y pide resolverlos antes de continuar. La operación es reversible usando la tabla de mapeo. Al ser bases PostgreSQL distintas, la referencia al ID Core es lógica y backend la valida; no crear una FK entre bases.
 
@@ -263,7 +263,7 @@ Pruebas necesarias antes de aplicar a datos reales: integridad de todos los IDs 
 2. Hacer respaldo de Core y de cada base Center antes de migrar. Aplicar la migración Laravel desde el backend para ejecutar el mapeo y retiro de la tabla local.
 3. Después de migrar, comprobar que cada ID de servicio y vínculo profesional exista en `core.specialties`, y revisar reservas históricas y asociaciones activas por centro.
 
-La corrección frontend de sesión caducada y carga de reservas no requiere cambios de esquema por sí sola. Las migraciones del backend sí deben verificarse y ejecutarse por entorno según `../README_EQUIPO.md`.
+La corrección frontend de sesión caducada y carga de reservas no requiere cambios de esquema por sí sola. Las migraciones del backend sí deben verificarse y ejecutarse por entorno según `../MedSync/README_EQUIPO.md`.
 
 ## Migración posterior al respaldo SQL (2026-10-31)
 

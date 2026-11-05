@@ -313,13 +313,11 @@ Requiere estar autenticado. Devuelve `{ "data": { ...mismo formato... } }` con e
 
 ---
 
-## 9. Nota sobre `medsync_BD/medsync_schema.sql` y `docs/Base_datos_y_modelos.md`
+## 9. Evidencia y documentación de base de datos
 
-`medsync_BD/medsync_schema.sql` sigue **sin ser la fuente de verdad**: nada lo ejecuta ni lo referencia. El esquema real que existe hoy en Postgres lo crean y versionan las migraciones de Laravel en `medsync_backend/database/migrations/core/` y `database/migrations/center/`.
+La carpeta de evidencia está en `../../Base de datos/` y contiene diagramas, `README_BD.md` y respaldos SQL. Actualmente no contiene un archivo llamado `medsync_schema.sql`; no se debe tratar como una fuente o migración disponible. Los respaldos son referenciales y no se deben ejecutar sobre bases que ya tienen migraciones aplicadas.
 
-Roberto agregó `medsync_backend/docs/Base_datos_y_modelos.md`, que **sí está al día** con el diseño de dos bases (core/center) — léelo junto con la sección 1 de este README para el detalle completo del modelo de datos.
-
-Recomendación: no correr `medsync_schema.sql` contra una base que ya tiene las migraciones aplicadas (crearía conflictos). Si se quiere mantener, lo ideal es actualizarlo para que refleje el esquema actual o marcarlo como archivo histórico.
+El esquema vigente de PostgreSQL se crea y versiona mediante las migraciones de Laravel en `database/migrations/core/` y `database/migrations/center/`. Para el detalle de modelos y conexiones, consulta `docs/Base_datos_y_modelos.md` junto con este README.
 
 ---
 

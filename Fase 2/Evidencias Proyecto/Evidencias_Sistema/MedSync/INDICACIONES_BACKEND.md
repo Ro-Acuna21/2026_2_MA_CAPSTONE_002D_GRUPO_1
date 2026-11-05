@@ -6,7 +6,7 @@ Implementar una API REST con Laravel, PostgreSQL, Eloquent, Sanctum y Spatie Per
 
 ## Orden recomendado de implementación
 
-1. Corregir y migrar el esquema actual de `medsync_BD` siguiendo `REQUERIMIENTOS_BD.md`.
+1. Contrastar los diagramas, respaldos y documentación ubicados en `../Base de datos` con `REQUERIMIENTOS_BD.md` antes de modificar el esquema mediante migraciones.
 2. Instalar y configurar Sanctum y Spatie Permission; crear el superadministrador de plataforma y los roles del centro.
 3. ✅ Resolver el centro para rutas clínicas mediante sesión: tras `auth:sanctum`, el middleware valida `active_medical_center_id`, `medical_centers.is_active` y la membresía activa en `center_users`; configura la conexión `center` desde `medical_centers.database_name`. Nunca usar un `medical_center_id` ni nombre de base libre enviado por el cliente.
 4. Implementar autenticación, sesión, `GET /api/v1/me` y el bootstrap mínimo por rol.

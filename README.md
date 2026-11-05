@@ -6,8 +6,8 @@ MedSync es una plataforma de gestión clínica para varios centros. Una cuenta d
 
 | Componente | Tecnología | Ubicación |
 | --- | --- | --- |
-| Interfaz web | React, TypeScript, Vite | `Fase 2/Evidencias Proyecto/Evidencias_Sistema_Aplicacion/MedSync/medsync_frontend` |
-| API y autenticación | Laravel, Sanctum, Spatie Permission | `Fase 2/Evidencias Proyecto/Evidencias_Sistema_Aplicacion/MedSync/medsync_backend` |
+| Interfaz web | React, TypeScript, Vite | `Fase 2/Evidencias Proyecto/Evidencias_Sistema/MedSync/medsync_frontend` |
+| API y autenticación | Laravel, Sanctum, Spatie Permission | `Fase 2/Evidencias Proyecto/Evidencias_Sistema/MedSync/medsync_backend` |
 | Datos | PostgreSQL: Core y una base clínica por centro | Configuración en el backend |
 
 Core conserva centros, usuarios globales, membresías, catálogo de planes y suscripciones. Cada base clínica conserva pacientes, profesionales, prestaciones, disponibilidad, citas, resultados médicos, precios e historial. `SUPER_ADMIN` administra la plataforma sin acceso a datos clínicos; ADMIN, recepción, profesional y paciente usan permisos del centro activo.
@@ -36,4 +36,4 @@ Se requieren PHP 8.3 o superior con `pdo_pgsql`, Composer, PostgreSQL y Node.js.
 
 En `medsync_frontend`, ejecutar `npm install` y `npm run dev`. La interfaz se abre en `http://localhost:3000` y, por defecto, llama a la API en `http://localhost:8000`; `VITE_API_URL` permite cambiar esa dirección.
 
-La configuración de bases, migraciones y centros existentes se explica en [README del backend](Fase%202/Evidencias%20Proyecto/Evidencias_Sistema_Aplicacion/MedSync/medsync_backend/README.md). El [contrato de API](Fase%202/Evidencias%20Proyecto/Evidencias_Sistema_Aplicacion/MedSync/medsync_frontend/docs/api-contract.md) y la [matriz de roles](Fase%202/Evidencias%20Proyecto/Evidencias_Sistema_Aplicacion/MedSync/medsync_backend/docs/MATRIZ_ACCESO_ROLES.md) detallan rutas y permisos. Para ejecutar las pruebas: `php artisan test` en el backend y `npm test` en el frontend.
+La configuración de bases, migraciones y centros existentes se explica en [README del backend](Fase%202/Evidencias%20Proyecto/Evidencias_Sistema/MedSync/medsync_backend/README.md). El [contrato de API](Fase%202/Evidencias%20Proyecto/Evidencias_Sistema/MedSync/medsync_frontend/docs/api-contract.md) y la [matriz de roles](Fase%202/Evidencias%20Proyecto/Evidencias_Sistema/MedSync/medsync_backend/docs/MATRIZ_ACCESO_ROLES.md) detallan rutas y permisos. Para ejecutar las pruebas: `php artisan test` en el backend y `npm test` en el frontend.
