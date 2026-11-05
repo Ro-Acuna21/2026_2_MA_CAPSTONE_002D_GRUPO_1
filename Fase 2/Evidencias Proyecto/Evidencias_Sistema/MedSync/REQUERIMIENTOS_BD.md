@@ -1,6 +1,6 @@
 # Requerimientos de base de datos — MedSync
 
-Este documento define el modelo objetivo para PostgreSQL y Laravel. Parte del esquema inicial de `medsync_BD/medsync_schema.sql`, pero lo amplía para el SaaS multi-centro y para los flujos que el frontend ya muestra. No usar datos clínicos reales en desarrollo.
+Este documento define el modelo objetivo para PostgreSQL y Laravel. Debe contrastarse con la documentación, los diagramas y los respaldos ubicados en `../Base de datos`; estos materiales no sustituyen las migraciones vigentes. No usar datos clínicos reales en desarrollo.
 
 ## Reglas transversales
 
@@ -117,7 +117,7 @@ Guardar `consent_at` y `consent_version`, no solo un booleano. Los cambios de ci
 
 ### Transición del catálogo de especialidades (24-10-2026)
 
-La tabla `specialties` descrita arriba representa el diseño clínico local previo. El PR #19 agregó en Core `specialties` y `medical_center_specialties`, pero las FK de `services.specialty_id` y `professional_specialty.specialty_id` aún apuntan a `center.specialties`. El diseño objetivo usa la relación Core para la selección de cada centro y referencias lógicas desde la base clínica a IDs globales. Antes de retirar tablas o FK locales se requiere un mapeo por centro, validación de todas las referencias, adaptación del backend y pruebas de reserva e historial. El procedimiento propuesto y sus verificaciones están en `medsync_BD/README_BD.md`; no se ejecutó ninguna migración en esta entrega.
+La tabla `specialties` descrita arriba representa el diseño clínico local previo. El PR #19 agregó en Core `specialties` y `medical_center_specialties`, pero las FK de `services.specialty_id` y `professional_specialty.specialty_id` aún apuntan a `center.specialties`. El diseño objetivo usa la relación Core para la selección de cada centro y referencias lógicas desde la base clínica a IDs globales. Antes de retirar tablas o FK locales se requiere un mapeo por centro, validación de todas las referencias, adaptación del backend y pruebas de reserva e historial. El procedimiento propuesto y sus verificaciones están en `../Base de datos/README_BD.md`; no se ejecutó ninguna migración en esta entrega.
 
 ## Estado implementado en Core: aprovisionamiento e incorporación
 

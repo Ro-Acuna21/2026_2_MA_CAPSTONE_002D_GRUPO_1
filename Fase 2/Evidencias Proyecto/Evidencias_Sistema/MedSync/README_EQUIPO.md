@@ -1,6 +1,6 @@
 # MedSync: actualización del entorno de cada integrante
 
-Esta guía corresponde al código actual de `main`. Ejecutar los comandos dentro de `Fase 2/Evidencias Proyecto/Evidencias_Sistema_Aplicacion/MedSync`, no en la copia antigua de `Fase 2/Evidencias Grupales/MedSync`.
+Esta guía corresponde al código actual de `main`. Ejecutar los comandos dentro de `Fase 2/Evidencias Proyecto/Evidencias_Sistema/MedSync`, no en la copia antigua de `Fase 2/Evidencias Grupales/MedSync`.
 
 ## Si ya tienes MedSync instalado
 

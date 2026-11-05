@@ -60,7 +60,7 @@ La interfaz concentra las solicitudes Laravel en `src/services/http.ts` y servic
 
 ## Documentación para la integración
 
-En la repo compartida, el modelo de datos necesario para reemplazar los datos demo está en `Fase 2/Evidencias Proyecto/Evidencias_Sistema_Aplicacion/MedSync/REQUERIMIENTOS_BD.md`. Las tareas, reglas de seguridad y orden recomendado para Laravel están en `Fase 2/Evidencias Proyecto/Evidencias_Sistema_Aplicacion/MedSync/INDICACIONES_BACKEND.md`.
+En la repo compartida, el modelo de datos necesario para reemplazar los datos demo está en `Fase 2/Evidencias Proyecto/Evidencias_Sistema/MedSync/REQUERIMIENTOS_BD.md`. Las tareas, reglas de seguridad y orden recomendado para Laravel están en `Fase 2/Evidencias Proyecto/Evidencias_Sistema/MedSync/INDICACIONES_BACKEND.md`.
 
 ## Comandos
 
