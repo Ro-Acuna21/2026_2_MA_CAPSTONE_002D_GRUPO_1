@@ -36,6 +36,10 @@ it('creates one local patient and membership only after explicit confirmation', 
     expect(Patient::count())->toBe(0);
     expect(CenterUser::count())->toBe(0);
 
+    $this->getJson('/api/v1/patient-enrollment')->assertOk()
+        ->assertJsonPath('data.name', 'Paciente existente')
+        ->assertJsonPath('data.email', 'existing@example.test');
+
     $this->postJson('/api/v1/patient-enrollment', enrollmentPayload())
         ->assertCreated()->assertJsonPath('data.center.slug', 'centro-prueba');
 

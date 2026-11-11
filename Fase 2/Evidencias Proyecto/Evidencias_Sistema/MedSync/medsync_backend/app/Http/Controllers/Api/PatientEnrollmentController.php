@@ -33,6 +33,7 @@ class PatientEnrollmentController extends Controller
         return response()->json(['data' => [
             'center' => $center->only(['id', 'name', 'slug']),
             'email' => $request->user()->email,
+            'name' => $request->user()->name,
         ]]);
     }
 
