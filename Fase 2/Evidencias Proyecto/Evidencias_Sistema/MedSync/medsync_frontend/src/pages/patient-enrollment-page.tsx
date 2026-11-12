@@ -8,7 +8,12 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { firstApiErrorMessage, sanctum } from '@/services/http'
 
-type Pending = { center: { id: number; name: string; slug: string }; email: string; name: string }
+type Pending = {
+  center: { id: number; name: string; slug: string }
+  email: string
+  name: string
+  prefill: { first_name: string; last_name: string; rut: string; birth_date: string | null; phone: string | null } | null
+}
 
 export function PatientEnrollmentPage() {
   const { centerSlug = '' } = useParams()
@@ -34,7 +39,15 @@ export function PatientEnrollmentPage() {
 
   const base = `/centro/${centerSlug}`
   const accountName = pending?.name?.trim().split(/\s+/) ?? []
-  const initialName = { firstName: accountName[0] ?? '', lastName: accountName.slice(1).join(' ') }
+  const initialName = {
+    firstName: pending?.prefill?.first_name ?? accountName[0] ?? '',
+    lastName: pending?.prefill?.last_name ?? accountName.slice(1).join(' '),
+  }
+  const initialPersonalData = {
+    rut: pending?.prefill?.rut ?? '',
+    birthDate: pending?.prefill?.birth_date ?? '',
+    phone: pending?.prefill?.phone ?? '',
+  }
   return <main className="min-h-screen bg-secondary p-5 sm:p-8"><div className="mx-auto max-w-3xl">
     <Logo name={pending?.center.name} />
     <Card className="mt-8"><CardHeader><CardTitle>Crear ficha en {pending?.center.name ?? 'el centro'}</CardTitle>
@@ -43,7 +56,7 @@ export function PatientEnrollmentPage() {
       {loading && <p role="status">Verificando tu sesión…</p>}
       {error && <p role="alert" className="mb-4 text-sm text-rose-700">{error}</p>}
       {pending && <><p className="mb-5 text-sm">Cuenta: <strong>{pending.email}</strong></p>
-        <p className="mb-5 text-sm text-muted-foreground">Revisa y completa tus datos antes de confirmar la inscripción en este centro. El nombre viene de tu cuenta MedSync.</p>
+        <p className="mb-5 text-sm text-muted-foreground">Revisa y completa tus datos antes de confirmar la inscripción en este centro. {pending.prefill ? 'Los datos personales provienen de una ficha anterior vinculada a tu cuenta; solo se compartirán con este centro al confirmar.' : 'El nombre viene de tu cuenta MedSync.'}</p>
         <ActionForm className="sm:grid-cols-2" label="Crear mi ficha en este centro" onSave={async (values) => {
           try {
             await sanctum.enrollPatient({
@@ -58,7 +71,7 @@ export function PatientEnrollmentPage() {
           } catch (failure) {
             throw new Error(firstApiErrorMessage(failure, 'No fue posible crear tu ficha.'))
           }
-        }}><PatientFields includeEmail={false} initialName={initialName} /><ConsentField /></ActionForm>
+        }}><PatientFields includeEmail={false} initialName={initialName} initialPersonalData={initialPersonalData} /><ConsentField /></ActionForm>
         <Button className="mt-5" variant="outline" onClick={() => { void sanctum.logout().finally(() => navigate(`${base}/ingresar`)) }}>Cancelar</Button>
       </>}
       {!pending && !loading && <Link className="text-sm font-medium text-primary underline" to={`${base}/ingresar`}>Volver al acceso</Link>}
