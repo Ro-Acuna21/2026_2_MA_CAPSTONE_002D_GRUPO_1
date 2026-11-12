@@ -223,7 +223,7 @@ export const sanctum = {
 
   me: () => apiRequest<AuthResponse>("/api/v1/me"),
 
-  pendingEnrollment: () => apiRequest<{ data: { center: { id: number; name: string; slug: string }; email: string } }>("/api/v1/patient-enrollment"),
+  pendingEnrollment: () => apiRequest<{ data: { center: { id: number; name: string; slug: string }; email: string; name: string; prefill: { first_name: string; last_name: string; rut: string; birth_date: string | null; phone: string | null } | null } }>("/api/v1/patient-enrollment"),
 
   enrollPatient: (payload: Omit<PatientRegisterPayload, 'center_slug' | 'email' | 'password' | 'password_confirmation'>) =>
     apiRequest<{ data: { center: { id: number; name: string; slug: string }; patient_id: number } }>("/api/v1/patient-enrollment", {

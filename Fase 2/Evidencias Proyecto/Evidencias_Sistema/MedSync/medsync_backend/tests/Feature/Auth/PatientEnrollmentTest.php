@@ -5,6 +5,7 @@ use App\Models\Center\Patient;
 use App\Models\Core\CenterUser;
 use App\Models\Core\MedicalCenter;
 use App\Models\User;
+use App\Services\Tenants\TenantConnectionResolver;
 
 beforeEach(function () {
     $this->center = MedicalCenter::create([
@@ -28,6 +29,67 @@ function enrollmentPayload(array $overrides = []): array
     ], $overrides);
 }
 
+it('prefills only verified personal data from the same account in another center', function () {
+    $this->mock(TenantConnectionResolver::class, function ($mock) {
+        $mock->shouldReceive('connect')->andReturnNull();
+    });
+    $previous = MedicalCenter::create([
+        'name' => 'Centro anterior', 'slug' => 'centro-anterior',
+        'rut' => '76543211-1', 'database_name' => 'previous_center_for_prefill',
+        'is_active' => true, 'provisioning_status' => 'READY',
+    ]);
+    $patient = Patient::create([
+        'user_id' => $this->user->id, 'first_name' => 'María José', 'last_name' => 'Pérez Soto',
+        'rut' => '12345678-5', 'email' => $this->user->email,
+        'phone' => '912345678', 'birth_date' => '1990-05-10',
+        'health_insurance_id' => HealthInsurance::firstOrFail()->id, 'is_active' => true,
+    ]);
+    CenterUser::create([
+        'medical_center_id' => $previous->id, 'user_id' => $this->user->id,
+        'role' => 'PACIENTE', 'patient_id' => $patient->id, 'is_active' => true,
+    ]);
+
+    $this->withHeader('Origin', 'http://localhost:3000')->postJson('/api/login', [
+        'email' => $this->user->email, 'password' => 'Password123', 'center_slug' => $this->center->slug,
+    ])->assertStatus(409);
+    $this->getJson('/api/v1/patient-enrollment')->assertOk()
+        ->assertJsonPath('data.prefill.first_name', 'María José')
+        ->assertJsonPath('data.prefill.last_name', 'Pérez Soto')
+        ->assertJsonPath('data.prefill.rut', '12345678-5')
+        ->assertJsonPath('data.prefill.birth_date', '1990-05-10')
+        ->assertJsonPath('data.prefill.phone', '912345678');
+    expect(CenterUser::where('medical_center_id', $this->center->id)->count())->toBe(0);
+});
+
+it('does not prefill a prior patient record owned by another account', function () {
+    $this->mock(TenantConnectionResolver::class, function ($mock) {
+        $mock->shouldReceive('connect')->andReturnNull();
+    });
+    $previous = MedicalCenter::create([
+        'name' => 'Centro anterior', 'slug' => 'centro-anterior',
+        'rut' => '76543211-1', 'database_name' => 'previous_center_for_prefill',
+        'is_active' => true, 'provisioning_status' => 'READY',
+    ]);
+    $other = User::create([
+        'name' => 'Otra persona', 'email' => 'other@example.test',
+        'password' => 'Password123', 'is_active' => true,
+    ]);
+    $patient = Patient::create([
+        'user_id' => $other->id, 'first_name' => 'Otra', 'last_name' => 'Persona',
+        'rut' => '12345678-5', 'email' => $other->email,
+        'phone' => '912345678', 'birth_date' => '1990-05-10',
+        'health_insurance_id' => HealthInsurance::firstOrFail()->id, 'is_active' => true,
+    ]);
+    CenterUser::create([
+        'medical_center_id' => $previous->id, 'user_id' => $this->user->id,
+        'role' => 'PACIENTE', 'patient_id' => $patient->id, 'is_active' => true,
+    ]);
+    $this->withHeader('Origin', 'http://localhost:3000')->postJson('/api/login', [
+        'email' => $this->user->email, 'password' => 'Password123', 'center_slug' => $this->center->slug,
+    ])->assertStatus(409);
+    $this->getJson('/api/v1/patient-enrollment')->assertOk()->assertJsonPath('data.prefill', null);
+});
+
 it('creates one local patient and membership only after explicit confirmation', function () {
     $this->withHeader('Origin', 'http://localhost:3000')->postJson('/api/login', [
         'email' => $this->user->email, 'password' => 'Password123', 'center_slug' => $this->center->slug,
@@ -35,6 +97,10 @@ it('creates one local patient and membership only after explicit confirmation', 
 
     expect(Patient::count())->toBe(0);
     expect(CenterUser::count())->toBe(0);
+
+    $this->getJson('/api/v1/patient-enrollment')->assertOk()
+        ->assertJsonPath('data.name', 'Paciente existente')
+        ->assertJsonPath('data.email', 'existing@example.test');
 
     $this->postJson('/api/v1/patient-enrollment', enrollmentPayload())
         ->assertCreated()->assertJsonPath('data.center.slug', 'centro-prueba');

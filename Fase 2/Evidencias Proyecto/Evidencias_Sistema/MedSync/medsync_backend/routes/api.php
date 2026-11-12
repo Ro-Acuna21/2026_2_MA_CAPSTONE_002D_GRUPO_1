@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\ServiceController;
 use App\Http\Controllers\Api\SpecialtyController;
 use App\Http\Controllers\Api\PlatformSpecialtyController;
 use App\Http\Controllers\Api\PlatformCenterController;
+use App\Http\Controllers\Api\PlatformReportController;
 use App\Http\Controllers\Api\PatientEnrollmentController;
 use App\Http\Controllers\Api\CenterAccessController;
 use App\Http\Controllers\Api\CenterPermissionCatalogController;
@@ -43,6 +44,7 @@ Route::middleware('auth:sanctum')->group(function () {
 // Catálogo global de especialidades (plataforma): exclusivo de SUPER_ADMIN,
 // nunca abre una conexión clínica (ver api-contract.md, 24-10-2026).
 Route::middleware('auth:sanctum')->prefix('v1/platform')->group(function () {
+    Route::get('/reports/summary', PlatformReportController::class);
     Route::get('/commercial-inquiries', [CommercialInquiryController::class, 'index']);
     Route::get('/plans', [PlanController::class, 'index']);
     Route::post('/plans', [PlanController::class, 'store']);

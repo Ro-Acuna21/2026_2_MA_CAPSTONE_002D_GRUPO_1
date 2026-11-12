@@ -18,6 +18,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class PatientEnrollmentController extends Controller
 {
@@ -30,10 +31,52 @@ class PatientEnrollmentController extends Controller
     public function show(Request $request): JsonResponse
     {
         $center = $this->pendingCenter($request);
+        $user = $request->user();
         return response()->json(['data' => [
             'center' => $center->only(['id', 'name', 'slug']),
-            'email' => $request->user()->email,
+            'email' => $user->email,
+            'name' => $user->name,
+            'prefill' => $this->verifiedPersonalData($user, $center),
         ]]);
+    }
+
+    private function verifiedPersonalData(User $user, MedicalCenter $pendingCenter): ?array
+    {
+        $originalDatabase = config('database.connections.center.database');
+        $memberships = CenterUser::query()->with('medicalCenter')
+            ->where('user_id', $user->id)->where('role', 'PACIENTE')
+            ->where('is_active', true)->whereNotNull('patient_id')
+            ->where('medical_center_id', '!=', $pendingCenter->id)
+            ->orderByDesc('id')->get();
+
+        foreach ($memberships as $membership) {
+            $sourceCenter = $membership->medicalCenter;
+            if (! $sourceCenter || ! $sourceCenter->is_active || $sourceCenter->provisioning_status !== 'READY') {
+                continue;
+            }
+            try {
+                $this->resolver->connect($sourceCenter);
+                if (! $this->integrity->valid($membership, $user)) {
+                    continue;
+                }
+                $patient = Patient::query()->find($membership->patient_id);
+                return [
+                    'first_name' => $patient->first_name,
+                    'last_name' => $patient->last_name,
+                    'rut' => $patient->rut,
+                    'birth_date' => $patient->birth_date?->toDateString(),
+                    'phone' => $patient->phone,
+                ];
+            } catch (Throwable $exception) {
+                report($exception);
+            } finally {
+                // The next tenant request resolves its own connection. Restoring the
+                // configured name avoids leaving this request pointed at the source.
+                config(['database.connections.center.database' => $originalDatabase]);
+            }
+        }
+
+        return null;
     }
 
     public function store(Request $request): JsonResponse
