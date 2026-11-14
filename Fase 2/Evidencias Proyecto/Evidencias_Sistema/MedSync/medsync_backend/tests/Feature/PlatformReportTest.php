@@ -25,7 +25,7 @@ it('counts distinct patient accounts and center registrations without opening te
         ->assertJsonPath('data.unique_patients', 2)
         ->assertJsonPath('data.patient_center_registrations', 3)
         ->assertJsonPath('data.patients_in_multiple_centers', 1)
-        ->assertJsonPath('data.users_without_center', 1)
+        ->assertJsonMissingPath('data.users_without_center')
         ->assertJsonPath('data.centers.0.patient_count', 2)
         ->assertJsonPath('data.centers.1.patient_count', 1);
     $this->actingAs($patient)->getJson('/api/v1/platform/reports/summary')->assertForbidden();

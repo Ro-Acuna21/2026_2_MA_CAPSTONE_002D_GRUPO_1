@@ -39,9 +39,6 @@ class PlatformReportController extends Controller
             'unique_patients' => $linksByUser->count(),
             'patient_center_registrations' => $linksByCenter->sum(),
             'patients_in_multiple_centers' => $linksByUser->filter(fn ($count) => $count > 1)->count(),
-            'users_without_center' => User::query()->where(fn ($query) => $query
-                ->whereNull('system_role')->orWhere('system_role', '!=', 'SUPER_ADMIN'))
-                ->whereDoesntHave('centerUsers')->count(),
             'centers' => $centers->map(fn (MedicalCenter $center) => [
                 'id' => $center->id,
                 'name' => $center->name,
