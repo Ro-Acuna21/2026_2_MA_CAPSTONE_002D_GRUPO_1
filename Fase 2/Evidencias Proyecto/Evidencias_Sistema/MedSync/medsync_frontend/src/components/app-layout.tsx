@@ -17,7 +17,7 @@ export function AppLayout() {
     : user?.role === 'PROFESIONAL' ? [{ to: '/', label: 'Inicio', icon: LayoutDashboard }, { to: '/citas', label: 'Mi agenda', icon: CalendarDays }, { to: '/resultados', label: 'Informes y resultados', icon: ClipboardPlus }]
     : [{ to: '/', label: 'Inicio', icon: LayoutDashboard }, { to: '/citas', label: 'Mis citas', icon: CalendarDays }, { to: '/reservar', label: 'Reservar hora', icon: ClipboardPlus }, { to: '/resultados', label: 'Mis informes y resultados', icon: ClipboardPlus }, { to: '/perfil', label: 'Mis datos', icon: UserRound }]
   const links = user?.role === 'SUPER_ADMIN' ? roleLinks : roleLinks.map((link) => ({ ...link, to: centerPath(link.to) }))
-  useEffect(() => { document.title = user?.role === 'SUPER_ADMIN' ? 'MedSync · Plataforma' : organization?.name ?? 'Portal médico' }, [organization?.name, user?.role])
+  useEffect(() => { document.title = user?.role === 'SUPER_ADMIN' ? 'Plataforma · MedSync' : `${organization?.name ?? 'Portal médico'} · MedSync` }, [organization?.name, user?.role])
   // Además de cerrar la sesión mock, avisa al backend real (solo aplica si
   // había una sesión real iniciada en clinica-horizonte vía login/registro).
   const handleLogout = () => {

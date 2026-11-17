@@ -58,8 +58,8 @@ export function LoginPage({ platform = false }: { platform?: boolean }) {
 
   useEffect(() => {
     document.title = platform
-      ? "MedSync · Plataforma"
-      : (center?.name ?? "Portal médico");
+      ? "Plataforma · MedSync"
+      : `${center?.name ?? "Acceso"} · MedSync`;
   }, [center?.name, platform]);
 
   useEffect(() => {
