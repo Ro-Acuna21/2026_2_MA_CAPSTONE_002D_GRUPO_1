@@ -23,7 +23,7 @@ El selector, directorio y portada públicos usan `GET /api/public/centers` como 
 
 | Ruta | Propósito |
 | --- | --- |
-| `/` | Landing comercial de MediSync. |
+| `/` | Landing comercial de MedSync. |
 | `/centros` | Directorio de centros asociados. |
 | `/centros/{slug}` | Micrositio público reutilizable de cada centro. |
 | `/ingresar` | Busca o selecciona el centro antes de cualquier autenticación. |

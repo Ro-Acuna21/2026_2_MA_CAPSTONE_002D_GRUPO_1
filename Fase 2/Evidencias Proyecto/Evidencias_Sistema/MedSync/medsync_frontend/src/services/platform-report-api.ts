@@ -7,7 +7,6 @@ export interface PlatformReport {
   unique_patients: number
   patient_center_registrations: number
   patients_in_multiple_centers: number
-  users_without_center: number
   centers: { id: number; name: string; slug: string; is_active: boolean; patient_count: number }[]
 }
 

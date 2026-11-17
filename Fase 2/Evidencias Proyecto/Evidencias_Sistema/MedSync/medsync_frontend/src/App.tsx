@@ -30,6 +30,7 @@ import { CenterSelectorPage } from "@/pages/center-selector-page";
 import { PlatformSpecialtiesPage } from "@/pages/platform-specialties-page";
 import { PublicPlansPage } from "@/pages/public-plans-page";
 import { PlatformInquiriesPage } from "@/pages/platform-inquiries-page";
+import { PatientBillingPage } from "@/pages/patient-billing-page";
 import { PlatformReportsPage } from "@/pages/platform-reports-page";
 
 function PlatformProtectedRoute() {
@@ -142,6 +143,9 @@ export default function App() {
           </Route>
           <Route element={<RoleRoute allowed={["RECEPCIONISTA"]} />}>
             <Route path="pacientes" element={<PatientsPage />} />
+          </Route>
+          <Route element={<RoleRoute allowed={["ADMIN", "RECEPCIONISTA"]} />}>
+            <Route path="cobros" element={<PatientBillingPage />} />
           </Route>
           <Route element={<RoleRoute allowed={["ADMIN"]} />}>
             <Route path="reportes" element={<ReportsPage />} />

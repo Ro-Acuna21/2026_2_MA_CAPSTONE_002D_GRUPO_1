@@ -28,7 +28,7 @@ export function PublicSectionLink({ sectionId, children, ...props }: ComponentPr
 }
 
 export function MedSyncMark({ inverse = false }: { inverse?: boolean }) {
-  return <Link className={`group inline-flex items-center gap-2.5 ${inverse ? "text-white" : "text-foreground"}`} to="/"><span className={`grid size-9 place-items-center rounded-xl transition-transform group-hover:scale-105 ${inverse ? "bg-white/15 text-white" : "bg-primary text-primary-foreground"}`}><Activity className="size-5" strokeWidth={2.6} /></span><span className="text-lg font-bold tracking-tight">Medi<span className={inverse ? "text-emerald-200" : "text-primary"}>Sync</span></span></Link>;
+  return <Link className={`group inline-flex items-center gap-2.5 ${inverse ? "text-white" : "text-foreground"}`} to="/"><span className={`grid size-9 place-items-center rounded-xl transition-transform group-hover:scale-105 ${inverse ? "bg-white/15 text-white" : "bg-primary text-primary-foreground"}`}><Activity className="size-5" strokeWidth={2.6} /></span><span className="text-lg font-bold tracking-tight">Med<span className={inverse ? "text-emerald-200" : "text-primary"}>Sync</span></span></Link>;
 }
 
 export function PublicNavbar() {

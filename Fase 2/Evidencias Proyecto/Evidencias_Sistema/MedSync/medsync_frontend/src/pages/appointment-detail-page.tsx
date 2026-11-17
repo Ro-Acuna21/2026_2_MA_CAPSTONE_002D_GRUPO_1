@@ -12,6 +12,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { toast } from 'sonner'
 import { useCenterPath } from '@/lib/tenant'
 import { canPatientModifyAppointment } from '@/domain/appointment-rules'
+import { CareIndications } from '@/components/care-indications'
 
 export function AppointmentHistoryPage() {
   const { id } = useParams()
@@ -39,6 +40,7 @@ export function AppointmentHistoryPage() {
       {error && <div><p role="alert" className="text-destructive">{error}</p><Button variant="outline" onClick={() => { setLoading(true); setReload((n) => n + 1) }}>Reintentar</Button></div>}
       {!loading && !error && history && (history.events.length ? <ol className="relative border-l border-border pl-7">{history.events.map((event) => <li className="relative pb-8 last:pb-0" key={event.id}><span className="absolute -left-[38px] grid size-5 place-items-center rounded-full bg-primary text-white"><CheckCircle2 className="size-3" /></span><p className="font-semibold">{event.event_type.replaceAll('_', ' ')}</p><p className="mt-1 text-sm text-muted-foreground">{event.previous_status && `${statusNames[event.previous_status]} → `}{event.new_status && statusNames[event.new_status]}{event.old_date && <><br />{event.old_date} → {event.new_date}</>}{event.old_professional_id && event.new_professional_id && <><br />{event.old_professional_name ?? `Profesional #${event.old_professional_id}`} → {event.new_professional_name ?? `Profesional #${event.new_professional_id}`}</>}{event.reason && <><br />Motivo: {event.reason}</>}</p><small className="mt-2 block text-xs text-muted-foreground">{new Date(event.created_at).toLocaleString('es-CL')}</small></li>)}</ol> : <p className="text-sm text-muted-foreground">Esta cita todavía no tiene eventos de historial.</p>)}
     </CardContent></Card>
+    {appointment && <CareIndications appointmentId={Number(id)} attended={appointment.status === 'ATENDIDA'} professional={user.role === 'PROFESIONAL'} />}
   </>
 }
 export function ReschedulePage() {
