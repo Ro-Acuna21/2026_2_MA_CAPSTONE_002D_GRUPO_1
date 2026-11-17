@@ -845,8 +845,28 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
          * para que AppointmentTable pueda mostrar su nombre.
          */
         const professionalStubs: Professional[] = [];
+        const patientStubs: Patient[] = [];
 
         response.data.forEach((item) => {
+          if (item.patient) {
+            const id = String(item.patient.id);
+
+            if (!patientStubs.some((patient) => patient.id === id)) {
+              patientStubs.push({
+                id,
+                organizationId: organization.id,
+                name: `${item.patient.first_name} ${item.patient.last_name}`,
+                rut: "",
+                email: "",
+                phone: "",
+                birthDate: "",
+                address: "",
+                consent: true,
+                active: true,
+              });
+            }
+          }
+
           if (!item.professional) {
             return;
           }
@@ -882,6 +902,14 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
                 ),
             ),
             ...appointments,
+          ],
+
+          patients: [
+            ...current.patients.filter(
+              (patient) =>
+                !patientStubs.some((stub) => stub.id === patient.id),
+            ),
+            ...patientStubs,
           ],
 
           professionals: [
@@ -1325,6 +1353,21 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
           user,
         );
 
+        const createdPatient = response.data.patient
+          ? {
+              id: String(response.data.patient.id),
+              organizationId: organization.id,
+              name: `${response.data.patient.first_name} ${response.data.patient.last_name}`,
+              rut: "",
+              email: "",
+              phone: "",
+              birthDate: "",
+              address: "",
+              consent: true,
+              active: true,
+            }
+          : null;
+
         const createdProfessional = response.data.professional
           ? {
               id: String(response.data.professional.id),
@@ -1344,6 +1387,14 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
         setAllData((current) => ({
           ...current,
           appointments: [...current.appointments, mapped],
+          patients: createdPatient
+            ? [
+                ...current.patients.filter(
+                  (patient) => patient.id !== createdPatient.id,
+                ),
+                createdPatient,
+              ]
+            : current.patients,
           professionals: createdProfessional
             ? [
                 ...current.professionals.filter(

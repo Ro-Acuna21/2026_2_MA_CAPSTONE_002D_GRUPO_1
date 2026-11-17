@@ -112,7 +112,7 @@ export function RegisterPage() {
   );
 
   useEffect(() => {
-    document.title = center?.name ?? "Portal médico";
+    document.title = `${center?.name ?? "Registro"} · MedSync`;
   }, [center?.name]);
 
   useEffect(() => {

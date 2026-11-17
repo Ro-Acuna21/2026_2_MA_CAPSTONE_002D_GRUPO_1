@@ -3,7 +3,6 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
-use Illuminate\Auth\Middleware\Authenticate;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use App\Http\Middleware\ResolveCenterTenant;
@@ -23,7 +22,6 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // El tenant requiere un usuario autenticado y debe quedar listo antes
         // de cualquier binding de modelos clínicos en la ruta.
-        $middleware->appendToPriorityList(Authenticate::class, ResolveCenterTenant::class);
         $middleware->prependToPriorityList(SubstituteBindings::class, ResolveCenterTenant::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
