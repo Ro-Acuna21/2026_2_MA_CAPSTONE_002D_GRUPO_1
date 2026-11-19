@@ -147,6 +147,7 @@ export interface ProfessionalPayload {
 export interface BackendProfessional {
   id: number;
   user_id: number | null;
+  access_state?: "active" | "inactive" | "incomplete" | "conflict" | "not_linked";
   first_name: string;
   last_name: string;
   rut: string;

@@ -227,7 +227,9 @@ function ProfessionalAccess({
   const [submitting, setSubmitting] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
-  const hasAccess = backendProfessional?.user_id != null;
+  const accessState = backendProfessional?.access_state ?? "not_linked";
+  const hasAccess = accessState === "active";
+  const hasConflict = accessState === "conflict";
   const accessKnown = backendProfessional !== undefined;
 
   async function handleEnableAccess() {
@@ -278,8 +280,14 @@ function ProfessionalAccess({
               : !accessKnown
                 ? "No fue posible determinar el estado de acceso."
                 : hasAccess
-                  ? "Este profesional ya tiene una cuenta vinculada a MedSync."
-                  : "Este profesional todavía no tiene una cuenta de acceso."}
+                  ? "Este profesional tiene una cuenta activa en este centro."
+                  : accessState === "incomplete"
+                    ? "La ficha está vinculada a una cuenta, pero falta completar el acceso profesional en este centro."
+                    : accessState === "inactive"
+                      ? "La membresía profesional de este centro está inactiva."
+                      : hasConflict
+                        ? "La cuenta o la ficha tiene otra membresía en este centro. Revisa la vinculación antes de continuar."
+                        : "Este profesional todavía no tiene una cuenta de acceso."}
           </p>
         </div>
 
@@ -289,27 +297,33 @@ function ProfessionalAccess({
           </span>
         )}
 
-        {!loading && accessKnown && !hasAccess && (
+        {!loading && accessKnown && !hasAccess && hasConflict && (
+          <span className="inline-flex w-fit rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-800">
+            Revisión necesaria
+          </span>
+        )}
+
+        {!loading && accessKnown && !hasAccess && !hasConflict && (
           <>
             <Button
               type="button"
               onClick={() => setConfirmOpen(true)}
               disabled={submitting}
             >
-              Habilitar acceso
+              {accessState === "incomplete" || accessState === "inactive" ? "Reparar acceso" : "Habilitar acceso"}
             </Button>
 
             <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
               <AlertDialogContent>
                 <AlertDialogHeader>
                   <AlertDialogTitle>
-                    Habilitar acceso al sistema
+                    {accessState === "incomplete" || accessState === "inactive" ? "Reparar acceso al sistema" : "Habilitar acceso al sistema"}
                   </AlertDialogTitle>
 
                   <AlertDialogDescription>
-                    Se creará el acceso a MedSync para{" "}
-                    <strong>{professionalName}</strong> y se generará una
-                    invitación para crear su contraseña.
+                    {accessState === "incomplete" || accessState === "inactive"
+                      ? <>Se completará la membresía de <strong>{professionalName}</strong> para este centro. Se conservarán la cuenta global y sus demás accesos.</>
+                      : <>Se creará el acceso a MedSync para <strong>{professionalName}</strong> y se generará una invitación para crear su contraseña.</>}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
 
@@ -325,7 +339,7 @@ function ProfessionalAccess({
                       void handleEnableAccess();
                     }}
                   >
-                    {submitting ? "Habilitando..." : "Habilitar acceso"}
+                    {submitting ? "Guardando..." : accessState === "incomplete" || accessState === "inactive" ? "Reparar acceso" : "Habilitar acceso"}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
@@ -446,6 +460,7 @@ export function AdminPage() {
         [professionalId]: {
           ...professional,
           user_id: userId,
+          access_state: "active",
         },
       };
     });
