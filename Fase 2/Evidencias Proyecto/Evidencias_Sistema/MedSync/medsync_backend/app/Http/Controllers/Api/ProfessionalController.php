@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Center\Professional;
+use App\Models\Core\CenterUser;
 use App\Models\Core\Specialty;
 use App\Models\Center\ProfessionalSpecialty;
 use App\Services\Specialties\CenterSpecialtyCatalog;
@@ -37,10 +38,52 @@ class ProfessionalController extends Controller
             ->get();
         $this->loadGlobalSpecialties($professionals);
 
+        $professionalIds = $professionals->modelKeys();
+        $linkedUserIds = $professionals->pluck('user_id')->filter()->unique()->values();
+        $centerMemberships = collect();
+
+        if ($professionalIds !== []) {
+            $centerMemberships = CenterUser::query()
+                ->where('medical_center_id', $this->tenantContext->medicalCenter()->id)
+                ->where(function ($query) use ($professionalIds, $linkedUserIds): void {
+                    $query->whereIn('professional_id', $professionalIds);
+                    if ($linkedUserIds->isNotEmpty()) {
+                        $query->orWhereIn('user_id', $linkedUserIds);
+                    }
+                })
+                ->get();
+        }
+
         return response()->json([
             'data' => $professionals->map(
-                fn (Professional $professional) =>
-                    $this->presentProfessional($professional)
+                function (Professional $professional) use ($centerMemberships): array {
+                    $memberByProfessional = $centerMemberships->firstWhere('professional_id', $professional->id);
+                    $memberByUser = $professional->user_id !== null
+                        ? $centerMemberships->firstWhere('user_id', $professional->user_id)
+                        : null;
+
+                    $matches = $memberByUser
+                        && $memberByUser->role === 'PROFESIONAL'
+                        && (int) $memberByUser->professional_id === (int) $professional->id;
+
+                    if ($matches) {
+                        $accessState = $memberByUser->is_active ? 'active' : 'inactive';
+                    } elseif ($memberByProfessional && $professional->user_id === null
+                        && $memberByProfessional->role === 'PROFESIONAL') {
+                        $accessState = 'incomplete';
+                    } elseif ($memberByProfessional || $memberByUser) {
+                        $accessState = 'conflict';
+                    } elseif ($professional->user_id !== null) {
+                        $accessState = 'incomplete';
+                    } else {
+                        $accessState = 'not_linked';
+                    }
+
+                    return [
+                        ...$this->presentProfessional($professional),
+                        'access_state' => $accessState,
+                    ];
+                }
             ),
         ]);
     }

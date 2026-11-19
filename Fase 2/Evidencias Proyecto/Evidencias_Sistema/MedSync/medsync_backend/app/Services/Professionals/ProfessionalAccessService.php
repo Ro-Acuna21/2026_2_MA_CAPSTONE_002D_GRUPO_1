@@ -40,24 +40,40 @@ class ProfessionalAccessService
             ]);
         }
 
-        if ($professional->user_id !== null) {
+        $email = strtolower(trim($professional->email));
+
+        $user = $professional->user_id !== null
+            ? User::query()->find($professional->user_id)
+            : null;
+
+        // A legacy or partially repaired profile may retain a user_id that
+        // no longer exists. Recover the global account by the profile email.
+        if (! $user) {
+            $user = User::query()
+                ->whereRaw('LOWER(TRIM(email)) = ?', [$email])
+                ->first();
+        }
+
+        if ($professional->user_id !== null && ! $user) {
             throw ValidationException::withMessages([
                 'professional' => [
-                    'Este profesional ya tiene una cuenta vinculada.',
+                    'El vínculo guardado en la ficha no apunta a una cuenta existente y no se encontró una cuenta con el mismo correo. Revisa el correo antes de reparar el acceso.',
                 ],
             ]);
         }
-
-        $email = strtolower(trim($professional->email));
-
-        $user = User::query()
-            ->whereRaw('LOWER(TRIM(email)) = ?', [$email])
-            ->first();
 
         if ($user && ! $user->is_active) {
             throw ValidationException::withMessages([
                 'email' => [
                     'Existe una cuenta con este correo, pero se encuentra inactiva.',
+                ],
+            ]);
+        }
+
+        if ($user?->isSuperAdmin()) {
+            throw ValidationException::withMessages([
+                'email' => [
+                    'Una cuenta de plataforma no puede vincularse como profesional de un centro.',
                 ],
             ]);
         }
@@ -73,12 +89,45 @@ class ProfessionalAccessService
                 ->first();
 
             if ($existingCenterUser) {
-                throw ValidationException::withMessages([
-                    'email' => [
-                        'La cuenta asociada a este correo ya pertenece a este centro médico.',
-                    ],
-                ]);
+                if ($existingCenterUser->role !== 'PROFESIONAL'
+                    || (int) $existingCenterUser->professional_id !== (int) $professional->id) {
+                    throw ValidationException::withMessages([
+                        'email' => [
+                            'La cuenta ya tiene otro rol o está vinculada a otra ficha en este centro.',
+                        ],
+                    ]);
+                }
+
+                if (! $existingCenterUser->is_active) {
+                    $existingCenterUser->update(['is_active' => true]);
+                }
+
+                if ((int) $professional->user_id !== (int) $user->id) {
+                    $professional->update(['user_id' => $user->id]);
+                }
+
+                return [
+                    'user' => $user,
+                    'center_user' => $existingCenterUser->fresh(),
+                    'professional' => $professional->fresh(),
+                    'account_created' => false,
+                    'invitation_sent' => false,
+                    'message' => 'El acceso profesional del centro quedó vinculado correctamente.',
+                ];
             }
+        }
+
+        $existingProfessionalMembership = CenterUser::query()
+            ->where('medical_center_id', $adminCenterUser->medical_center_id)
+            ->where('professional_id', $professional->id)
+            ->first();
+
+        if ($existingProfessionalMembership) {
+            throw ValidationException::withMessages([
+                'professional' => [
+                    'Esta ficha ya está asociada a otra cuenta del centro. Revisa esa membresía antes de continuar.',
+                ],
+            ]);
         }
 
         $userWasCreated = false;
