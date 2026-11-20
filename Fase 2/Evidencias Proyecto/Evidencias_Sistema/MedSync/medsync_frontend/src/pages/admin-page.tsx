@@ -8,6 +8,8 @@ import { AccessForm } from "@/components/access-form";
 import { CenterPermissionCatalogView } from "@/components/center-permission-catalog";
 import { CenterSpecialtyCatalog } from "@/components/center-specialty-catalog";
 import { CenterSubscriptionView } from "@/components/center-subscription";
+import { CenterPlatformServices } from "@/components/center-platform-services";
+import { RutInput } from "@/components/rut-input";
 import { useClinic } from "@/state/clinic-store";
 import {
   ApiError,
@@ -77,7 +79,7 @@ function ProfessionalForm({ item, linkedAccount = false }: { item?: Professional
         <Input name="name" defaultValue={item?.name} required />
       </Field>
       <Field label="RUT">
-        <Input name="rut" defaultValue={item?.rut} readOnly={Boolean(item)} required />
+        <RutInput defaultValue={item?.rut} readOnly={Boolean(item)} />
       </Field>
       <Field label="Correo">
         <Input name="email" type="email" defaultValue={item?.email} readOnly={linkedAccount} required />
@@ -517,6 +519,7 @@ export function AdminPage() {
         </Card>
         <AvailabilitySection />
         <CenterSpecialtyCatalog />
+        <CenterPlatformServices />
         <Card>
           <CardHeader>
             <CardTitle>Prestaciones del centro</CardTitle>

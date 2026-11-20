@@ -166,3 +166,7 @@ Los centros se crean y editan con códigos CUT de región y comuna validados con
 ### Nombre de base para centros nuevos · 03-11-2026
 
 El servidor deriva `database_name` del slug validado: `clinica-maipu` produce `medsync_clinica_maipu`. Si supera 63 bytes, conserva un prefijo legible y agrega un sufijo estable para evitar colisiones por truncamiento. Antes de crear el centro comprueba que el nombre no esté asignado en Core ni exista ya en PostgreSQL. Los centros existentes conservan su `database_name` al editar el slug; no se renombran bases ni se modifican fichas clínicas.
+
+## Prestaciones y cobros para defensa · 20-11-2026
+
+Catálogo y precios base pertenecen a Core y solo los administra `SUPER_ADMIN`. El centro crea o vincula explícitamente su prestación local al ID global; `ADMIN` puede definir una vigencia propia. El precio efectivo es propio si existe y, en otro caso, base. El profesional asignado puede generar deuda directa en cita `ATENDIDA` o mantener la indicación sin deuda. Recepción asigna pagos manuales a cargos; el paciente consulta exclusivamente sus cargos del centro activo. El módulo no procesa pagos electrónicos. La ayuda de DV en React solo completa el cuerpo cuando no parece un RUT completo válido; el backend sigue validando el RUT completo.

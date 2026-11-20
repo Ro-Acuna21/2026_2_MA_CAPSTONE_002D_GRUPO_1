@@ -23,6 +23,7 @@ class Service extends Model
         'description',
         'duration_minutes',
         'is_active',
+        'platform_service_id',
     ];
 
     protected function casts(): array

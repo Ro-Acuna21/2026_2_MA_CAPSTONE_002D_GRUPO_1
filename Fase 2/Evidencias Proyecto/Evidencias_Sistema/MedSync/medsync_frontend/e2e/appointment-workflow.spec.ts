@@ -46,14 +46,6 @@ async function saveEvidence(page: Page, filename: string, fullPage = false) {
   await page.screenshot({ path: path.join(evidenceDirectory, filename), fullPage })
 }
 
-async function login(page: Page, email: string, password: string, base = centerBase) {
-  await page.goto(`${base}/ingresar`)
-  await page.getByLabel('Correo electrónico').fill(email)
-  await page.getByLabel('Contraseña').fill(password)
-  await page.getByRole('button', { name: 'Ingresar', exact: true }).click()
-  await expect(page).toHaveURL(new RegExp(`${base}/?$`))
-}
-
 async function registerFictionalPatient(page: Page, patient: FictionalPatient, evidencePrefix?: string, base = centerBase) {
   await page.goto(`${base}/crear-cuenta`)
   await expect(page.getByRole('heading', { name: 'Crear cuenta de paciente' })).toBeVisible()
@@ -302,7 +294,7 @@ test('Reserva · una fecha sin disponibilidad no permite avanzar ni enviar la ci
   const patient = makeFictionalPatient()
   await registerFictionalPatient(page, patient)
   await chooseBookingCatalog(page)
-  const date = await findDateWithoutAvailability(page, 1, 21)
+  await findDateWithoutAvailability(page, 1, 21)
   await expect(page.getByText('No hay horas disponibles para este día.')).toBeVisible()
   await expect(page.getByRole('status')).toBeHidden()
 

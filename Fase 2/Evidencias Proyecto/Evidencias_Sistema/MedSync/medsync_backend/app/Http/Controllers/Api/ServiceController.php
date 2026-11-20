@@ -4,7 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Center\Service;
-use App\Models\Center\ServicePrice;
+use App\Models\Core\PlatformService;
+use App\Services\Billing\EffectiveServicePrice;
 use App\Services\Appointments\AppointmentService;
 use App\Support\TenantContext;
 use Illuminate\Http\Request;
@@ -16,7 +17,8 @@ class ServiceController extends Controller
     public function __construct(
         private readonly AppointmentService $appointmentService,
         private readonly TenantContext $tenantContext,
-        private readonly CenterSpecialtyCatalog $specialtyCatalog
+        private readonly CenterSpecialtyCatalog $specialtyCatalog,
+        private readonly EffectiveServicePrice $effectivePrices
     ) {
     }
 
@@ -118,6 +120,45 @@ class ServiceController extends Controller
         ], 201);
     }
 
+    /** Creates a local offering linked to a global catalog entry. */
+    public function adopt(Request $request)
+    {
+        $this->ensureAdmin();
+        $data = $request->validate([
+            'platform_service_id' => ['required', 'integer'],
+            'specialty_id' => ['required', 'integer'],
+        ]);
+        $catalog = PlatformService::query()->whereKey($data['platform_service_id'])->where('is_active', true)->firstOrFail();
+        $this->specialtyCatalog->ensureAvailable((int) $data['specialty_id']);
+        if (Service::query()->where('platform_service_id', $catalog->id)->exists()) {
+            throw ValidationException::withMessages(['platform_service_id' => 'Esta prestación ya está habilitada en el centro.']);
+        }
+        $this->ensureNameAvailable((int) $data['specialty_id'], $catalog->name);
+        $service = Service::create([
+            'platform_service_id' => $catalog->id, 'specialty_id' => $data['specialty_id'],
+            'name' => $catalog->name, 'description' => null,
+            'duration_minutes' => $catalog->duration_minutes, 'is_active' => true,
+        ]);
+        return response()->json(['data' => $this->presentService($service->load('specialty'), true)], 201);
+    }
+
+    /** Links an existing center service without rewriting its historical prices or bookings. */
+    public function linkPlatform(Request $request, int $service)
+    {
+        $this->ensureAdmin();
+        $data = $request->validate(['platform_service_id' => ['required', 'integer']]);
+        $catalog = PlatformService::query()->whereKey($data['platform_service_id'])->where('is_active', true)->firstOrFail();
+        $local = Service::findOrFail($service);
+        if ($local->platform_service_id && (int) $local->platform_service_id !== $catalog->id) {
+            throw ValidationException::withMessages(['platform_service_id' => 'Esta prestación ya está vinculada a otra prestación global.']);
+        }
+        if (Service::query()->where('platform_service_id', $catalog->id)->whereKeyNot($local->id)->exists()) {
+            throw ValidationException::withMessages(['platform_service_id' => 'Otra prestación del centro ya usa esta referencia global.']);
+        }
+        $local->update(['platform_service_id' => $catalog->id]);
+        return response()->json(['data' => $this->presentService($local->fresh('specialty'), true)]);
+    }
+
     /**
      * PATCH /api/v1/services/{service}
      *
@@ -210,6 +251,7 @@ class ServiceController extends Controller
             'description' => $service->description,
             'duration_minutes' => $service->duration_minutes,
             'current_price_clp' => $this->priceForDate($service->id, now()->toDateString()),
+            'platform_service_id' => $service->platform_service_id,
             'specialty' => $service->specialty ? [
                 'id' => $service->specialty->id,
                 'name' => $service->specialty->name,
@@ -226,11 +268,7 @@ class ServiceController extends Controller
 
     private function priceForDate(int $serviceId, string $date): ?int
     {
-        $price = ServicePrice::query()->where('service_id', $serviceId)
-            ->whereDate('effective_from', '<=', $date)
-            ->where(fn ($query) => $query->whereNull('effective_to')->orWhereDate('effective_to', '>=', $date))
-            ->orderByDesc('effective_from')->first();
-
-        return $price ? (int) $price->amount_clp : null;
+        $service = Service::findOrFail($serviceId);
+        return $this->effectivePrices->forDate($service, $date)['amount_clp'] ?? null;
     }
 }
