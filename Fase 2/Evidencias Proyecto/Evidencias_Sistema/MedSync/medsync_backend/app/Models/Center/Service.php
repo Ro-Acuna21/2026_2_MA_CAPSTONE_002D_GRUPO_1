@@ -24,6 +24,7 @@ class Service extends Model
         'duration_minutes',
         'is_active',
         'platform_service_id',
+        'category',
     ];
 
     protected function casts(): array

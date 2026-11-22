@@ -334,6 +334,7 @@ export interface BackendService {
   is_active?: boolean;
   specialty_id?: number;
   platform_service_id?: number | null;
+  category?: 'CONSULTATION' | 'EXAM' | 'DIAGNOSIS' | null;
 }
 
 export interface ServicesResponse {
@@ -362,6 +363,7 @@ export const specialtyApi = {
 
 export interface ServicePayload {
   specialty_id: number;
+  category: 'CONSULTATION' | 'EXAM' | 'DIAGNOSIS';
   name: string;
   description?: string | null;
   duration_minutes: number;

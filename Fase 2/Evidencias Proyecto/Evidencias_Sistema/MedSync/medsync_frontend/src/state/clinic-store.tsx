@@ -171,6 +171,7 @@ function mapBackendService(
     name: item.name,
     duration: item.duration_minutes,
     active: item.is_active ?? true,
+    category: item.category ?? null,
   };
 }
 
@@ -2252,6 +2253,7 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
       }
       if (
         !input.name?.trim() ||
+        !['CONSULTATION', 'EXAM', 'DIAGNOSIS'].includes(input.category ?? '') ||
         !data.specialties.some(
           (specialty) => specialty.id === input.specialtyId && specialty.active,
         ) ||
@@ -2260,7 +2262,7 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
         Number(input.duration) > 480
       ) {
         throw new Error(
-          "Revisa nombre, especialidad y duración (5 a 480 minutos).",
+          "Revisa nombre, categoría, especialidad y duración (5 a 480 minutos).",
         );
       }
 
@@ -2270,6 +2272,7 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
 
       const payload = {
         specialty_id: Number(input.specialtyId),
+        category: input.category as 'CONSULTATION' | 'EXAM' | 'DIAGNOSIS',
         name: input.name.trim(),
         duration_minutes: Number(input.duration),
         is_active: input.active !== "false",

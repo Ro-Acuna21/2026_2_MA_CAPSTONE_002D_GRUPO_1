@@ -8,6 +8,7 @@ use App\Models\Core\PlatformService;
 use App\Models\Core\PlatformServicePrice;
 use App\Services\Billing\EffectiveServicePrice;
 use App\Support\TenantContext;
+use App\Support\BusinessDate;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -32,7 +33,7 @@ class PlatformServiceController extends Controller
                 $item = $this->present($service);
                 $local = $linked->get($service->id);
                 $item['center_service_id'] = $local?->id;
-                $item['effective_price_clp'] = $local ? ($this->prices->forDate($local, today()->toDateString())['amount_clp'] ?? null) : $item['base_price_clp'];
+                $item['effective_price_clp'] = $local ? ($this->prices->forDate($local, BusinessDate::today())['amount_clp'] ?? null) : $item['base_price_clp'];
                 return $item;
             })]);
     }
@@ -74,9 +75,12 @@ class PlatformServiceController extends Controller
         abort_unless($request->user()?->isSuperAdmin(), 403);
         $data = $request->validate([
             'amount_clp' => ['required', 'integer', 'min:0', 'max:999999999'],
-            'effective_from' => ['required', 'date_format:Y-m-d', 'after_or_equal:today'],
+            'effective_from' => ['required', 'date_format:Y-m-d'],
             'effective_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:effective_from'],
         ]);
+        if ($data['effective_from'] < BusinessDate::today()) {
+            throw ValidationException::withMessages(['effective_from' => 'La vigencia debe comenzar hoy o en una fecha futura de Chile.']);
+        }
         $price = DB::connection('core')->transaction(function () use ($service, $data) {
             PlatformService::query()->whereKey($service->id)->lockForUpdate()->firstOrFail();
             $overlap = PlatformServicePrice::query()->where('platform_service_id', $service->id)
@@ -91,7 +95,10 @@ class PlatformServiceController extends Controller
     public function closePrice(Request $request, PlatformServicePrice $price)
     {
         abort_unless($request->user()?->isSuperAdmin(), 403);
-        $data = $request->validate(['effective_to' => ['required', 'date_format:Y-m-d', 'after_or_equal:today']]);
+        $data = $request->validate(['effective_to' => ['required', 'date_format:Y-m-d']]);
+        if ($data['effective_to'] < BusinessDate::today()) {
+            throw ValidationException::withMessages(['effective_to' => 'La vigencia solo puede cerrarse desde hoy en Chile o una fecha futura.']);
+        }
         abort_unless($price->effective_to === null && $price->effective_from->toDateString() <= $data['effective_to'], 422);
         $price->update($data);
         return response()->json(['data' => $price->refresh()]);
@@ -100,8 +107,9 @@ class PlatformServiceController extends Controller
     private function present(PlatformService $service): array
     {
         $prices = PlatformServicePrice::query()->where('platform_service_id', $service->id)->orderByDesc('effective_from')->get();
-        $current = $prices->first(fn ($item) => $item->effective_from->toDateString() <= today()->toDateString()
-            && ($item->effective_to === null || $item->effective_to->toDateString() >= today()->toDateString()));
+        $businessDate = BusinessDate::today();
+        $current = $prices->first(fn ($item) => $item->effective_from->toDateString() <= $businessDate
+            && ($item->effective_to === null || $item->effective_to->toDateString() >= $businessDate));
         return ['id' => $service->id, 'name' => $service->name, 'category' => $service->category,
             'duration_minutes' => $service->duration_minutes, 'is_active' => $service->is_active,
             'base_price_clp' => $current?->amount_clp, 'prices' => $prices];

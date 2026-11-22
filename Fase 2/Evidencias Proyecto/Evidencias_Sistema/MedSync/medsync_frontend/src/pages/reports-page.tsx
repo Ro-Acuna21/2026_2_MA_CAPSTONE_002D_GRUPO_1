@@ -8,9 +8,10 @@ import { Field, Input, Select } from '@/components/ui/form-controls'
 import { Button } from '@/components/ui/button'
 import { firstApiErrorMessage, professionalApi, serviceApi, type BackendProfessional, type BackendService } from '@/services/http'
 import { priceApi, reportApi, type ReportSummary, type ServicePrice } from '@/services/results-reports-api'
+import { businessDateAt } from '@/lib/business-date'
 const clp = new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 })
-const today = () => new Date().toISOString().slice(0, 10)
-const yearStart = () => `${new Date().getFullYear()}-01-01`
+const today = businessDateAt
+const yearStart = () => `${today().slice(0, 4)}-01-01`
 function Bars({ title, items }: { title: string; items: { label: string; total: number }[] }) {
   const max = Math.max(1, ...items.map((item) => item.total))
   return <Card><CardHeader><CardTitle>{title}</CardTitle></CardHeader><CardContent className="grid gap-4">{items.length ? items.map((item) => <div key={item.label}><div className="flex justify-between gap-2 text-sm"><span>{item.label}</span><strong>{item.total}</strong></div><div className="mt-2 h-2 rounded bg-muted"><div className="h-2 rounded bg-primary" style={{ width: `${100 * item.total / max}%` }} /></div></div>) : <p className="text-sm text-muted-foreground">Sin datos para este período.</p>}</CardContent></Card>
@@ -70,7 +71,7 @@ export function ReportsPage({ commercial = false, prices = false }: { commercial
     ].map(([label, value]) => <Card key={label}><CardContent className="p-5"><p className="text-xs text-muted-foreground">{label}</p><strong className="mt-2 block text-xl">{value}</strong></CardContent></Card>)}</section>
       <section className="grid gap-5 lg:grid-cols-2"><Bars title="Citas por mes" items={summary.months.map((m) => ({ label: m.month, total: m.bookings }))} /><Bars title="Ingresos estimados por mes (CLP)" items={summary.months.map((m) => ({ label: m.month, total: m.total }))} /><Bars title="Citas por prestación" items={summary.services.map((s) => ({ label: s.label, total: s.bookings }))} /><Bars title="Ingresos estimados por profesional (CLP)" items={summary.professionals.map((p) => ({ label: p.label, total: p.revenue }))} /></section>
     </>}
-    {prices && <Card className="mt-6"><CardHeader><CardTitle>Precios por prestación e historial</CardTitle></CardHeader><CardContent><form onSubmit={createPrice} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    {prices && <Card className="mt-6"><CardHeader><CardTitle>Precios por prestación e historial</CardTitle><p className="text-sm text-muted-foreground">Las fechas corresponden al calendario de Chile. Los períodos incluyen tanto el día de inicio como el de término; para evitar cruces, cierra el precio anterior el día previo al inicio del nuevo.</p></CardHeader><CardContent><form onSubmit={createPrice} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       <Field label="Prestación"><Select required value={priceServiceId} onChange={(e) => setPriceServiceId(e.target.value)}><option value="">Seleccionar</option>{services.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</Select></Field>
       <Field label="Precio CLP"><Input required type="number" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} /></Field>
       <Field label="Vigente desde"><Input required type="date" value={effectiveFrom} onChange={(e) => setEffectiveFrom(e.target.value)} /></Field>

@@ -8,6 +8,7 @@ use App\Models\Center\Patient;
 use App\Models\Center\Service;
 use App\Services\Billing\EffectiveServicePrice;
 use App\Support\TenantContext;
+use App\Support\BusinessDate;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -62,7 +63,7 @@ class PatientBillingController extends Controller
                 throw ValidationException::withMessages(['service_id' => ['Esta prestación ya fue registrada en la cita.']]);
             }
             Service::query()->whereKey($service->id)->lockForUpdate()->firstOrFail();
-            $price = $this->prices->forDate($service, today()->toDateString());
+            $price = $this->prices->forDate($service, BusinessDate::today());
             if (!$price) throw ValidationException::withMessages(['service_id' => ['La prestación no tiene un precio vigente en este centro.']]);
             $id = DB::connection('center')->table('care_indications')->insertGetId([
                 'appointment_id' => $locked->id, 'patient_id' => $locked->patient_id,

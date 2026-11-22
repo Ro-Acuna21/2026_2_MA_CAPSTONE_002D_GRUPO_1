@@ -183,6 +183,15 @@ function CatalogForm({
       )}
       {kind === "service" && (
         <>
+          <Field label="Categoría de la prestación">
+            <Select name="category" defaultValue={service?.category ?? ""} required>
+              <option value="">Seleccionar categoría</option>
+              <option value="CONSULTATION">Consulta</option>
+              <option value="EXAM">Examen</option>
+              <option value="DIAGNOSIS">Diagnóstico</option>
+            </Select>
+            {!service?.category && <p className="text-xs text-muted-foreground">Selecciona una categoría para guardar la prestación. Las prestaciones antiguas deben clasificarse antes de vincularlas al catálogo global.</p>}
+          </Field>
           <Field label="Especialidad">
             <Select
               name="specialtyId"
@@ -539,7 +548,7 @@ export function AdminPage() {
             {catalogLoad.status === 'ready' && data.services.map((s) => (
               <details className="mb-2 rounded-lg border p-3" key={s.id}>
                 <summary className="cursor-pointer">
-                  Prestación · {s.name} · {s.duration} min
+                Prestación · {s.name} · {s.duration} min · {s.category === 'CONSULTATION' ? 'Consulta' : s.category === 'EXAM' ? 'Examen' : s.category === 'DIAGNOSIS' ? 'Diagnóstico' : 'Sin categoría'}
                 </summary>
                 <div className="mt-4">
                   <CatalogForm kind="service" item={s} />

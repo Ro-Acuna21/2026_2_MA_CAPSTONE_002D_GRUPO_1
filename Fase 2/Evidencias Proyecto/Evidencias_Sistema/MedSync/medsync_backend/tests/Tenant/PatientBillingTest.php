@@ -18,7 +18,7 @@ function prepareBillingTenant(string $path): void
     $schema = Schema::connection('center');
     $schema->create('patients', function (Blueprint $t) { $t->id(); $t->string('first_name'); $t->string('last_name'); $t->string('rut'); $t->string('email')->nullable(); $t->unsignedBigInteger('user_id')->nullable(); $t->boolean('is_active')->default(true); $t->timestamps(); $t->softDeletes(); });
     $schema->create('professionals', function (Blueprint $t) { $t->id(); $t->string('first_name'); $t->string('last_name'); $t->timestamps(); $t->softDeletes(); });
-    $schema->create('services', function (Blueprint $t) { $t->id(); $t->string('name'); $t->boolean('is_active')->default(true); $t->timestamps(); });
+    $schema->create('services', function (Blueprint $t) { $t->id(); $t->string('name'); $t->string('category')->nullable(); $t->boolean('is_active')->default(true); $t->timestamps(); });
     $schema->create('appointments', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('patient_id'); $t->unsignedBigInteger('professional_id'); $t->unsignedBigInteger('service_id'); $t->string('status'); $t->timestamps(); });
     $schema->create('service_prices', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('service_id'); $t->unsignedBigInteger('amount_clp'); $t->date('effective_from'); $t->date('effective_to')->nullable(); $t->timestamps(); });
     (require database_path('migrations/center/2026_11_14_000001_create_patient_billing_tables.php'))->up();
@@ -26,7 +26,7 @@ function prepareBillingTenant(string $path): void
     $now = now();
     DB::connection('center')->table('patients')->insert(['id'=>1,'first_name'=>'Ana','last_name'=>'Soto','rut'=>'12345678-5','created_at'=>$now,'updated_at'=>$now]);
     DB::connection('center')->table('professionals')->insert([['id'=>1,'first_name'=>'Dra','last_name'=>'Uno','created_at'=>$now,'updated_at'=>$now], ['id'=>2,'first_name'=>'Dr','last_name'=>'Dos','created_at'=>$now,'updated_at'=>$now]]);
-    DB::connection('center')->table('services')->insert([['id'=>1,'name'=>'Consulta','is_active'=>true,'created_at'=>$now,'updated_at'=>$now], ['id'=>2,'name'=>'Examen','is_active'=>true,'created_at'=>$now,'updated_at'=>$now]]);
+    DB::connection('center')->table('services')->insert([['id'=>1,'name'=>'Consulta','category'=>'CONSULTATION','is_active'=>true,'created_at'=>$now,'updated_at'=>$now], ['id'=>2,'name'=>'Examen','category'=>'EXAM','is_active'=>true,'created_at'=>$now,'updated_at'=>$now]]);
     DB::connection('center')->table('appointments')->insert(['id'=>1,'patient_id'=>1,'professional_id'=>1,'service_id'=>1,'status'=>'ATENDIDA','created_at'=>$now,'updated_at'=>$now]);
     DB::connection('center')->table('service_prices')->insert(['service_id'=>2,'amount_clp'=>10000,'effective_from'=>today()->subDay(),'created_at'=>$now,'updated_at'=>$now]);
 }
@@ -103,6 +103,35 @@ it('uses the Core base price when the center has no override and preserves it in
     $this->actingAs($this->patient, 'sanctum')->withSession($session)
         ->getJson('/api/v1/billing/mine')->assertJsonPath('data.charges.0.amount_clp', 18000)
         ->assertJsonPath('data.charges.0.payment_status', 'PENDING');
+});
+
+it('requires matching local and global categories when linking services', function () {
+    $catalog = PlatformService::create(['name' => 'Consulta global', 'category' => 'CONSULTATION', 'duration_minutes' => 30]);
+    $session = ['active_medical_center_id' => $this->center->id];
+
+    $this->actingAs($this->admin, 'sanctum')->withHeader('Origin', 'http://localhost:3000')->withSession($session)
+        ->patchJson('/api/v1/services/2/platform-link', ['platform_service_id' => $catalog->id])
+        ->assertUnprocessable()
+        ->assertJsonPath('errors.platform_service_id.0', 'Las categorías no coinciden. Solo puedes vincular prestaciones de la misma categoría.');
+
+    $this->patchJson('/api/v1/services/1/platform-link', ['platform_service_id' => $catalog->id])->assertOk()
+        ->assertJsonPath('data.platform_service_id', $catalog->id)
+        ->assertJsonPath('data.category', 'CONSULTATION');
+});
+
+it('does not apply a global base price if linked service category later drifts', function () {
+    $catalog = PlatformService::create(['name' => 'Examen global con tarifa', 'category' => 'EXAM', 'duration_minutes' => 30]);
+    PlatformServicePrice::create(['platform_service_id' => $catalog->id, 'amount_clp' => 18000,
+        'effective_from' => today()->subDay()->toDateString()]);
+    $session = ['active_medical_center_id' => $this->center->id];
+    $this->actingAs($this->admin, 'sanctum')->withHeader('Origin', 'http://localhost:3000')->withSession($session)
+        ->patchJson('/api/v1/services/2/platform-link', ['platform_service_id' => $catalog->id])->assertOk();
+
+    $superAdmin = User::create(['name' => 'Superadmin', 'email' => uniqid().'@example.test', 'password' => 'Password123', 'system_role' => 'SUPER_ADMIN', 'is_active' => true]);
+    $this->actingAs($superAdmin, 'sanctum')->patchJson("/api/v1/platform/services/{$catalog->id}", ['category' => 'DIAGNOSIS'])->assertOk();
+    $response = $this->actingAs($this->admin, 'sanctum')->withSession($session)->getJson('/api/v1/center/platform-services')->assertOk();
+    $linked = collect($response->json('data'))->firstWhere('id', $catalog->id);
+    expect($linked['effective_price_clp'])->toBeNull();
 });
 
 afterEach(function () {
