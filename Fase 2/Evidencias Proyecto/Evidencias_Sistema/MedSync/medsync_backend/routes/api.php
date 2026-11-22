@@ -23,6 +23,7 @@ use App\Http\Controllers\Api\ResultTypeController;
 use App\Http\Controllers\Api\ServicePriceController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\PatientBillingController;
+use App\Http\Controllers\Api\PlatformServiceController;
 use App\Http\Controllers\Api\PlanController;
 use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\CommercialInquiryController;
@@ -67,9 +68,15 @@ Route::middleware('auth:sanctum')->prefix('v1/platform')->group(function () {
     Route::get('/specialties', [PlatformSpecialtyController::class, 'index']);
     Route::post('/specialties', [PlatformSpecialtyController::class, 'store']);
     Route::patch('/specialties/{specialty}', [PlatformSpecialtyController::class, 'update'])->whereNumber('specialty');
+    Route::get('/services', [PlatformServiceController::class, 'index']);
+    Route::post('/services', [PlatformServiceController::class, 'store']);
+    Route::patch('/services/{service}', [PlatformServiceController::class, 'update'])->whereNumber('service');
+    Route::post('/services/{service}/prices', [PlatformServiceController::class, 'price'])->whereNumber('service');
+    Route::patch('/service-prices/{price}/close', [PlatformServiceController::class, 'closePrice'])->whereNumber('price');
 });
 
 Route::middleware(['auth:sanctum', 'tenant.center'])->group(function () {
+    Route::get('/v1/center/platform-services', [PlatformServiceController::class, 'centerIndex']);
     Route::get('/v1/center/subscription', [SubscriptionController::class, 'centerShow']);
     Route::get('/v1/center/permissions', CenterPermissionCatalogController::class);
     Route::get('/v1/center/receptionists', [CenterAccessController::class, 'centerIndex']);
@@ -91,8 +98,10 @@ Route::middleware(['auth:sanctum', 'tenant.center'])->group(function () {
     Route::delete('/v1/service-prices/{price}', [ServicePriceController::class, 'destroy'])->whereNumber('price');
     Route::get('/v1/reports/summary', ReportController::class);
     Route::get('/v1/billing/summary', [PatientBillingController::class, 'summary']);
+    Route::get('/v1/billing/mine', [PatientBillingController::class, 'mine']);
     Route::get('/v1/appointments/{appointment}/indications', [PatientBillingController::class, 'appointment'])->whereNumber('appointment');
     Route::post('/v1/appointments/{appointment}/indications', [PatientBillingController::class, 'indicate'])->whereNumber('appointment');
+    Route::post('/v1/appointments/{appointment}/charges', [PatientBillingController::class, 'charge'])->whereNumber('appointment');
     Route::post('/v1/billing/indications/{indication}/confirm', [PatientBillingController::class, 'confirm'])->whereNumber('indication');
     Route::post('/v1/billing/indications/{indication}/void', [PatientBillingController::class, 'voidIndication'])->whereNumber('indication');
     Route::post('/v1/billing/patients/{patient}/payments', [PatientBillingController::class, 'pay'])->whereNumber('patient');
@@ -126,6 +135,8 @@ Route::middleware(['auth:sanctum', 'tenant.center'])->group(function () {
     // Administración del centro: especialidades (API local heredada) y prestaciones.
     Route::get('/v1/specialties', [SpecialtyController::class, 'index']);
     Route::post('/v1/services', [ServiceController::class, 'store']);
+    Route::post('/v1/services/from-platform', [ServiceController::class, 'adopt']);
+    Route::patch('/v1/services/{service}/platform-link', [ServiceController::class, 'linkPlatform'])->whereNumber('service');
     Route::patch('/v1/services/{service}', [ServiceController::class, 'update'])->whereNumber('service');
 
     // Selección del centro en el catálogo global: el centro solo activa o

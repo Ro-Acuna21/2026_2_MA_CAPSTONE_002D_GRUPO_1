@@ -28,6 +28,11 @@ export interface PatientPayment {
   reference: string | null
   created_at: string
 }
+export interface BillingCharge {
+  id: number; appointment_id: number; patient_id: number; service_id: number
+  service_name: string; amount_clp: number; paid_clp: number; balance_clp: number
+  payment_status: 'PENDING' | 'PARTIAL' | 'PAID'; confirmed_at: string
+}
 export interface BillingSummary {
   charged_clp: number
   paid_clp: number
@@ -36,6 +41,7 @@ export interface BillingSummary {
   patients: PatientBalance[]
   indications: CareIndication[]
   payments: PatientPayment[]
+  charges: BillingCharge[]
 }
 
 const post = <T>(url: string, body?: object) => apiRequest<{ data: T }>(url, {
@@ -45,9 +51,11 @@ const post = <T>(url: string, body?: object) => apiRequest<{ data: T }>(url, {
 export const patientBillingApi = {
   appointment: (appointmentId: number) => apiRequest<{ data: CareIndication[] }>(`/api/v1/appointments/${appointmentId}/indications`),
   indicate: (appointmentId: number, serviceId: number) => post<CareIndication>(`/api/v1/appointments/${appointmentId}/indications`, { service_id: serviceId }),
+  charge: (appointmentId: number, serviceId: number) => post<CareIndication>(`/api/v1/appointments/${appointmentId}/charges`, { service_id: serviceId }),
   summary: () => apiRequest<{ data: BillingSummary }>('/api/v1/billing/summary'),
+  mine: () => apiRequest<{ data: {charged_clp: number; paid_clp: number; balance_clp: number; charges: BillingCharge[]} }>('/api/v1/billing/mine'),
   confirm: (id: number) => post<CareIndication>(`/api/v1/billing/indications/${id}/confirm`),
   voidIndication: (id: number, reason: string) => post<CareIndication>(`/api/v1/billing/indications/${id}/void`, { reason }),
-  pay: (patientId: number, input: { amount_clp: number; method: PatientPayment['method']; reference?: string }) => post<PatientPayment>(`/api/v1/billing/patients/${patientId}/payments`, input),
+  pay: (patientId: number, input: { amount_clp: number; method: PatientPayment['method']; reference?: string; allocations?: {care_indication_id: number; amount_clp: number}[] }) => post<PatientPayment>(`/api/v1/billing/patients/${patientId}/payments`, input),
   voidPayment: (id: number, reason: string) => post<PatientPayment>(`/api/v1/billing/payments/${id}/void`, { reason }),
 }

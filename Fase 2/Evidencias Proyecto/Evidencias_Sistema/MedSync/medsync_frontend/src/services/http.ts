@@ -333,6 +333,7 @@ export interface BackendService {
   // paciente.
   is_active?: boolean;
   specialty_id?: number;
+  platform_service_id?: number | null;
 }
 
 export interface ServicesResponse {
@@ -380,6 +381,11 @@ export const serviceApi = {
     apiRequest<ServiceResponse>("/api/v1/services", {
       method: "POST",
       body: JSON.stringify(payload),
+    }),
+
+  linkPlatform: (id: number, platform_service_id: number) =>
+    apiRequest<ServiceResponse>(`/api/v1/services/${id}/platform-link`, {
+      method: 'PATCH', body: JSON.stringify({platform_service_id}),
     }),
 
   update: (id: number, payload: Partial<ServicePayload>) =>

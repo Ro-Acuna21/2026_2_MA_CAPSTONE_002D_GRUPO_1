@@ -10,6 +10,7 @@ import { PatientAddressFields } from '@/components/patient-address-fields'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Field, Input, Select } from '@/components/ui/form-controls'
+import { RutInput } from '@/components/rut-input'
 import { firstApiErrorMessage } from '@/services/http'
 import { platformCenterApi, type CenterInput, type PlatformCenter } from '@/services/platform-center-api'
 import { PlatformSubscription } from '@/components/platform-subscription'
@@ -36,7 +37,7 @@ function CenterForm({ center, onSaved }: { center?: PlatformCenter; onSaved: (in
   }}>
     <Field label="Nombre del centro"><Input name="name" defaultValue={center?.name} required minLength={3} maxLength={150} /></Field>
     <Field label="Dirección del centro en la plataforma"><Input name="slug" defaultValue={center?.slug} pattern="[a-z0-9]+(-[a-z0-9]+)*" required maxLength={150} /></Field>
-    <Field label="RUT del centro"><Input name="rut" defaultValue={center?.rut} required placeholder="12.345.678-5" /></Field>
+    <Field label="RUT del centro"><RutInput defaultValue={center?.rut} /></Field>
     <Field label="Correo de contacto"><Input name="email" type="email" defaultValue={center?.email ?? ''} /></Field>
     <Field label="Teléfono"><Input name="phone" defaultValue={center?.phone ?? ''} /></Field>
     <PatientAddressFields address={center?.address_line} region={center?.region} commune={center?.commune} preserveLegacy />

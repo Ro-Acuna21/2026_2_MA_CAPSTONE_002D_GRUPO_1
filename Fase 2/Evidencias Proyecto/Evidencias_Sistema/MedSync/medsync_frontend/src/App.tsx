@@ -32,6 +32,7 @@ import { PublicPlansPage } from "@/pages/public-plans-page";
 import { PlatformInquiriesPage } from "@/pages/platform-inquiries-page";
 import { PatientBillingPage } from "@/pages/patient-billing-page";
 import { PlatformReportsPage } from "@/pages/platform-reports-page";
+import { PlatformServicesPage } from "@/pages/platform-services-page";
 
 function PlatformProtectedRoute() {
   const { user, organization, authLoading } = useClinic();
@@ -120,6 +121,7 @@ export default function App() {
           <Route path="/plataforma/solicitudes" element={<PlatformInquiriesPage />} />
           <Route path="/plataforma/especialidades" element={<PlatformSpecialtiesPage />} />
           <Route path="/plataforma/reportes" element={<PlatformReportsPage />} />
+          <Route path="/plataforma/prestaciones" element={<PlatformServicesPage />} />
         </Route>
       </Route>
       <Route path="/centro/:centerSlug" element={<CenterProtectedRoute />}>
