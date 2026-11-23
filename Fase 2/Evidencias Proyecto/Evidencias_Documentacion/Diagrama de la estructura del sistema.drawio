@@ -1,0 +1,46 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="Estructura MedSync" id="NPf3HKdrVtdYs6qf3X5x">
+    <mxGraphModel dx="1670" dy="739" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="i_e32e0hN0TMEC8srrHR-14" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#9AABB5;strokeWidth=2;dashed=1;verticalAlign=top;align=center;spacingTop=16;spacingLeft=24;fontSize=20;fontStyle=1;fontColor=#17324D;" value="MedSync" vertex="1">
+          <mxGeometry height="660" width="1310" x="260" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="i_e32e0hN0TMEC8srrHR-15" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F0F7F6;strokeColor=#62A39C;strokeWidth=2;fontColor=#17324D;fontSize=15;align=center;verticalAlign=middle;spacing=10;shadow=1;" value="&lt;b&gt;Usuario de MedSync&lt;/b&gt;&lt;br&gt;Paciente · personal&lt;br&gt;Administradores" vertex="1">
+          <mxGeometry height="105" width="210" x="10" y="312.5" as="geometry" />
+        </mxCell>
+        <mxCell id="i_e32e0hN0TMEC8srrHR-16" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#137C78;strokeColor=#0F625F;strokeWidth=2;fontColor=#FFFFFF;fontSize=16;align=center;verticalAlign=middle;spacing=12;shadow=1;" value="&lt;b&gt;CUENTAS Y ACCESO&lt;/b&gt;&lt;br&gt;Sesión · centro activo · permisos" vertex="1">
+          <mxGeometry height="130" width="270" x="320" y="300" as="geometry" />
+        </mxCell>
+        <mxCell id="i_e32e0hN0TMEC8srrHR-17" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8FAFC;strokeColor=#A6B6BF;strokeWidth=1.5;verticalAlign=top;align=left;spacingTop=14;spacingLeft=18;fontSize=16;fontStyle=1;fontColor=#17324D;" value="Módulos funcionales" vertex="1">
+          <mxGeometry height="410" width="850" x="630" y="170" as="geometry" />
+        </mxCell>
+        <mxCell id="i_e32e0hN0TMEC8srrHR-18" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EAF0F8;strokeColor=#496B91;strokeWidth=2;fontColor=#17324D;fontSize=14;align=center;verticalAlign=middle;spacing=10;shadow=1;" value="&lt;b&gt;ADMINISTRACIÓN&lt;/b&gt;&lt;br&gt;Centros · especialidades&lt;br&gt;Servicios · profesionales" vertex="1">
+          <mxGeometry height="140" width="215" x="670" y="300" as="geometry" />
+        </mxCell>
+        <mxCell id="i_e32e0hN0TMEC8srrHR-19" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EAF0F8;strokeColor=#496B91;strokeWidth=2;fontColor=#17324D;fontSize=14;align=center;verticalAlign=middle;spacing=10;shadow=1;" value="&lt;b&gt;GESTIÓN CLÍNICA Y AGENDA&lt;/b&gt;&lt;br&gt;Pacientes · disponibilidad&lt;br&gt;Citas" vertex="1">
+          <mxGeometry height="140" width="215" x="960" y="300" as="geometry" />
+        </mxCell>
+        <mxCell id="i_e32e0hN0TMEC8srrHR-20" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EAF0F8;strokeColor=#496B91;strokeWidth=2;fontColor=#17324D;fontSize=14;align=center;verticalAlign=middle;spacing=10;shadow=1;" value="&lt;b&gt;ATENCIÓN Y REPORTES&lt;/b&gt;&lt;br&gt;Resultados · cobros&lt;br&gt;Informes" vertex="1">
+          <mxGeometry height="140" width="215" x="1250" y="300" as="geometry" />
+        </mxCell>
+        <mxCell id="i_e32e0hN0TMEC8srrHR-21" edge="1" parent="1" source="i_e32e0hN0TMEC8srrHR-15" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#137C78;strokeWidth=2;endArrow=block;endFill=1;fontColor=#365A62;fontSize=12;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" target="i_e32e0hN0TMEC8srrHR-16" value="inicia sesión">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="i_e32e0hN0TMEC8srrHR-22" edge="1" parent="1" source="i_e32e0hN0TMEC8srrHR-16" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#66869A;strokeWidth=1.5;dashed=1;endArrow=block;endFill=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" target="i_e32e0hN0TMEC8srrHR-17" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="i_e32e0hN0TMEC8srrHR-23" edge="1" parent="1" source="i_e32e0hN0TMEC8srrHR-18" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#137C78;strokeWidth=2;endArrow=block;endFill=1;fontColor=#365A62;fontSize=12;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" target="i_e32e0hN0TMEC8srrHR-19" value="oferta">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="i_e32e0hN0TMEC8srrHR-24" edge="1" parent="1" source="i_e32e0hN0TMEC8srrHR-19" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#137C78;strokeWidth=2;endArrow=block;endFill=1;fontColor=#365A62;fontSize=12;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" target="i_e32e0hN0TMEC8srrHR-20" value="cita">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="i_e32e0hN0TMEC8srrHR-25" parent="1" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fillColor=none;strokeColor=none;fontColor=#526979;fontSize=12;" value="Flecha punteada: acceso según permisos. Flechas continuas: relación funcional entre módulos." vertex="1">
+          <mxGeometry height="45" width="790" x="660" y="500" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

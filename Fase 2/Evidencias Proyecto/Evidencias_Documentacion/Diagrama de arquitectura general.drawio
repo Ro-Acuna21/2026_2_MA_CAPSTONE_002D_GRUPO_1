@@ -1,0 +1,97 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="Página-1" id="hz2E6CsMRy5t1cvrzAAT">
+    <mxGraphModel dx="1269" dy="562" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <UserObject label="" plantUmlData="{&#xa;  &quot;data&quot;: &quot;@startuml\nleft to right direction\n\nskinparam backgroundColor white\nskinparam shadowing false\nskinparam linetype ortho\nskinparam componentStyle rectangle\nskinparam defaultFontName Arial\nskinparam defaultFontSize 12\nskinparam nodesep 40\nskinparam ranksep 50\nskinparam ArrowColor #137C78\n\nnode \&quot;Equipo cliente\\n«device»\&quot; as Cliente {\n  node \&quot;Navegador web\\n«execution environment»\&quot; as Navegador {\n    artifact \&quot;Interfaz MedSync\\nReact · TypeScript\&quot; as Frontend\n  }\n}\n\nnode \&quot;Servidor de aplicación\\n«device» nodo lógico\&quot; as App {\n  node \&quot;PHP 8.3 · Laravel\\n«execution environment»\&quot; as Backend {\n    component \&quot;Cuentas y acceso\\nSanctum · Spatie\&quot; as C1 #DDF3EF\n    component \&quot;Plataforma y centros\&quot; as C2 #E8F0FA\n    component \&quot;Gestión clínica y agenda\&quot; as C3 #E8F0FA\n    component \&quot;Atención y reportes\&quot; as C4 #E8F0FA\n\n    C1 -[hidden]right- C2\n    C3 -[hidden]right- C4\n    C1 -[hidden]down- C3\n    C2 -[hidden]down- C4\n  }\n}\n\nnode \&quot;Servidor de datos\\n«device» nodo lógico\&quot; as Datos {\n  node \&quot;PostgreSQL\\n«execution environment»\&quot; as Postgres {\n    database \&quot;Core\\nDatos globales\&quot; as Core\n    database \&quot;Center\\nDatos del centro\&quot; as Center\n\n    Core -[hidden]right- Center\n  }\n}\n\nCliente -right-&gt; App : HTTP / JSON\nApp -right-&gt; Datos : TCP/IP · PostgreSQL\n\n@enduml&quot;,&#xa;  &quot;config&quot;: null&#xa;}" id="3jLdwkoL9Bu25V1u1ZX_-1">
+          <mxCell connectable="0" parent="1" style="group;transparentBounds=1;editIcon=1;lockedGroup=0;groupPadding=10;" vertex="1">
+            <mxGeometry as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="Equipo cliente&#xa;«device»" plantUmlId="c_0" plantUmlBaseStyle="shape=cube;size=10;flipH=1;fillColor=none;strokeColor=#181818;verticalAlign=top;align=center;spacingTop=7;spacingRight=10;fontSize=12;fontStyle=1;whiteSpace=wrap;shadow=0;fontFamily=Arial;" plantUmlBaseValue="Equipo cliente&#xa;«device»" id="3jLdwkoL9Bu25V1u1ZX_-2">
+          <mxCell parent="3jLdwkoL9Bu25V1u1ZX_-1" style="shape=cube;size=10;flipH=1;fillColor=none;strokeColor=#181818;verticalAlign=top;align=center;spacingTop=7;spacingRight=10;fontSize=12;fontStyle=1;whiteSpace=wrap;shadow=0;fontFamily=Arial;" vertex="1">
+            <mxGeometry height="188" width="289.56500000000005" x="132.71749999999997" y="30" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="Navegador web&#xa;«execution environment»" plantUmlId="c_1" plantUmlBaseStyle="shape=cube;size=10;flipH=1;fillColor=none;strokeColor=#181818;verticalAlign=top;align=center;spacingTop=7;spacingRight=10;fontSize=12;fontStyle=1;whiteSpace=wrap;shadow=0;fontFamily=Arial;" plantUmlBaseValue="Navegador web&#xa;«execution environment»" id="3jLdwkoL9Bu25V1u1ZX_-3">
+          <mxCell parent="3jLdwkoL9Bu25V1u1ZX_-2" style="shape=cube;size=10;flipH=1;fillColor=none;strokeColor=#181818;verticalAlign=top;align=center;spacingTop=7;spacingRight=10;fontSize=12;fontStyle=1;whiteSpace=wrap;shadow=0;fontFamily=Arial;" vertex="1">
+            <mxGeometry height="117" width="249.56500000000003" x="15.000000000000014" y="55" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="Interfaz MedSync&#xa;React · TypeScript" plantUmlId="n_2" plantUmlBaseStyle="rounded=1;absoluteArcSize=1;arcSize=5;fillColor=#F1F1F1;strokeColor=#181818;fontSize=12;whiteSpace=wrap;spacingRight=10;spacingTop=2;shadow=0;fontFamily=Arial;" plantUmlBaseValue="Interfaz MedSync&#xa;React · TypeScript" id="3jLdwkoL9Bu25V1u1ZX_-4">
+          <mxCell parent="3jLdwkoL9Bu25V1u1ZX_-3" style="rounded=1;absoluteArcSize=1;arcSize=5;fillColor=#F1F1F1;strokeColor=#181818;fontSize=12;whiteSpace=wrap;spacingRight=10;spacingTop=2;shadow=0;fontFamily=Arial;" vertex="1">
+            <mxGeometry height="46" width="152" x="43.78250000000001" y="55" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" plantUmlId="ci_3" plantUmlBaseStyle="shape=note;size=6;fillColor=#F1F1F1;strokeColor=#181818;strokeWidth=0.5;part=1;shadow=0;fontSize=12;fontFamily=Arial;" plantUmlBaseValue="" id="3jLdwkoL9Bu25V1u1ZX_-5">
+          <mxCell parent="3jLdwkoL9Bu25V1u1ZX_-4" style="shape=note;size=6;fillColor=#F1F1F1;strokeColor=#181818;strokeWidth=0.5;part=1;shadow=0;fontSize=12;fontFamily=Arial;" vertex="1">
+            <mxGeometry height="14" relative="1" width="12" x="1" as="geometry">
+              <mxPoint x="-17" y="5" as="offset" />
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="Servidor de aplicación&#xa;«device» nodo lógico" plantUmlId="c_4" plantUmlBaseStyle="shape=cube;size=10;flipH=1;fillColor=none;strokeColor=#181818;verticalAlign=top;align=center;spacingTop=7;spacingRight=10;fontSize=12;fontStyle=1;whiteSpace=wrap;shadow=0;fontFamily=Arial;" plantUmlBaseValue="Servidor de aplicación&#xa;«device» nodo lógico" id="3jLdwkoL9Bu25V1u1ZX_-6">
+          <mxCell parent="3jLdwkoL9Bu25V1u1ZX_-1" style="shape=cube;size=10;flipH=1;fillColor=none;strokeColor=#181818;verticalAlign=top;align=center;spacingTop=7;spacingRight=10;fontSize=12;fontStyle=1;whiteSpace=wrap;shadow=0;fontFamily=Arial;" vertex="1">
+            <mxGeometry height="300" width="495" x="30" y="278" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="PHP 8.3 · Laravel&#xa;«execution environment»" plantUmlId="c_5" plantUmlBaseStyle="shape=cube;size=10;flipH=1;fillColor=none;strokeColor=#181818;verticalAlign=top;align=center;spacingTop=7;spacingRight=10;fontSize=12;fontStyle=1;whiteSpace=wrap;shadow=0;fontFamily=Arial;" plantUmlBaseValue="PHP 8.3 · Laravel&#xa;«execution environment»" id="3jLdwkoL9Bu25V1u1ZX_-7">
+          <mxCell parent="3jLdwkoL9Bu25V1u1ZX_-6" style="shape=cube;size=10;flipH=1;fillColor=none;strokeColor=#181818;verticalAlign=top;align=center;spacingTop=7;spacingRight=10;fontSize=12;fontStyle=1;whiteSpace=wrap;shadow=0;fontFamily=Arial;" vertex="1">
+            <mxGeometry height="229" width="455" x="15" y="55" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="Cuentas y acceso&#xa;Sanctum · Spatie" plantUmlId="n_6" plantUmlBaseStyle="rounded=1;absoluteArcSize=1;arcSize=6;fillColor=#DDF3EF;strokeColor=#181818;fontSize=12;whiteSpace=wrap;shadow=0;fontFamily=Arial;" plantUmlBaseValue="Cuentas y acceso&#xa;Sanctum · Spatie" id="3jLdwkoL9Bu25V1u1ZX_-8">
+          <mxCell parent="3jLdwkoL9Bu25V1u1ZX_-7" style="rounded=1;absoluteArcSize=1;arcSize=6;fillColor=#DDF3EF;strokeColor=#181818;fontSize=12;whiteSpace=wrap;shadow=0;fontFamily=Arial;" vertex="1">
+            <mxGeometry height="49" width="154" x="27" y="55" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="Plataforma y centros" plantUmlId="n_7" plantUmlBaseStyle="rounded=1;absoluteArcSize=1;arcSize=6;fillColor=#E8F0FA;strokeColor=#181818;fontSize=12;whiteSpace=wrap;shadow=0;fontFamily=Arial;" plantUmlBaseValue="Plataforma y centros" id="3jLdwkoL9Bu25V1u1ZX_-9">
+          <mxCell parent="3jLdwkoL9Bu25V1u1ZX_-7" style="rounded=1;absoluteArcSize=1;arcSize=6;fillColor=#E8F0FA;strokeColor=#181818;fontSize=12;whiteSpace=wrap;shadow=0;fontFamily=Arial;" vertex="1">
+            <mxGeometry height="49" width="178" x="15" y="164" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="Gestión clínica y agenda" plantUmlId="n_8" plantUmlBaseStyle="rounded=1;absoluteArcSize=1;arcSize=6;fillColor=#E8F0FA;strokeColor=#181818;fontSize=12;whiteSpace=wrap;shadow=0;fontFamily=Arial;" plantUmlBaseValue="Gestión clínica y agenda" id="3jLdwkoL9Bu25V1u1ZX_-10">
+          <mxCell parent="3jLdwkoL9Bu25V1u1ZX_-7" style="rounded=1;absoluteArcSize=1;arcSize=6;fillColor=#E8F0FA;strokeColor=#181818;fontSize=12;whiteSpace=wrap;shadow=0;fontFamily=Arial;" vertex="1">
+            <mxGeometry height="49" width="202" x="228" y="55" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="Atención y reportes" plantUmlId="n_9" plantUmlBaseStyle="rounded=1;absoluteArcSize=1;arcSize=6;fillColor=#E8F0FA;strokeColor=#181818;fontSize=12;whiteSpace=wrap;shadow=0;fontFamily=Arial;" plantUmlBaseValue="Atención y reportes" id="3jLdwkoL9Bu25V1u1ZX_-11">
+          <mxCell parent="3jLdwkoL9Bu25V1u1ZX_-7" style="rounded=1;absoluteArcSize=1;arcSize=6;fillColor=#E8F0FA;strokeColor=#181818;fontSize=12;whiteSpace=wrap;shadow=0;fontFamily=Arial;" vertex="1">
+            <mxGeometry height="49" width="170" x="244" y="164" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="Servidor de datos&#xa;«device» nodo lógico" plantUmlId="c_10" plantUmlBaseStyle="shape=cube;size=10;flipH=1;fillColor=none;strokeColor=#181818;verticalAlign=top;align=center;spacingTop=7;spacingRight=10;fontSize=12;fontStyle=1;whiteSpace=wrap;shadow=0;fontFamily=Arial;" plantUmlBaseValue="Servidor de datos&#xa;«device» nodo lógico" id="3jLdwkoL9Bu25V1u1ZX_-12">
+          <mxCell parent="3jLdwkoL9Bu25V1u1ZX_-1" style="shape=cube;size=10;flipH=1;fillColor=none;strokeColor=#181818;verticalAlign=top;align=center;spacingTop=7;spacingRight=10;fontSize=12;fontStyle=1;whiteSpace=wrap;shadow=0;fontFamily=Arial;" vertex="1">
+            <mxGeometry height="294" width="289.56500000000005" x="132.71749999999997" y="638" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="PostgreSQL&#xa;«execution environment»" plantUmlId="c_11" plantUmlBaseStyle="shape=cube;size=10;flipH=1;fillColor=none;strokeColor=#181818;verticalAlign=top;align=center;spacingTop=7;spacingRight=10;fontSize=12;fontStyle=1;whiteSpace=wrap;shadow=0;fontFamily=Arial;" plantUmlBaseValue="PostgreSQL&#xa;«execution environment»" id="3jLdwkoL9Bu25V1u1ZX_-13">
+          <mxCell parent="3jLdwkoL9Bu25V1u1ZX_-12" style="shape=cube;size=10;flipH=1;fillColor=none;strokeColor=#181818;verticalAlign=top;align=center;spacingTop=7;spacingRight=10;fontSize=12;fontStyle=1;whiteSpace=wrap;shadow=0;fontFamily=Arial;" vertex="1">
+            <mxGeometry height="223" width="249.56500000000003" x="15.000000000000014" y="55" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="Core&#xa;Datos globales" plantUmlId="n_12" plantUmlBaseStyle="shape=cylinder3;size=10;boundedLbl=1;backgroundOutline=1;fillColor=#F1F1F1;strokeColor=#181818;fontSize=12;whiteSpace=wrap;shadow=0;fontFamily=Arial;" plantUmlBaseValue="Core&#xa;Datos globales" id="3jLdwkoL9Bu25V1u1ZX_-14">
+          <mxCell parent="3jLdwkoL9Bu25V1u1ZX_-13" style="shape=cylinder3;size=10;boundedLbl=1;backgroundOutline=1;fillColor=#F1F1F1;strokeColor=#181818;fontSize=12;whiteSpace=wrap;shadow=0;fontFamily=Arial;" vertex="1">
+            <mxGeometry height="46" width="115" x="62.28250000000001" y="55" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="Center&#xa;Datos del centro" plantUmlId="n_13" plantUmlBaseStyle="shape=cylinder3;size=10;boundedLbl=1;backgroundOutline=1;fillColor=#F1F1F1;strokeColor=#181818;fontSize=12;whiteSpace=wrap;shadow=0;fontFamily=Arial;" plantUmlBaseValue="Center&#xa;Datos del centro" id="3jLdwkoL9Bu25V1u1ZX_-15">
+          <mxCell parent="3jLdwkoL9Bu25V1u1ZX_-13" style="shape=cylinder3;size=10;boundedLbl=1;backgroundOutline=1;fillColor=#F1F1F1;strokeColor=#181818;fontSize=12;whiteSpace=wrap;shadow=0;fontFamily=Arial;" vertex="1">
+            <mxGeometry height="46" width="127" x="56.28250000000001" y="161" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="HTTP / JSON" plantUmlId="e_14" plantUmlBaseStyle="strokeColor=#137C78;fontColor=#000000;fontSize=12;html=1;labelBackgroundColor=#FFFFFF;labelPosition=right;align=left;endArrow=classicThin;endFill=1;fontFamily=Arial;edgeStyle=orthogonalEdgeStyle;curved=0;rounded=0;endSize=6;sourcePerimeterSpacing=0;targetPerimeterSpacing=0;" plantUmlBaseValue="HTTP / JSON" id="3jLdwkoL9Bu25V1u1ZX_-16">
+          <mxCell edge="1" parent="3jLdwkoL9Bu25V1u1ZX_-1" source="3jLdwkoL9Bu25V1u1ZX_-2" style="strokeColor=#137C78;fontColor=#000000;fontSize=12;html=1;labelBackgroundColor=#FFFFFF;labelPosition=right;align=left;endArrow=classicThin;endFill=1;fontFamily=Arial;edgeStyle=orthogonalEdgeStyle;curved=0;rounded=0;endSize=6;sourcePerimeterSpacing=0;targetPerimeterSpacing=0;" target="3jLdwkoL9Bu25V1u1ZX_-6">
+            <mxGeometry relative="1" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="TCP/IP · PostgreSQL" plantUmlId="e_15" plantUmlBaseStyle="strokeColor=#137C78;fontColor=#000000;fontSize=12;html=1;labelBackgroundColor=#FFFFFF;labelPosition=right;align=left;endArrow=classicThin;endFill=1;fontFamily=Arial;edgeStyle=orthogonalEdgeStyle;curved=0;rounded=0;endSize=6;sourcePerimeterSpacing=0;targetPerimeterSpacing=0;" plantUmlBaseValue="TCP/IP · PostgreSQL" id="3jLdwkoL9Bu25V1u1ZX_-17">
+          <mxCell edge="1" parent="3jLdwkoL9Bu25V1u1ZX_-1" source="3jLdwkoL9Bu25V1u1ZX_-6" style="strokeColor=#137C78;fontColor=#000000;fontSize=12;html=1;labelBackgroundColor=#FFFFFF;labelPosition=right;align=left;endArrow=classicThin;endFill=1;fontFamily=Arial;edgeStyle=orthogonalEdgeStyle;curved=0;rounded=0;endSize=6;sourcePerimeterSpacing=0;targetPerimeterSpacing=0;" target="3jLdwkoL9Bu25V1u1ZX_-12">
+            <mxGeometry relative="1" as="geometry" />
+          </mxCell>
+        </UserObject>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
