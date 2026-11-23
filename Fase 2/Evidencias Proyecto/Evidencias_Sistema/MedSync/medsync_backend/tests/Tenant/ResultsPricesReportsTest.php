@@ -4,6 +4,8 @@ use App\Models\Core\CenterUser;
 use App\Models\Core\MedicalCenter;
 use App\Models\Core\MedicalCenterSpecialty;
 use App\Models\Core\Specialty;
+use App\Models\Core\PlatformService;
+use App\Models\Core\PlatformServicePrice;
 use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\UploadedFile;
@@ -18,7 +20,7 @@ function prepareResultsTenant(string $path): void
     $schema = Schema::connection('center');
     $schema->create('patients', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('user_id')->nullable(); $t->string('email')->nullable(); $t->boolean('is_active')->default(true); $t->string('first_name'); $t->string('last_name'); $t->timestamps(); $t->softDeletes(); });
     $schema->create('professionals', function (Blueprint $t) { $t->id(); $t->string('first_name'); $t->string('last_name'); $t->timestamps(); $t->softDeletes(); });
-    $schema->create('services', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('specialty_id')->nullable(); $t->string('name'); $t->boolean('is_active')->default(true); $t->timestamps(); });
+    $schema->create('services', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('specialty_id')->nullable(); $t->unsignedBigInteger('platform_service_id')->nullable(); $t->string('category')->nullable(); $t->string('name'); $t->boolean('is_active')->default(true); $t->timestamps(); });
     $schema->create('appointments', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('patient_id'); $t->unsignedBigInteger('professional_id'); $t->unsignedBigInteger('service_id'); $t->date('appointment_date'); $t->string('status'); $t->timestamps(); });
     $schema->create('result_types', function (Blueprint $t) { $t->id(); $t->string('name'); $t->text('description')->nullable(); $t->boolean('is_active'); $t->timestamps(); });
     $schema->create('medical_results', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('patient_id'); $t->unsignedBigInteger('professional_id'); $t->unsignedBigInteger('result_type_id'); $t->unsignedBigInteger('appointment_id'); $t->timestamp('performed_at'); $t->string('status'); $t->timestamp('published_at')->nullable(); $t->unsignedBigInteger('created_by'); $t->unsignedBigInteger('published_by')->nullable(); $t->timestamp('voided_at')->nullable(); $t->unsignedBigInteger('voided_by')->nullable(); $t->text('void_reason')->nullable(); $t->timestamps(); $t->softDeletes(); });
@@ -106,6 +108,26 @@ it('shows the price for the chosen appointment date without exposing price manag
     $this->getJson('/api/v1/services/1/price?date=2026-10-31')->assertOk()->assertJsonPath('data.amount_clp', null);
     $this->getJson('/api/v1/service-prices')->assertForbidden();
 });
+it('uses a valid Core tariff for historical estimates and prefers the local tariff', function () {
+    $global = PlatformService::create(['name' => 'Consulta global', 'category' => 'CONSULTATION', 'duration_minutes' => 30]);
+    PlatformServicePrice::create(['platform_service_id' => $global->id, 'amount_clp' => 18000,
+        'effective_from' => '2026-10-01']);
+    DB::connection('center')->table('services')->where('id', 1)->update([
+        'platform_service_id' => $global->id, 'category' => 'CONSULTATION',
+    ]);
+    $this->actingAs($this->admin, 'sanctum')->withHeader('Origin', 'http://localhost:3000')
+        ->withSession(['active_medical_center_id' => $this->center->id]);
+    $url = '/api/v1/reports/summary?from=2026-10-01&to=2026-10-31';
+    $this->getJson($url)->assertOk()->assertJsonPath('data.estimated_revenue_clp', 18000)
+        ->assertJsonPath('data.lost_estimate_clp', 18000)->assertJsonPath('data.unpriced_appointments', 0);
+    DB::connection('center')->table('service_prices')->insert([
+        'service_id' => 1, 'amount_clp' => 12000, 'effective_from' => '2026-10-20',
+        'effective_to' => '2026-10-20', 'created_at' => now(), 'updated_at' => now(),
+    ]);
+    $this->getJson($url)->assertOk()->assertJsonPath('data.estimated_revenue_clp', 12000)
+        ->assertJsonPath('data.lost_estimate_clp', 18000);
+});
+
 it('does not include appointments or prices from another center database', function () {
     $this->actingAs($this->admin, 'sanctum')->withHeader('Origin', 'http://localhost:3000')->withSession(['active_medical_center_id'=>$this->center->id]);
     $this->postJson('/api/v1/service-prices', ['service_id'=>1,'amount_clp'=>15000,'effective_from'=>'2026-10-01'])->assertCreated();

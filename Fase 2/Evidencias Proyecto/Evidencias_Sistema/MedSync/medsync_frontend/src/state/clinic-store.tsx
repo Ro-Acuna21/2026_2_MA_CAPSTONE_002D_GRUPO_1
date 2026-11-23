@@ -172,6 +172,7 @@ function mapBackendService(
     duration: item.duration_minutes,
     active: item.is_active ?? true,
     category: item.category ?? null,
+    isSharedExam: item.is_shared_exam ?? false,
   };
 }
 
@@ -2273,6 +2274,7 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
       const payload = {
         specialty_id: Number(input.specialtyId),
         category: input.category as 'CONSULTATION' | 'EXAM' | 'DIAGNOSIS',
+        is_shared_exam: input.isSharedExam === 'true',
         name: input.name.trim(),
         duration_minutes: Number(input.duration),
         is_active: input.active !== "false",

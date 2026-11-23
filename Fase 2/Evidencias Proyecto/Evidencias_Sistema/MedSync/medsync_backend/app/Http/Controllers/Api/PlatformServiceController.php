@@ -6,11 +6,14 @@ use App\Http\Controllers\Controller;
 use App\Models\Center\Service;
 use App\Models\Core\PlatformService;
 use App\Models\Core\PlatformServicePrice;
+use App\Models\Core\MedicalCenter;
 use App\Services\Billing\EffectiveServicePrice;
 use App\Support\TenantContext;
 use App\Support\BusinessDate;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Database\QueryException;
 use Illuminate\Validation\ValidationException;
 
 class PlatformServiceController extends Controller
@@ -66,7 +69,13 @@ class PlatformServiceController extends Controller
         if (isset($data['name']) || isset($data['category'])) {
             $this->ensureNameAvailable($data['name'] ?? $service->name, $data['category'] ?? $service->category, $service->id);
         }
-        $service->update($data);
+        DB::connection('core')->transaction(function () use ($service, $data) {
+            PlatformService::query()->whereKey($service->id)->lockForUpdate()->firstOrFail();
+            if (isset($data['category']) && $data['category'] !== $service->category) {
+                $this->ensureCategoryHasNoCenterLinks($service->id);
+            }
+            $service->update($data);
+        });
         return response()->json(['data' => $this->present($service->refresh())]);
     }
 
@@ -78,9 +87,6 @@ class PlatformServiceController extends Controller
             'effective_from' => ['required', 'date_format:Y-m-d'],
             'effective_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:effective_from'],
         ]);
-        if ($data['effective_from'] < BusinessDate::today()) {
-            throw ValidationException::withMessages(['effective_from' => 'La vigencia debe comenzar hoy o en una fecha futura de Chile.']);
-        }
         $price = DB::connection('core')->transaction(function () use ($service, $data) {
             PlatformService::query()->whereKey($service->id)->lockForUpdate()->firstOrFail();
             $overlap = PlatformServicePrice::query()->where('platform_service_id', $service->id)
@@ -96,9 +102,6 @@ class PlatformServiceController extends Controller
     {
         abort_unless($request->user()?->isSuperAdmin(), 403);
         $data = $request->validate(['effective_to' => ['required', 'date_format:Y-m-d']]);
-        if ($data['effective_to'] < BusinessDate::today()) {
-            throw ValidationException::withMessages(['effective_to' => 'La vigencia solo puede cerrarse desde hoy en Chile o una fecha futura.']);
-        }
         abort_unless($price->effective_to === null && $price->effective_from->toDateString() <= $data['effective_to'], 422);
         $price->update($data);
         return response()->json(['data' => $price->refresh()]);
@@ -121,5 +124,32 @@ class PlatformServiceController extends Controller
             ->whereRaw('LOWER(name) = ?', [mb_strtolower($name)])
             ->when($except, fn ($query) => $query->whereKeyNot($except))->exists();
         if ($exists) throw ValidationException::withMessages(['name' => 'Ya existe una prestación de este tipo con ese nombre.']);
+    }
+
+    private function ensureCategoryHasNoCenterLinks(int $platformServiceId): void
+    {
+        $originalDatabase = config('database.connections.center.database');
+        try {
+            foreach (MedicalCenter::query()->whereNotNull('database_name')->cursor() as $center) {
+                config(['database.connections.center.database' => $center->database_name]);
+                DB::purge('center');
+                if (!Schema::connection('center')->hasTable('services')
+                    || !Schema::connection('center')->hasColumn('services', 'platform_service_id')) {
+                    continue;
+                }
+                if (Service::query()->where('platform_service_id', $platformServiceId)->exists()) {
+                    throw ValidationException::withMessages([
+                        'category' => 'No puedes cambiar la categoría: la prestación está vinculada en un centro.',
+                    ]);
+                }
+            }
+        } catch (QueryException $exception) {
+            throw ValidationException::withMessages([
+                'category' => 'No se pudo comprobar el estado de todos los centros. Intenta nuevamente.',
+            ]);
+        } finally {
+            config(['database.connections.center.database' => $originalDatabase]);
+            DB::purge('center');
+        }
     }
 }

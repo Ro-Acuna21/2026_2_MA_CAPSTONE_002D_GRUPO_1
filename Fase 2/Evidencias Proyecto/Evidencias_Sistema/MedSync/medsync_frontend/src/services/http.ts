@@ -335,6 +335,7 @@ export interface BackendService {
   specialty_id?: number;
   platform_service_id?: number | null;
   category?: 'CONSULTATION' | 'EXAM' | 'DIAGNOSIS' | null;
+  is_shared_exam?: boolean;
 }
 
 export interface ServicesResponse {
@@ -364,6 +365,7 @@ export const specialtyApi = {
 export interface ServicePayload {
   specialty_id: number;
   category: 'CONSULTATION' | 'EXAM' | 'DIAGNOSIS';
+  is_shared_exam?: boolean;
   name: string;
   description?: string | null;
   duration_minutes: number;

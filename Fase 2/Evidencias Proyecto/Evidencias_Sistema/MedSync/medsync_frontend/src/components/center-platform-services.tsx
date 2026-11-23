@@ -11,7 +11,7 @@ import { linkableLocalServices } from '@/lib/service-linking'
 
 const money = new Intl.NumberFormat('es-CL', {style: 'currency', currency: 'CLP', maximumFractionDigits: 0})
 const today = businessDateAt
-const categoryLabel = (value: PlatformService['category'] | null | undefined) => value === 'CONSULTATION' ? 'Consulta' : value === 'EXAM' ? 'Examen' : value === 'DIAGNOSIS' ? 'Diagnóstico' : 'Sin categoría'
+const categoryLabel = (value: PlatformService['category'] | null | undefined) => value === 'CONSULTATION' ? 'Consulta' : value === 'EXAM' ? 'Examen' : value === 'DIAGNOSIS' ? 'Prestación diagnóstica' : 'Sin categoría'
 
 export function CenterPlatformServices() {
   const {data, reloadCatalog} = useClinic()

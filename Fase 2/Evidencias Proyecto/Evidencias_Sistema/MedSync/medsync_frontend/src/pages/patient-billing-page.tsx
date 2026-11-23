@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { Navigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { PageHeading } from '@/components/page-heading'
@@ -22,6 +22,7 @@ export function PatientBillingPage() {
   const [amount, setAmount] = useState('')
   const [method, setMethod] = useState<PatientPayment['method']>('CASH')
   const [reference, setReference] = useState('')
+  const pendingPayment = useRef<{ signature: string; key: string } | null>(null)
   const refresh = useCallback(async () => {
     try { setSummary((await patientBillingApi.summary()).data); setError('') }
     catch (failure) { setError(firstApiErrorMessage(failure, 'No fue posible cargar el estado de cobros.')) }
@@ -38,7 +39,13 @@ export function PatientBillingPage() {
   async function pay(event: FormEvent) {
     event.preventDefault()
     if (!patientId || !chargeId || !amount) return
-    if (await action(() => patientBillingApi.pay(Number(patientId), { amount_clp: Number(amount), method, reference: reference.trim() || undefined, allocations: [{care_indication_id: Number(chargeId), amount_clp: Number(amount)}] }), 'Pago registrado.')) {
+    const signature = JSON.stringify([patientId, chargeId, amount, method, reference.trim()])
+    if (pendingPayment.current?.signature !== signature) {
+      pendingPayment.current = { signature, key: crypto.randomUUID() }
+    }
+    const key = pendingPayment.current.key
+    if (await action(() => patientBillingApi.pay(Number(patientId), { amount_clp: Number(amount), method, idempotency_key: key, reference: reference.trim() || undefined, allocations: [{care_indication_id: Number(chargeId), amount_clp: Number(amount)}] }), 'Pago registrado.')) {
+      pendingPayment.current = null
       setAmount(''); setReference(''); setChargeId('')
     }
   }

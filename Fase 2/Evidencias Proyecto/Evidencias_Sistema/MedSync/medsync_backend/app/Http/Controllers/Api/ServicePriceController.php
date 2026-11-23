@@ -33,9 +33,6 @@ class ServicePriceController extends Controller
             'service_id' => ['required', 'integer'], 'amount_clp' => ['required', 'integer', 'min:0', 'max:999999999'],
             'effective_from' => ['required', 'date_format:Y-m-d'], 'effective_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:effective_from'],
         ]);
-        if ($data['effective_from'] < BusinessDate::today()) {
-            throw ValidationException::withMessages(['effective_from' => 'La vigencia debe comenzar hoy o en una fecha futura de Chile.']);
-        }
         Service::findOrFail($data['service_id']);
         $price = DB::connection('center')->transaction(function () use ($data) {
             // Bloquea la prestación para serializar cambios de precio concurrentes.
@@ -60,8 +57,8 @@ class ServicePriceController extends Controller
         if ($future && isset($data['effective_from']) && $data['effective_from'] <= $businessDate) {
             throw ValidationException::withMessages(['effective_from' => 'Un precio futuro debe comenzar después de hoy en Chile.']);
         }
-        if (!$future && (!isset($data['effective_to']) || $data['effective_to'] < $businessDate)) {
-            throw ValidationException::withMessages(['effective_to' => 'Cierra el precio vigente desde hoy o una fecha futura.']);
+        if (!$future && !isset($data['effective_to'])) {
+            throw ValidationException::withMessages(['effective_to' => 'Indica el último día de vigencia del precio.']);
         }
         $from = $data['effective_from'] ?? $price->effective_from->toDateString();
         $to = array_key_exists('effective_to', $data) ? $data['effective_to'] : $price->effective_to?->toDateString();

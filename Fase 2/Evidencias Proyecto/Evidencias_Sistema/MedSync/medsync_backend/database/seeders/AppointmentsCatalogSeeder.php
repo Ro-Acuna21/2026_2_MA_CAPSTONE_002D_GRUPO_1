@@ -45,8 +45,8 @@ class AppointmentsCatalogSeeder extends Seeder
                     ['rut' => '84444444-4', 'first_name' => 'Fernanda', 'last_name' => 'Médica General', 'email' => 'fernanda.general@medsync.test', 'phone' => '+56984444444'],
                 ],
                 'services' => [
-                    ['name' => 'Consulta general', 'duration_minutes' => 30],
-                    ['name' => 'Control de salud', 'duration_minutes' => 20],
+                    ['name' => 'Consulta general', 'duration_minutes' => 30, 'category' => 'CONSULTATION'],
+                    ['name' => 'Control de salud', 'duration_minutes' => 20, 'category' => 'CONSULTATION'],
                 ],
             ],
             [
@@ -58,8 +58,8 @@ class AppointmentsCatalogSeeder extends Seeder
                     ['rut' => '85555555-5', 'first_name' => 'Helena', 'last_name' => 'Cardióloga', 'email' => 'helena.cardio@medsync.test', 'phone' => '+56985555555'],
                 ],
                 'services' => [
-                    ['name' => 'Consulta cardiológica', 'duration_minutes' => 30],
-                    ['name' => 'Electrocardiograma', 'duration_minutes' => 20],
+                    ['name' => 'Consulta cardiológica', 'duration_minutes' => 30, 'category' => 'CONSULTATION'],
+                    ['name' => 'Electrocardiograma', 'duration_minutes' => 20, 'category' => 'EXAM'],
                 ],
             ],
             [
@@ -71,7 +71,7 @@ class AppointmentsCatalogSeeder extends Seeder
                     ['rut' => '86666666-6', 'first_name' => 'Julieta', 'last_name' => 'Pediatra', 'email' => 'julieta.pediatria@medsync.test', 'phone' => '+56986666666'],
                 ],
                 'services' => [
-                    ['name' => 'Consulta pediátrica', 'duration_minutes' => 30],
+                    ['name' => 'Consulta pediátrica', 'duration_minutes' => 30, 'category' => 'CONSULTATION'],
                 ],
             ],
         ];
@@ -98,6 +98,8 @@ class AppointmentsCatalogSeeder extends Seeder
                     [
                         'description' => null,
                         'duration_minutes' => $serviceData['duration_minutes'],
+                        'category' => $serviceData['category'],
+                        'is_shared_exam' => false,
                         'is_active' => true,
                     ]
                 );

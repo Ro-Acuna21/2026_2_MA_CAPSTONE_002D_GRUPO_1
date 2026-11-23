@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Support\TenantContext;
+use App\Models\Center\Service;
+use App\Services\Billing\EffectiveServicePrice;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -11,7 +13,7 @@ use Illuminate\Validation\ValidationException;
 
 class ReportController extends Controller
 {
-    public function __construct(private readonly TenantContext $tenant) {}
+    public function __construct(private readonly TenantContext $tenant, private readonly EffectiveServicePrice $effectivePrice) {}
 
     public function __invoke(Request $request)
     {
@@ -31,19 +33,21 @@ class ReportController extends Controller
         if (!empty($data['service_id'])) $query->where('a.service_id', $data['service_id']);
         if (!empty($data['professional_id'])) $query->where('a.professional_id', $data['professional_id']);
         $appointments = $query->get();
-        $prices = DB::connection('center')->table('service_prices')
-            ->whereIn('service_id', $appointments->pluck('service_id')->unique()->all())
-            ->whereDate('effective_from', '<=', $data['to'])
-            ->where(function ($q) use ($data) { $q->whereNull('effective_to')->orWhereDate('effective_to', '>=', $data['from']); })
-            ->orderByDesc('effective_from')->get()->groupBy('service_id');
+        $catalog = Service::query()->whereIn('id', $appointments->pluck('service_id')->unique()->all())->get()->keyBy('id');
+        $resolvedPrices = [];
         $counts = ['PENDIENTE' => 0, 'CONFIRMADA' => 0, 'ATENDIDA' => 0, 'CANCELADA' => 0, 'NO_SHOW' => 0];
         $months = []; $services = []; $professionals = [];
         $estimated = 0; $lost = 0; $unpriced = 0;
         foreach ($appointments as $row) {
             $counts[$row->status] = ($counts[$row->status] ?? 0) + 1;
             $day = substr($row->appointment_date, 0, 10);
-            $price = ($prices[$row->service_id] ?? collect())->first(fn ($item) => substr($item->effective_from, 0, 10) <= $day && ($item->effective_to === null || substr($item->effective_to, 0, 10) >= $day));
-            $amount = $price ? (int) $price->amount_clp : 0;
+            $key = $row->service_id.':'.$day;
+            if (!array_key_exists($key, $resolvedPrices)) {
+                $resolvedPrices[$key] = isset($catalog[$row->service_id])
+                    ? $this->effectivePrice->forDate($catalog[$row->service_id], $day) : null;
+            }
+            $price = $resolvedPrices[$key];
+            $amount = $price ? $price['amount_clp'] : 0;
             if (!$price && in_array($row->status, ['ATENDIDA', 'CANCELADA', 'NO_SHOW'], true)) $unpriced++;
             $revenue = $row->status === 'ATENDIDA' ? $amount : 0;
             $loss = in_array($row->status, ['CANCELADA', 'NO_SHOW'], true) ? $amount : 0;

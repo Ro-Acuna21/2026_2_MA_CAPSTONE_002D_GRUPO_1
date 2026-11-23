@@ -25,6 +25,7 @@ class Service extends Model
         'is_active',
         'platform_service_id',
         'category',
+        'is_shared_exam',
     ];
 
     protected function casts(): array
@@ -32,6 +33,7 @@ class Service extends Model
         return [
             'duration_minutes' => 'integer',
             'is_active' => 'boolean',
+            'is_shared_exam' => 'boolean',
         ];
     }
 

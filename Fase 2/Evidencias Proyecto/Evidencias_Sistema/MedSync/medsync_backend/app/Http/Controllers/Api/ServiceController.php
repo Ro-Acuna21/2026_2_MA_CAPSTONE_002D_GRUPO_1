@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Center\Service;
 use App\Models\Core\PlatformService;
+use Illuminate\Support\Facades\DB;
 use App\Services\Billing\EffectiveServicePrice;
 use App\Services\Appointments\AppointmentService;
 use App\Support\TenantContext;
@@ -98,6 +99,7 @@ class ServiceController extends Controller
         $data = $request->validate([
             'specialty_id' => ['required', 'integer'],
             'category' => ['required', 'in:CONSULTATION,EXAM,DIAGNOSIS'],
+            'is_shared_exam' => ['sometimes', 'boolean'],
             'name' => ['required', 'string', 'max:120'],
             'description' => ['nullable', 'string', 'max:2000'],
             'duration_minutes' => ['required', 'integer', 'min:5', 'max:480'],
@@ -105,6 +107,9 @@ class ServiceController extends Controller
         ]);
 
         $name = trim($data['name']);
+        if (($data['is_shared_exam'] ?? false) && $data['category'] !== 'EXAM') {
+            throw ValidationException::withMessages(['is_shared_exam' => 'Solo un examen puede estar disponible para otras especialidades.']);
+        }
         $this->specialtyCatalog->ensureAvailable((int) $data['specialty_id']);
 
         $this->ensureNameAvailable((int) $data['specialty_id'], $name);
@@ -112,6 +117,7 @@ class ServiceController extends Controller
         $service = Service::create([
             'specialty_id' => $data['specialty_id'],
             'category' => $data['category'],
+            'is_shared_exam' => $data['is_shared_exam'] ?? false,
             'name' => $name,
             'description' => $data['description'] ?? null,
             'duration_minutes' => $data['duration_minutes'],
@@ -131,18 +137,21 @@ class ServiceController extends Controller
             'platform_service_id' => ['required', 'integer'],
             'specialty_id' => ['required', 'integer'],
         ]);
-        $catalog = PlatformService::query()->whereKey($data['platform_service_id'])->where('is_active', true)->firstOrFail();
-        $this->specialtyCatalog->ensureAvailable((int) $data['specialty_id']);
-        if (Service::query()->where('platform_service_id', $catalog->id)->exists()) {
-            throw ValidationException::withMessages(['platform_service_id' => 'Esta prestación ya está habilitada en el centro.']);
-        }
-        $this->ensureNameAvailable((int) $data['specialty_id'], $catalog->name);
-        $service = Service::create([
-            'platform_service_id' => $catalog->id, 'specialty_id' => $data['specialty_id'],
-            'category' => $catalog->category,
-            'name' => $catalog->name, 'description' => null,
-            'duration_minutes' => $catalog->duration_minutes, 'is_active' => true,
-        ]);
+        $service = DB::connection('core')->transaction(function () use ($data) {
+            $catalog = PlatformService::query()->whereKey($data['platform_service_id'])
+                ->where('is_active', true)->lockForUpdate()->firstOrFail();
+            $this->specialtyCatalog->ensureAvailable((int) $data['specialty_id']);
+            if (Service::query()->where('platform_service_id', $catalog->id)->exists()) {
+                throw ValidationException::withMessages(['platform_service_id' => 'Esta prestación ya está habilitada en el centro.']);
+            }
+            $this->ensureNameAvailable((int) $data['specialty_id'], $catalog->name);
+            return Service::create([
+                'platform_service_id' => $catalog->id, 'specialty_id' => $data['specialty_id'],
+                'category' => $catalog->category,
+                'name' => $catalog->name, 'description' => null,
+                'duration_minutes' => $catalog->duration_minutes, 'is_active' => true,
+            ]);
+        });
         return response()->json(['data' => $this->presentService($service->load('specialty'), true)], 201);
     }
 
@@ -151,21 +160,25 @@ class ServiceController extends Controller
     {
         $this->ensureAdmin();
         $data = $request->validate(['platform_service_id' => ['required', 'integer']]);
-        $catalog = PlatformService::query()->whereKey($data['platform_service_id'])->where('is_active', true)->firstOrFail();
-        $local = Service::findOrFail($service);
-        if (! $local->category) {
-            throw ValidationException::withMessages(['service' => 'Asigna una categoría a la prestación local antes de vincularla.']);
-        }
-        if ($local->category !== $catalog->category) {
-            throw ValidationException::withMessages(['platform_service_id' => 'Las categorías no coinciden. Solo puedes vincular prestaciones de la misma categoría.']);
-        }
-        if ($local->platform_service_id && (int) $local->platform_service_id !== $catalog->id) {
-            throw ValidationException::withMessages(['platform_service_id' => 'Esta prestación ya está vinculada a otra prestación global.']);
-        }
-        if (Service::query()->where('platform_service_id', $catalog->id)->whereKeyNot($local->id)->exists()) {
-            throw ValidationException::withMessages(['platform_service_id' => 'Otra prestación del centro ya usa esta referencia global.']);
-        }
-        $local->update(['platform_service_id' => $catalog->id]);
+        $local = DB::connection('core')->transaction(function () use ($data, $service) {
+            $catalog = PlatformService::query()->whereKey($data['platform_service_id'])
+                ->where('is_active', true)->lockForUpdate()->firstOrFail();
+            $local = Service::findOrFail($service);
+            if (! $local->category) {
+                throw ValidationException::withMessages(['service' => 'Asigna una categoría a la prestación local antes de vincularla.']);
+            }
+            if ($local->category !== $catalog->category) {
+                throw ValidationException::withMessages(['platform_service_id' => 'Las categorías no coinciden. Solo puedes vincular prestaciones de la misma categoría.']);
+            }
+            if ($local->platform_service_id && (int) $local->platform_service_id !== $catalog->id) {
+                throw ValidationException::withMessages(['platform_service_id' => 'Esta prestación ya está vinculada a otra prestación global.']);
+            }
+            if (Service::query()->where('platform_service_id', $catalog->id)->whereKeyNot($local->id)->exists()) {
+                throw ValidationException::withMessages(['platform_service_id' => 'Otra prestación del centro ya usa esta referencia global.']);
+            }
+            $local->update(['platform_service_id' => $catalog->id]);
+            return $local;
+        });
         return response()->json(['data' => $this->presentService($local->fresh('specialty'), true)]);
     }
 
@@ -186,6 +199,7 @@ class ServiceController extends Controller
         $data = $request->validate([
             'specialty_id' => ['sometimes', 'required', 'integer'],
             'category' => ['sometimes', 'required', 'in:CONSULTATION,EXAM,DIAGNOSIS'],
+            'is_shared_exam' => ['sometimes', 'boolean'],
             'name' => ['sometimes', 'required', 'string', 'max:120'],
             'description' => ['sometimes', 'nullable', 'string', 'max:2000'],
             'duration_minutes' => ['sometimes', 'required', 'integer', 'min:5', 'max:480'],
@@ -193,6 +207,10 @@ class ServiceController extends Controller
         ]);
 
         $specialtyId = (int) ($data['specialty_id'] ?? $record->specialty_id);
+        $category = $data['category'] ?? $record->category;
+        if (($data['is_shared_exam'] ?? $record->is_shared_exam) && $category !== 'EXAM') {
+            throw ValidationException::withMessages(['is_shared_exam' => 'Solo un examen puede estar disponible para otras especialidades.']);
+        }
         if (array_key_exists('specialty_id', $data)) {
             $this->specialtyCatalog->ensureAvailable($specialtyId, (int) $record->specialty_id);
         }
@@ -203,7 +221,17 @@ class ServiceController extends Controller
             $data['name'] = $name;
         }
 
-        $record->update($data);
+        if ($record->platform_service_id) {
+            DB::connection('core')->transaction(function () use ($record, $category, $data) {
+                $global = PlatformService::query()->whereKey($record->platform_service_id)->lockForUpdate()->first();
+                if (!$global || $category !== $global->category) {
+                    throw ValidationException::withMessages(['category' => 'La categoría debe coincidir con la prestación global vinculada.']);
+                }
+                $record->update($data);
+            });
+        } else {
+            $record->update($data);
+        }
 
         return response()->json([
             'data' => $this->presentService($record->fresh('specialty'), true),
@@ -264,6 +292,7 @@ class ServiceController extends Controller
             'current_price_clp' => $this->priceForDate($service->id, BusinessDate::today()),
             'platform_service_id' => $service->platform_service_id,
             'category' => $service->category,
+            'is_shared_exam' => (bool) $service->is_shared_exam,
             'specialty' => $service->specialty ? [
                 'id' => $service->specialty->id,
                 'name' => $service->specialty->name,

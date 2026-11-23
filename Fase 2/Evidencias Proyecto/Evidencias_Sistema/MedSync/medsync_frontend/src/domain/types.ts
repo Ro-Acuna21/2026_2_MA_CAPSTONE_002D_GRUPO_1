@@ -24,7 +24,7 @@ export interface Professional {
   specialtyIds: string[]; description: string; active: boolean
 }
 export interface Specialty { id: string; organizationId: string; name: string; description: string; active: boolean }
-export interface Service { id: string; organizationId: string; specialtyId: string; name: string; duration: number; active: boolean; category?: 'CONSULTATION' | 'EXAM' | 'DIAGNOSIS' | null }
+export interface Service { id: string; organizationId: string; specialtyId: string; name: string; duration: number; active: boolean; category?: 'CONSULTATION' | 'EXAM' | 'DIAGNOSIS' | null; isSharedExam?: boolean }
 export interface Availability {
   id: string; organizationId: string; professionalId: string; weekday: number; start: string; end: string; active: boolean
 }
