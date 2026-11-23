@@ -56,6 +56,6 @@ export const patientBillingApi = {
   mine: () => apiRequest<{ data: {charged_clp: number; paid_clp: number; balance_clp: number; charges: BillingCharge[]} }>('/api/v1/billing/mine'),
   confirm: (id: number) => post<CareIndication>(`/api/v1/billing/indications/${id}/confirm`),
   voidIndication: (id: number, reason: string) => post<CareIndication>(`/api/v1/billing/indications/${id}/void`, { reason }),
-  pay: (patientId: number, input: { amount_clp: number; method: PatientPayment['method']; reference?: string; allocations?: {care_indication_id: number; amount_clp: number}[] }) => post<PatientPayment>(`/api/v1/billing/patients/${patientId}/payments`, input),
+  pay: (patientId: number, input: { amount_clp: number; method: PatientPayment['method']; idempotency_key: string; reference?: string; allocations?: {care_indication_id: number; amount_clp: number}[] }) => post<PatientPayment>(`/api/v1/billing/patients/${patientId}/payments`, input),
   voidPayment: (id: number, reason: string) => post<PatientPayment>(`/api/v1/billing/payments/${id}/void`, { reason }),
 }

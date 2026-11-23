@@ -5,6 +5,7 @@ namespace App\Services\Billing;
 use App\Models\Center\Service;
 use App\Models\Center\ServicePrice;
 use App\Models\Core\PlatformServicePrice;
+use App\Models\Core\PlatformService;
 
 class EffectiveServicePrice
 {
@@ -16,6 +17,9 @@ class EffectiveServicePrice
             ->orderByDesc('effective_from')->first();
         if ($override) return ['amount_clp' => (int) $override->amount_clp, 'source' => 'CENTER', 'record_id' => $override->id];
         if (!$service->platform_service_id) return null;
+        // A local category drift must never silently apply an unrelated Core tariff.
+        $platformService = PlatformService::query()->find($service->platform_service_id);
+        if (! $service->category || ! $platformService || $service->category !== $platformService->category) return null;
         $base = PlatformServicePrice::query()->where('platform_service_id', $service->platform_service_id)
             ->whereDate('effective_from', '<=', $date)
             ->where(fn ($query) => $query->whereNull('effective_to')->orWhereDate('effective_to', '>=', $date))

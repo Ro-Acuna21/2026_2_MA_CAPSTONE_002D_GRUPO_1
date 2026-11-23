@@ -22,3 +22,7 @@ Se retiró “Cuentas sin centro” del reporte principal: era un conteo de cuen
 ## Puesta en marcha
 
 Antes de migrar datos existentes, respaldar Core y cada base de centro y consultar `scripts/audit_migration_status.php`; algunos centros históricos registran migraciones en Core. Aplicar las migraciones incrementales `2026_11_20_000001_create_platform_services.php` (Core) y `2026_11_20_000001_link_services_and_allocate_payments.php` (cada centro) con el procedimiento de migración reconciliado. La segunda asigna abonos históricos activos a los cargos más antiguos del paciente y aborta si encuentra un abono imposible de asignar; revisar ese centro sin descartar datos. No usar `migrate:fresh`. Las pruebas automatizadas usan SQLite temporal; falta verificar migración y flujo en PostgreSQL de prueba antes de aplicar a datos reales.
+
+## Ajustes de cobros y reportes · 22-11-2026
+
+El reporte de citas valora cada fecha con `EffectiveServicePrice`: usa precio propio y, si no hay, precio Core solo cuando el vínculo y categoría coinciden. Son estimaciones, no pagos recibidos; los cargos emitidos conservan su monto guardado. Los pagos exigen un UUID por operación y devuelven el mismo registro ante un reintento idéntico. Las migraciones de instalación nueva y actualización de datos representativos se probaron en PostgreSQL temporal y se limpiaron; sigue pendiente probar una copia representativa de los centros reales y concurrencia con dos conexiones. Ver `ESTABILIZACION_2026_11_22.md`.

@@ -55,6 +55,8 @@ function prepareAppointmentWorkflowDatabase(string $connection, string $path): v
         $table->id();
         $table->unsignedBigInteger('specialty_id');
         $table->string('name');
+        $table->string('category')->nullable();
+        $table->boolean('is_shared_exam')->default(false);
         $table->text('description')->nullable();
         $table->smallInteger('duration_minutes');
         $table->boolean('is_active')->default(true);
@@ -198,13 +200,13 @@ it('crea una prestación con una especialidad activa y rechaza duplicados o espe
         [, , $client] = appointmentWorkflowClient($this, $path, 'service-create', 'ADMIN');
 
         $client->postJson('/api/v1/services', [
-            'specialty_id' => 1, 'name' => 'Consulta de prueba', 'duration_minutes' => 30,
+            'specialty_id' => 1, 'name' => 'Consulta de prueba', 'duration_minutes' => 30, 'category' => 'CONSULTATION',
         ])->assertCreated()->assertJsonPath('data.name', 'Consulta de prueba');
         $client->postJson('/api/v1/services', [
-            'specialty_id' => 1, 'name' => ' consulta de prueba ', 'duration_minutes' => 30,
+            'specialty_id' => 1, 'name' => ' consulta de prueba ', 'duration_minutes' => 30, 'category' => 'CONSULTATION',
         ])->assertUnprocessable()->assertJsonValidationErrors('name');
         $client->postJson('/api/v1/services', [
-            'specialty_id' => 999, 'name' => 'Otra consulta', 'duration_minutes' => 30,
+            'specialty_id' => 999, 'name' => 'Otra consulta', 'duration_minutes' => 30, 'category' => 'CONSULTATION',
         ])->assertUnprocessable()->assertJsonValidationErrors('specialty_id');
         expect(DB::connection('center')->table('services')->count())->toBe(2);
     } finally {

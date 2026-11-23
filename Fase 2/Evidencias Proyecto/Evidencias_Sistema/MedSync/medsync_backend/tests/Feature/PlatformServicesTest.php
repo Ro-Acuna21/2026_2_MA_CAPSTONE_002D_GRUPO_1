@@ -15,10 +15,10 @@ it('keeps global services and base prices exclusive to SUPER_ADMIN', function ()
         'name' => 'Consulta general', 'category' => 'CONSULTATION', 'duration_minutes' => 30,
     ])->assertCreated()->json('data.id');
     $this->postJson("/api/v1/platform/services/{$id}/prices", [
-        'amount_clp' => 25000, 'effective_from' => today()->toDateString(),
+        'amount_clp' => 25000, 'effective_from' => \App\Support\BusinessDate::today(),
     ])->assertCreated();
     $this->postJson("/api/v1/platform/services/{$id}/prices", [
-        'amount_clp' => 30000, 'effective_from' => today()->toDateString(),
+        'amount_clp' => 30000, 'effective_from' => \App\Support\BusinessDate::today(),
     ])->assertUnprocessable();
     $this->getJson('/api/v1/platform/services')->assertOk()
         ->assertJsonPath('data.0.base_price_clp', 25000);

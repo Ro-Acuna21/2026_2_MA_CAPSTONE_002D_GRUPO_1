@@ -170,3 +170,7 @@ El servidor deriva `database_name` del slug validado: `clinica-maipu` produce `m
 ## Prestaciones y cobros para defensa · 20-11-2026
 
 Catálogo y precios base pertenecen a Core y solo los administra `SUPER_ADMIN`. El centro crea o vincula explícitamente su prestación local al ID global; `ADMIN` puede definir una vigencia propia. El precio efectivo es propio si existe y, en otro caso, base. El profesional asignado puede generar deuda directa en cita `ATENDIDA` o mantener la indicación sin deuda. Recepción asigna pagos manuales a cargos; el paciente consulta exclusivamente sus cargos del centro activo. El módulo no procesa pagos electrónicos. La ayuda de DV en React solo completa el cuerpo cuando no parece un RUT completo válido; el backend sigue validando el RUT completo.
+
+## Estabilización de prestaciones y pagos · 22-11-2026
+
+Una prestación local antigua sin categoría permanece visible y ADMIN puede clasificarla antes de vincularla. Un vínculo exige la misma categoría local y global; ambos lados rechazan cambios que lo invaliden. El profesional solo registra prestaciones de la especialidad de la cita, salvo un examen marcado explícitamente como compartido. `DIAGNOSIS` es una prestación diagnóstica cobrable, no el diagnóstico clínico de una ficha. Los abonos manuales exigen una clave UUID por operación para reconocer reintentos; repetir la misma operación devuelve el pago original. Ver `ESTABILIZACION_2026_11_22.md`.

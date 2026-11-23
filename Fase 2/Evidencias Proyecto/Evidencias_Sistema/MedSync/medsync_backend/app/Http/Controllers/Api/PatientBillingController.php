@@ -8,6 +8,7 @@ use App\Models\Center\Patient;
 use App\Models\Center\Service;
 use App\Services\Billing\EffectiveServicePrice;
 use App\Support\TenantContext;
+use App\Support\BusinessDate;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -44,6 +45,13 @@ class PatientBillingController extends Controller
         abort_unless($member->role === 'PROFESIONAL' && (int) $member->professional_id === (int) $appointment->professional_id, 403);
         $data = $request->validate(['service_id' => ['required', 'integer', 'exists:center.services,id']]);
         $service = Service::query()->whereKey($data['service_id'])->where('is_active', true)->firstOrFail();
+        $appointmentService = Service::query()->findOrFail($appointment->service_id);
+        if ((int) $service->specialty_id !== (int) $appointmentService->specialty_id
+            && !($service->category === 'EXAM' && $service->is_shared_exam)) {
+            throw ValidationException::withMessages([
+                'service_id' => 'La prestación no corresponde a la especialidad de la cita ni es un examen compartido.',
+            ]);
+        }
         $indication = DB::connection('center')->transaction(function () use ($appointment, $service, $request, $charge) {
             $locked = Appointment::query()->whereKey($appointment->id)->lockForUpdate()->firstOrFail();
             if ($locked->status !== 'ATENDIDA') {
@@ -62,7 +70,7 @@ class PatientBillingController extends Controller
                 throw ValidationException::withMessages(['service_id' => ['Esta prestación ya fue registrada en la cita.']]);
             }
             Service::query()->whereKey($service->id)->lockForUpdate()->firstOrFail();
-            $price = $this->prices->forDate($service, today()->toDateString());
+            $price = $this->prices->forDate($service, BusinessDate::today());
             if (!$price) throw ValidationException::withMessages(['service_id' => ['La prestación no tiene un precio vigente en este centro.']]);
             $id = DB::connection('center')->table('care_indications')->insertGetId([
                 'appointment_id' => $locked->id, 'patient_id' => $locked->patient_id,
@@ -184,12 +192,34 @@ class PatientBillingController extends Controller
             'amount_clp' => ['required', 'integer', 'min:1', 'max:999999999'],
             'method' => ['required', 'in:CASH,CARD,TRANSFER,OTHER'],
             'reference' => ['nullable', 'string', 'max:120'],
+            'idempotency_key' => ['required', 'uuid'],
             'allocations' => ['sometimes', 'array', 'min:1'],
             'allocations.*.care_indication_id' => ['required_with:allocations', 'integer', 'distinct'],
             'allocations.*.amount_clp' => ['required_with:allocations', 'integer', 'min:1'],
         ]);
-        $payment = DB::connection('center')->transaction(function () use ($patient, $data, $request) {
+        $allocationsForHash = $data['allocations'] ?? null;
+        if ($allocationsForHash !== null) {
+            usort($allocationsForHash, fn ($left, $right) => $left['care_indication_id'] <=> $right['care_indication_id']);
+        }
+        $requestHash = hash('sha256', json_encode([
+            'patient_id' => $patient->id,
+            'amount_clp' => $data['amount_clp'],
+            'method' => $data['method'],
+            'reference' => trim($data['reference'] ?? ''),
+            'allocations' => $allocationsForHash,
+        ], JSON_THROW_ON_ERROR));
+        $result = DB::connection('center')->transaction(function () use ($patient, $data, $request, $requestHash) {
             Patient::query()->whereKey($patient->id)->lockForUpdate()->firstOrFail();
+            $existing = DB::connection('center')->table('patient_payments')
+                ->where('patient_id', $patient->id)->where('idempotency_key', $data['idempotency_key'])->first();
+            if ($existing) {
+                if ($existing->request_hash !== $requestHash) {
+                    throw ValidationException::withMessages([
+                        'idempotency_key' => 'Esta clave ya se usó para una operación de pago diferente.',
+                    ]);
+                }
+                return ['payment' => $existing, 'replayed' => true];
+            }
             if ($data['amount_clp'] > $this->balance($patient->id)['balance']) {
                 throw ValidationException::withMessages(['amount_clp' => ['El abono supera el saldo pendiente.']]);
             }
@@ -217,6 +247,7 @@ class PatientBillingController extends Controller
             $id = DB::connection('center')->table('patient_payments')->insertGetId([
                 'patient_id' => $patient->id, 'amount_clp' => $data['amount_clp'],
                 'method' => $data['method'], 'reference' => $data['reference'] ?? null,
+                'idempotency_key' => $data['idempotency_key'], 'request_hash' => $requestHash,
                 'recorded_by' => $request->user()->id, 'created_at' => now(), 'updated_at' => now(),
             ]);
             foreach ($allocations as $allocation) {
@@ -225,9 +256,9 @@ class PatientBillingController extends Controller
                     'amount_clp' => $allocation['amount_clp'], 'created_at' => now(), 'updated_at' => now(),
                 ]);
             }
-            return DB::connection('center')->table('patient_payments')->where('id', $id)->first();
+            return ['payment' => DB::connection('center')->table('patient_payments')->where('id', $id)->first(), 'replayed' => false];
         });
-        return response()->json(['data' => $payment], 201);
+        return response()->json(['data' => $result['payment']], $result['replayed'] ? 200 : 201);
     }
 
     public function voidPayment(Request $request, int $payment): JsonResponse

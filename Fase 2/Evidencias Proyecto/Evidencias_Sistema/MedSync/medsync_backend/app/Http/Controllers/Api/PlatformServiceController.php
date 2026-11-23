@@ -6,10 +6,14 @@ use App\Http\Controllers\Controller;
 use App\Models\Center\Service;
 use App\Models\Core\PlatformService;
 use App\Models\Core\PlatformServicePrice;
+use App\Models\Core\MedicalCenter;
 use App\Services\Billing\EffectiveServicePrice;
 use App\Support\TenantContext;
+use App\Support\BusinessDate;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Database\QueryException;
 use Illuminate\Validation\ValidationException;
 
 class PlatformServiceController extends Controller
@@ -32,7 +36,7 @@ class PlatformServiceController extends Controller
                 $item = $this->present($service);
                 $local = $linked->get($service->id);
                 $item['center_service_id'] = $local?->id;
-                $item['effective_price_clp'] = $local ? ($this->prices->forDate($local, today()->toDateString())['amount_clp'] ?? null) : $item['base_price_clp'];
+                $item['effective_price_clp'] = $local ? ($this->prices->forDate($local, BusinessDate::today())['amount_clp'] ?? null) : $item['base_price_clp'];
                 return $item;
             })]);
     }
@@ -65,7 +69,13 @@ class PlatformServiceController extends Controller
         if (isset($data['name']) || isset($data['category'])) {
             $this->ensureNameAvailable($data['name'] ?? $service->name, $data['category'] ?? $service->category, $service->id);
         }
-        $service->update($data);
+        DB::connection('core')->transaction(function () use ($service, $data) {
+            PlatformService::query()->whereKey($service->id)->lockForUpdate()->firstOrFail();
+            if (isset($data['category']) && $data['category'] !== $service->category) {
+                $this->ensureCategoryHasNoCenterLinks($service->id);
+            }
+            $service->update($data);
+        });
         return response()->json(['data' => $this->present($service->refresh())]);
     }
 
@@ -74,7 +84,7 @@ class PlatformServiceController extends Controller
         abort_unless($request->user()?->isSuperAdmin(), 403);
         $data = $request->validate([
             'amount_clp' => ['required', 'integer', 'min:0', 'max:999999999'],
-            'effective_from' => ['required', 'date_format:Y-m-d', 'after_or_equal:today'],
+            'effective_from' => ['required', 'date_format:Y-m-d'],
             'effective_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:effective_from'],
         ]);
         $price = DB::connection('core')->transaction(function () use ($service, $data) {
@@ -91,7 +101,7 @@ class PlatformServiceController extends Controller
     public function closePrice(Request $request, PlatformServicePrice $price)
     {
         abort_unless($request->user()?->isSuperAdmin(), 403);
-        $data = $request->validate(['effective_to' => ['required', 'date_format:Y-m-d', 'after_or_equal:today']]);
+        $data = $request->validate(['effective_to' => ['required', 'date_format:Y-m-d']]);
         abort_unless($price->effective_to === null && $price->effective_from->toDateString() <= $data['effective_to'], 422);
         $price->update($data);
         return response()->json(['data' => $price->refresh()]);
@@ -100,8 +110,9 @@ class PlatformServiceController extends Controller
     private function present(PlatformService $service): array
     {
         $prices = PlatformServicePrice::query()->where('platform_service_id', $service->id)->orderByDesc('effective_from')->get();
-        $current = $prices->first(fn ($item) => $item->effective_from->toDateString() <= today()->toDateString()
-            && ($item->effective_to === null || $item->effective_to->toDateString() >= today()->toDateString()));
+        $businessDate = BusinessDate::today();
+        $current = $prices->first(fn ($item) => $item->effective_from->toDateString() <= $businessDate
+            && ($item->effective_to === null || $item->effective_to->toDateString() >= $businessDate));
         return ['id' => $service->id, 'name' => $service->name, 'category' => $service->category,
             'duration_minutes' => $service->duration_minutes, 'is_active' => $service->is_active,
             'base_price_clp' => $current?->amount_clp, 'prices' => $prices];
@@ -113,5 +124,32 @@ class PlatformServiceController extends Controller
             ->whereRaw('LOWER(name) = ?', [mb_strtolower($name)])
             ->when($except, fn ($query) => $query->whereKeyNot($except))->exists();
         if ($exists) throw ValidationException::withMessages(['name' => 'Ya existe una prestación de este tipo con ese nombre.']);
+    }
+
+    private function ensureCategoryHasNoCenterLinks(int $platformServiceId): void
+    {
+        $originalDatabase = config('database.connections.center.database');
+        try {
+            foreach (MedicalCenter::query()->whereNotNull('database_name')->cursor() as $center) {
+                config(['database.connections.center.database' => $center->database_name]);
+                DB::purge('center');
+                if (!Schema::connection('center')->hasTable('services')
+                    || !Schema::connection('center')->hasColumn('services', 'platform_service_id')) {
+                    continue;
+                }
+                if (Service::query()->where('platform_service_id', $platformServiceId)->exists()) {
+                    throw ValidationException::withMessages([
+                        'category' => 'No puedes cambiar la categoría: la prestación está vinculada en un centro.',
+                    ]);
+                }
+            }
+        } catch (QueryException $exception) {
+            throw ValidationException::withMessages([
+                'category' => 'No se pudo comprobar el estado de todos los centros. Intenta nuevamente.',
+            ]);
+        } finally {
+            config(['database.connections.center.database' => $originalDatabase]);
+            DB::purge('center');
+        }
     }
 }

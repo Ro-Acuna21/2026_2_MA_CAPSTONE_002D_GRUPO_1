@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Center\Service;
 use App\Models\Center\ServicePrice;
 use App\Support\TenantContext;
+use App\Support\BusinessDate;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -45,15 +46,19 @@ class ServicePriceController extends Controller
     public function update(Request $request, ServicePrice $price)
     {
         $this->authorizeAdmin($request);
-        $future = $price->effective_from->isFuture();
-        abort_unless($future || ($price->effective_to === null && $price->effective_from->isPast()), 422, 'El historial cerrado no se modifica.');
+        $businessDate = BusinessDate::today();
+        $future = $price->effective_from->toDateString() > $businessDate;
+        abort_unless($future || ($price->effective_to === null && $price->effective_from->toDateString() <= $businessDate), 422, 'El historial cerrado no se modifica.');
         $data = $request->validate([
             'amount_clp' => $future ? ['sometimes', 'integer', 'min:0', 'max:999999999'] : ['prohibited'],
-            'effective_from' => $future ? ['sometimes', 'date_format:Y-m-d', 'after:today'] : ['prohibited'],
+            'effective_from' => $future ? ['sometimes', 'date_format:Y-m-d'] : ['prohibited'],
             'effective_to' => ['nullable', 'date_format:Y-m-d'],
         ]);
-        if (!$future && (!isset($data['effective_to']) || $data['effective_to'] < now()->toDateString())) {
-            throw ValidationException::withMessages(['effective_to' => 'Cierra el precio vigente desde hoy o una fecha futura.']);
+        if ($future && isset($data['effective_from']) && $data['effective_from'] <= $businessDate) {
+            throw ValidationException::withMessages(['effective_from' => 'Un precio futuro debe comenzar después de hoy en Chile.']);
+        }
+        if (!$future && !isset($data['effective_to'])) {
+            throw ValidationException::withMessages(['effective_to' => 'Indica el último día de vigencia del precio.']);
         }
         $from = $data['effective_from'] ?? $price->effective_from->toDateString();
         $to = array_key_exists('effective_to', $data) ? $data['effective_to'] : $price->effective_to?->toDateString();
@@ -76,7 +81,7 @@ class ServicePriceController extends Controller
 
     private function ensureFuture(ServicePrice $price): void
     {
-        abort_unless($price->effective_from->isFuture(), 422, 'El historial vigente o pasado no se modifica.');
+        abort_unless($price->effective_from->toDateString() > BusinessDate::today(), 422, 'El historial vigente o pasado no se modifica.');
     }
 
     private function ensureNoOverlap(int $serviceId, string $from, ?string $to, ?int $except = null): void
