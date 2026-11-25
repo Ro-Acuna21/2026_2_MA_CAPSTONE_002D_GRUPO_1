@@ -2,6 +2,7 @@
 
 use App\Models\Center\HealthInsurance;
 use App\Models\Center\Patient;
+use App\Models\Core\CenterUser;
 use App\Models\Core\MedicalCenter;
 use App\Models\User;
 
@@ -167,4 +168,38 @@ it('no vincula una ficha de recepción usando solo RUT y correo', function () {
         ->assertUnprocessable()->assertJsonValidationErrors('rut');
     expect(User::where('email', 'juan.perez@example.com')->exists())->toBeFalse();
     expect(Patient::count())->toBe(1);
+});
+
+it('vincula una ficha de recepción existente cuando coinciden RUT, correo y fecha de nacimiento', function () {
+    $patient = Patient::create([
+        'first_name' => 'Juan', 'last_name' => 'Pérez', 'rut' => '12345678-5',
+        'email' => 'juan.perez@example.com', 'birth_date' => '1990-05-10',
+        'phone' => '912345678', 'health_insurance_id' => HealthInsurance::firstOrFail()->id,
+        'is_active' => true,
+    ]);
+
+    $this->postJson('/api/register', validRegisterPayload())->assertCreated()
+        ->assertJsonPath('data.role', 'PACIENTE')
+        ->assertJsonPath('data.medical_center.slug', 'clinica-horizonte');
+
+    expect(Patient::count())->toBe(1)
+        ->and($patient->fresh()->user_id)->not->toBeNull()
+        ->and(CenterUser::where('medical_center_id', $this->center->id)
+            ->where('patient_id', $patient->id)->where('role', 'PACIENTE')->count())->toBe(1);
+});
+
+it('no vincula una ficha existente si la fecha de nacimiento no coincide', function () {
+    Patient::create([
+        'first_name' => 'Juan', 'last_name' => 'Pérez', 'rut' => '12345678-5',
+        'email' => 'juan.perez@example.com', 'birth_date' => '1991-05-10',
+        'phone' => '912345678', 'health_insurance_id' => HealthInsurance::firstOrFail()->id,
+        'is_active' => true,
+    ]);
+
+    $this->postJson('/api/register', validRegisterPayload())
+        ->assertUnprocessable()->assertJsonValidationErrors('rut');
+
+    expect(User::where('email', 'juan.perez@example.com')->exists())->toBeFalse()
+        ->and(Patient::count())->toBe(1)
+        ->and(Patient::firstOrFail()->user_id)->toBeNull();
 });
