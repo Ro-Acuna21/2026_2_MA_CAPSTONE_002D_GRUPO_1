@@ -65,7 +65,7 @@ export function ReportsPage({ commercial = false, prices = false }: { commercial
     {!summary && !error && <p>Cargando reportes…</p>}
     {summary && <><section className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-5">{[
       ['Total citas', summary.total_appointments], ['Atendidas', counts.ATENDIDA ?? 0], ['Canceladas', counts.CANCELADA ?? 0],
-      ['No-show', counts.NO_SHOW ?? 0], ['Ingresos estimados', clp.format(summary.estimated_revenue_clp)],
+      ['Citas no asistidas', counts.NO_SHOW ?? 0], ['Ingresos estimados', clp.format(summary.estimated_revenue_clp)],
       ['Pérdida estimada', clp.format(summary.lost_estimate_clp)], ['Ticket estimado', clp.format(summary.average_ticket_clp)],
       ['Sin precio vigente', summary.unpriced_appointments],
     ].map(([label, value]) => <Card key={label}><CardContent className="p-5"><p className="text-xs text-muted-foreground">{label}</p><strong className="mt-2 block text-xl">{value}</strong></CardContent></Card>)}</section>

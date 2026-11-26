@@ -120,10 +120,22 @@ if ($existingUser) {
             ]);
         }
 
-        if (Patient::withTrashed()->where('rut', $rut)
-            ->orWhereRaw('LOWER(TRIM(email)) = ?', [$data['email']])->exists()) {
+        $existingPatients = Patient::withTrashed()->where('rut', $rut)
+            ->orWhereRaw('LOWER(TRIM(email)) = ?', [$data['email']])->get();
+        if ($existingPatients->count() > 1) {
+            throw ValidationException::withMessages(['rut' => ['Los datos coinciden con más de una ficha. Contacta a recepción para revisar el registro.']]);
+        }
+        $existingPatient = $existingPatients->first();
+        if ($existingPatient && (
+            $existingPatient->trashed()
+            || ! $existingPatient->is_active
+            || $existingPatient->user_id !== null
+            || $existingPatient->rut !== $rut
+            || strtolower(trim((string) $existingPatient->email)) !== $data['email']
+            || $existingPatient->birth_date?->toDateString() !== $data['birth_date']
+        )) {
             throw ValidationException::withMessages([
-                'rut' => ['Ya existe una ficha con este RUT o correo. Contacta a recepción para verificar tu identidad.'],
+                'rut' => ['La ficha existente no coincide con todos los datos o ya tiene una cuenta. Contacta a recepción para verificar tu identidad.'],
             ]);
         }
 
@@ -136,12 +148,21 @@ if ($existingUser) {
                 'is_active' => true,
             ]);
 
-        $patient = DB::connection('center')->transaction(function () use ($data, $rut, $user, $healthInsurance, $addressData) {
+        $patient = DB::connection('center')->transaction(function () use ($data, $rut, $user, $healthInsurance, $addressData, $existingPatient) {
+            if ($existingPatient) {
+                $patient = Patient::withTrashed()->whereKey($existingPatient->id)->lockForUpdate()->firstOrFail();
+                if ($patient->trashed() || ! $patient->is_active || $patient->user_id !== null
+                    || $patient->rut !== $rut
+                    || strtolower(trim((string) $patient->email)) !== $data['email']
+                    || $patient->birth_date?->toDateString() !== $data['birth_date']) {
+                    throw ValidationException::withMessages(['rut' => ['La ficha ya no está disponible para vincular. Contacta a recepción.']]);
+                }
+                $patient->update(['user_id' => $user->id]);
+                return $patient;
+            }
             if (Patient::withTrashed()->where('rut', $rut)
                 ->orWhereRaw('LOWER(TRIM(email)) = ?', [$data['email']])->exists()) {
-                throw ValidationException::withMessages([
-                    'rut' => ['Ya existe una ficha con este RUT o correo. Contacta a recepción para verificar tu identidad.'],
-                ]);
+                throw ValidationException::withMessages(['rut' => ['Ya existe una ficha con este RUT o correo. Contacta a recepción para verificar tu identidad.']]);
             }
                 $patient = Patient::create([
                     'user_id' => $user->id,
